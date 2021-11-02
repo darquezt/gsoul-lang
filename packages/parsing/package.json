@@ -4,6 +4,9 @@
   "description": "Parsing and lexing module",
   "main": "build/index.js",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "directories": {
     "lib": "build"
   },
@@ -21,5 +24,5 @@
   "dependencies": {
     "@gsens-lang/core": "^0.1.1-alpha.1"
   },
-  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
+  "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
 }

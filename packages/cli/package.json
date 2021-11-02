@@ -12,10 +12,13 @@
     "test": "echo \"Error: run tests from root\" && exit 1",
     "build": "tsc -p tsconfig.release.json"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@gsens-lang/parsing": "^0.1.1-alpha.1",
     "@gsens-lang/runtime": "^0.1.1-alpha.1",
     "yargs": "^17.2.1"
   },
-  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
+  "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
 }

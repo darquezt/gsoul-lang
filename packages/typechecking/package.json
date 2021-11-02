@@ -4,6 +4,9 @@
   "description": "Typechecking module",
   "main": "index.ts",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.release.json"
   },
@@ -11,5 +14,5 @@
     "@gsens-lang/core": "^0.1.1-alpha.1",
     "@gsens-lang/parsing": "^0.1.1-alpha.1"
   },
-  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
+  "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
 }

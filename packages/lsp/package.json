@@ -5,6 +5,9 @@
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "lib/lsp.js",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "directories": {
     "lib": "lib",
     "test": "__tests__"
@@ -24,5 +27,5 @@
     "vscode-languageserver": "^7.0.0",
     "vscode-languageserver-textdocument": "^1.0.2"
   },
-  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
+  "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
 }
