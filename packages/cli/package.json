@@ -20,5 +20,12 @@
     "@gsens-lang/runtime": "^0.1.1-alpha.2",
     "yargs": "^17.2.1"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darquezt/gsens-lang/tree/master/packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/darquezt/gsens-lang/issues"
+  },
   "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
 }

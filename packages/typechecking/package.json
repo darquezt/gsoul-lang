@@ -14,5 +14,12 @@
     "@gsens-lang/core": "^0.1.1-alpha.2",
     "@gsens-lang/parsing": "^0.1.1-alpha.2"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darquezt/gsens-lang/tree/master/packages/typechecking"
+  },
+  "bugs": {
+    "url": "https://github.com/darquezt/gsens-lang/issues"
+  },
   "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
 }
