@@ -3,6 +3,7 @@
   "version": "0.1.1-alpha.0",
   "description": "Runtime (elaboration + interpreter) module",
   "main": "build/index.js",
+  "license": "MIT",
   "directories": {
     "lib": "build"
   },
@@ -12,5 +13,6 @@
   "dependencies": {
     "@gsens-lang/core": "^0.1.1-alpha.0",
     "@gsens-lang/parsing": "^0.1.1-alpha.0"
-  }
+  },
+  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
 }

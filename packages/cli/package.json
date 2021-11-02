@@ -4,6 +4,7 @@
   "description": "CLI module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "index.ts",
+  "license": "MIT",
   "bin": {
     "gsens": "build/index.js"
   },
@@ -15,5 +16,6 @@
     "@gsens-lang/parsing": "^0.1.1-alpha.0",
     "@gsens-lang/runtime": "^0.1.1-alpha.0",
     "yargs": "^17.2.1"
-  }
+  },
+  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
 }

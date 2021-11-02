@@ -4,6 +4,7 @@
   "description": "Language server protocol module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "lib/lsp.js",
+  "license": "MIT",
   "directories": {
     "lib": "lib",
     "test": "__tests__"
@@ -22,5 +23,6 @@
     "@gsens-lang/parsing": "^0.1.1-alpha.0",
     "vscode-languageserver": "^7.0.0",
     "vscode-languageserver-textdocument": "^1.0.2"
-  }
+  },
+  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
 }

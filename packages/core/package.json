@@ -3,6 +3,7 @@
   "version": "0.1.1-alpha.0",
   "description": "Core utility module",
   "main": "index.ts",
+  "license": "MIT",
   "exports": {
     ".": "./build/index.js",
     "./utils": "./build/utils/index.js",
@@ -14,5 +15,6 @@
   "dependencies": {
     "ramda": "^0.27.1",
     "ts-pattern": "^3.2.5"
-  }
+  },
+  "gitHead": "c5e366725fddaea968534ce6d44a3ae8227f6256"
 }
