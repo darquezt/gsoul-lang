@@ -5,7 +5,6 @@ import { run as runCommmand } from '@gsens-lang/runtime';
 import { parse } from '@gsens-lang/parsing';
 
 const runHandler = (file: string) => {
-  console.log('handler');
   try {
     const contents = readFileSync(file, { encoding: 'utf-8' });
 
