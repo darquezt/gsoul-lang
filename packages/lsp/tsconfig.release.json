@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./build",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+  },
+  "references": [
+    {
+      "path": "../parsing/tsconfig.release.json"
+    }
+  ],
+  "include": [
+    "lib"
+  ]
+}

@@ -1,0 +1,29 @@
+
+{
+  "extends": "./tsconfig.json",
+  "references": [
+    {
+      "path": "./packages/cli"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/parsing"
+    },
+    {
+      "path": "./packages/runtime"
+    },
+    {
+      "path": "./packages/typechecking"
+    },
+  ],
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "build",
+    "removeComments": true
+  },
+  "include": [
+    "packages/**/*"
+  ],
+}

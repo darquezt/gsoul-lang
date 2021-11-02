@@ -1,0 +1,26 @@
+{
+  "name": "@gsens-lang/parsing",
+  "version": "0.1.0",
+  "description": "Parsing and lexing module",
+  "main": "build/index.js",
+  "directories": {
+    "lib": "build"
+  },
+  "types": "build/**/*.d.ts",
+  "files": [
+    "build"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.yarnpkg.com"
+  },
+  "exports": {
+    ".": "./build/index.js",
+    "./*": "./build/*.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.release.json"
+  },
+  "dependencies": {
+    "@gsens-lang/core": "^0.1.0"
+  }
+}

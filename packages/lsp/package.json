@@ -1,0 +1,29 @@
+{
+  "name": "@gsens-lang/lsp",
+  "version": "0.1.0",
+  "description": "Language server protocol module",
+  "author": "Damian Arquez <damian.arquez.t@gmail.com>",
+  "main": "lib/lsp.js",
+  "directories": {
+    "lib": "lib",
+    "test": "__tests__"
+  },
+  "files": [
+    "lib"
+  ],
+  "bin": {
+    "gsens-lsp": "build/lib/server.js"
+  },
+  "publishConfig": {
+    "registry": "https://registry.yarnpkg.com"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.release.json",
+    "test": "echo \"Error: run tests from root\" && exit 1"
+  },
+  "dependencies": {
+    "@gsens-lang/parsing": "^0.1.0",
+    "vscode-languageserver": "^7.0.0",
+    "vscode-languageserver-textdocument": "^1.0.2"
+  }
+}

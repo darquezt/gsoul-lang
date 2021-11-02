@@ -1,0 +1,56 @@
+(* Program *)
+
+program ::= declaration* EOF;
+
+(* Declarations *)
+
+declaration ::= varDecl | statement;
+varDecl ::= "var" IDENTIFIER "=" expression ";";
+
+(* Statements *)
+
+statement ::= exprStmt
+            | print
+            | block;
+exprStmt ::= expression ";";
+print ::= "print" expression ";";
+block ::= "{" declaration* "}";
+
+(* Expressions *)
+
+expression ::= ascription;
+ascription ::= equality ("::" typeEff)*;
+(* Logic ops and assignments can be added here *)
+equality ::= comparison; (* Equality and inequality should be added here *)
+comparison ::= additive ("<=" additive)*;
+additive ::= factor ("+" factor)*; (* Minus op should be added here *)
+multiplicative ::= unary ("*" unary)*; (* Division should be added here *)
+unary ::= call; (* Unary operators may be added before `call` in the future *)
+call ::= primary "(" arguments ")";
+
+primary ::= "true" | "false"
+          | "null"
+          | "fun" "(" parameters ")" block
+          | NUMBER
+          | IDENTIFIER
+          | "(" expression ")";
+
+(* Types *)
+
+sensitivity ::= NUMBER | "?";
+senv ::= ( sensitivity IDENTIFIER ("+" sensitivity IDENTIFIER)* )?;
+type ::= "Number" | "Bool" | "Null" | "(" parameters  "->"  typeEff ")";
+typeEff ::= type "@" "[" senv "]"; (* Should the @[] be in the def of senv? *)
+
+(* Utility *)
+
+arguments ::= expression; (* This should be extended in the future for multiple args *)
+parameters ::= IDENTIFIER ":" type; (* This should be extended in the future for multiple params *)
+
+(* Lexical *)
+
+NUMBER ::= DIGIT+ ( "." DIGIT+ )?;
+STRING ::= "\"" <anything> "\"";
+IDENTIFIER ::= ALPHA ( ALPHA | DIGIT )*;
+ALPHA ::= /[a-zA-Z]/ | "_";
+DIGIT ::= /[0-9]/;

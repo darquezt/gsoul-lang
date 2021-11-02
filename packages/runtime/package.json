@@ -1,0 +1,16 @@
+{
+  "name": "@gsens-lang/runtime",
+  "version": "0.1.0",
+  "description": "Runtime (elaboration + interpreter) module",
+  "main": "build/index.js",
+  "directories": {
+    "lib": "build"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.release.json"
+  },
+  "dependencies": {
+    "@gsens-lang/core": "^0.1.0",
+    "@gsens-lang/parsing": "^0.1.0"
+  }
+}

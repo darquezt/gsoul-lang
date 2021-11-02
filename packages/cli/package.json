@@ -1,0 +1,22 @@
+{
+  "name": "@gsens-lang/cli",
+  "version": "0.1.0",
+  "description": "CLI module",
+  "author": "Damian Arquez <damian.arquez.t@gmail.com>",
+  "main": "index.ts",
+  "publishConfig": {
+    "registry": "https://registry.yarnpkg.com"
+  },
+  "bin": {
+    "gsens": "build/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: run tests from root\" && exit 1",
+    "build": "tsc -p tsconfig.release.json"
+  },
+  "dependencies": {
+    "@gsens-lang/parsing": "^0.1.0",
+    "@gsens-lang/runtime": "^0.1.0",
+    "yargs": "^17.2.1"
+  }
+}
