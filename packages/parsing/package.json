@@ -10,9 +10,6 @@
   "files": [
     "build"
   ],
-  "publishConfig": {
-    "registry": "https://registry.yarnpkg.com"
-  },
   "exports": {
     ".": "./build/index.js",
     "./*": "./build/*.js"

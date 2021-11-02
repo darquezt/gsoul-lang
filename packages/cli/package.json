@@ -4,9 +4,6 @@
   "description": "CLI module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "index.ts",
-  "publishConfig": {
-    "registry": "https://registry.yarnpkg.com"
-  },
   "bin": {
     "gsens": "build/index.js"
   },

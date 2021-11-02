@@ -14,9 +14,6 @@
   "bin": {
     "gsens-lsp": "build/lib/server.js"
   },
-  "publishConfig": {
-    "registry": "https://registry.yarnpkg.com"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.release.json",
     "test": "echo \"Error: run tests from root\" && exit 1"

@@ -17,7 +17,8 @@
     "gen:ast": "node src/scripts/generateAst.js src/syntax/ast",
     "test": "jest",
     "bootstrap": "lerna bootstrap",
-    "cli": "node packages/cli/build/index.js"
+    "cli": "node packages/cli/build/index.js",
+    "release": "lerna run build && lerna publish"
   },
   "dependencies": {
     "ramda": "^0.27.1",

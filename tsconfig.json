@@ -23,6 +23,7 @@
     "packages/**/*"
   ],
   "exclude": [
-    "scripts/**/*"
+    "scripts/**/*",
+    "packages/**/build/**/*"
   ]
 }
