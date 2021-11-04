@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/runtime",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Runtime (elaboration + interpreter) module",
   "main": "build/index.js",
   "license": "MIT",
@@ -14,8 +14,8 @@
     "build": "tsc -p tsconfig.release.json"
   },
   "dependencies": {
-    "@gsens-lang/core": "^0.0.1",
-    "@gsens-lang/parsing": "^0.0.1"
+    "@gsens-lang/core": "^0.0.2",
+    "@gsens-lang/parsing": "^0.0.2"
   },
   "repository": {
     "type": "git",

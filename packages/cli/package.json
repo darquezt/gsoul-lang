@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "CLI module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "index.ts",
@@ -16,8 +16,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@gsens-lang/parsing": "^0.0.1",
-    "@gsens-lang/runtime": "^0.0.1",
+    "@gsens-lang/parsing": "^0.0.2",
+    "@gsens-lang/runtime": "^0.0.2",
     "yargs": "^17.2.1"
   },
   "repository": {

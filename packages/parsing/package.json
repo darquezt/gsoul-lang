@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/parsing",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Parsing and lexing module",
   "main": "build/index.js",
   "license": "MIT",
@@ -22,7 +22,7 @@
     "build": "tsc -p tsconfig.release.json"
   },
   "dependencies": {
-    "@gsens-lang/core": "^0.0.1"
+    "@gsens-lang/core": "^0.0.2"
   },
   "repository": {
     "type": "git",
