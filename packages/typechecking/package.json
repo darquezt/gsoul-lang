@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/typechecking",
-  "version": "0.1.1-alpha.4",
+  "version": "0.0.1",
   "description": "Typechecking module",
   "main": "index.ts",
   "license": "MIT",
@@ -11,8 +11,8 @@
     "build": "tsc -p tsconfig.release.json"
   },
   "dependencies": {
-    "@gsens-lang/core": "^0.1.1-alpha.4",
-    "@gsens-lang/parsing": "^0.1.1-alpha.4"
+    "@gsens-lang/core": "^0.0.1",
+    "@gsens-lang/parsing": "^0.0.1"
   },
   "repository": {
     "type": "git",
