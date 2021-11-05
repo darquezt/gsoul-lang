@@ -19,7 +19,7 @@ const runHandler = (file: string) => {
 };
 
 const run: CommandModule = {
-  command: 'run [file]',
+  command: ['run <file>', '$0 <file>'],
   describe: 'Run a gsens file',
   builder: {
     file: {

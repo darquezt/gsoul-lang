@@ -9,4 +9,4 @@ yargs(hideBin(process.argv))
   .help()
   .alias('h', 'help')
   .demandCommand(1, 'must provide a valid command')
-  .completion();
+  .completion().argv;
