@@ -14,6 +14,7 @@
     "@gsens-lang/core": "^0.0.2",
     "@gsens-lang/parsing": "^0.0.2"
   },
+  "homepage": "https://github.com/darquezt/gsens-lang#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/darquezt/gsens-lang/tree/master/packages/typechecking"
