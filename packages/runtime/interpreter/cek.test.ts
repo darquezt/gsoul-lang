@@ -32,6 +32,7 @@ describe('CEK', () => {
             name: variableToken('x'),
             typeEff: RealEmptySenv,
           }),
+          showEvidence: false,
           typeEff: RealEmptySenv,
         }),
         ExprStmt({

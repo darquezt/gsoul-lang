@@ -171,7 +171,11 @@ export type Expression =
 export type ExprStmt = Term<{ kind: 'ExprStmt'; expression: Expression }>;
 export const ExprStmt = factoryOf<ExprStmt>('ExprStmt');
 
-export type Print = Term<{ kind: 'Print'; expression: Expression }>;
+export type Print = Term<{
+  kind: 'Print';
+  expression: Expression;
+  showEvidence: boolean;
+}>;
 export const Print = factoryOf<Print>('Print');
 
 export type Block = Term<{ kind: 'Block'; statements: Statement[] }>;

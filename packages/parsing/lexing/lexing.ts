@@ -8,6 +8,8 @@ const keywords: Record<string, TokenType> = {
   Nil: TokenType.NIL,
   var: TokenType.VAR,
   print: TokenType.PRINT,
+  printEv: TokenType.PRINTEV,
+  resource: TokenType.RESOURCE,
   Number: TokenType.NUMBER,
   Bool: TokenType.BOOL,
   fun: TokenType.FUN,

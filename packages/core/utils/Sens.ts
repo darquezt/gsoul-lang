@@ -1,3 +1,4 @@
+import * as chalk from 'chalk';
 import { match, __ } from 'ts-pattern';
 
 export type Sens = Readonly<[number, number]>;
@@ -8,12 +9,14 @@ export const UNKNOWN_SENS = [0, MAX_SENS] as const;
 export type UnknownSens = typeof UNKNOWN_SENS;
 export type MaxSens = [typeof MAX_SENS, typeof MAX_SENS];
 
+const isUndefined = (s?: number): s is undefined => !s && s !== 0;
+
 export const Sens = (lower?: number, upper?: number): Sens => {
-  if (!lower && !upper) {
+  if (isUndefined(lower) && isUndefined(upper)) {
     return UNKNOWN_SENS;
-  } else if (!lower && upper) {
+  } else if (isUndefined(lower) && !isUndefined(upper)) {
     return [0, upper];
-  } else if (lower && !upper) {
+  } else if (!isUndefined(lower) && isUndefined(upper)) {
     return [lower, lower];
   }
 
@@ -55,3 +58,18 @@ export const scale = (sens: Sens, factor: number): Sens => [
   multiplyBounds(sens[0], factor),
   multiplyBounds(sens[1], factor),
 ];
+
+export const format = ([s1, s2]: Sens): string => {
+  const s1String = s1 === MAX_SENS ? '∞' : String(s1);
+  const s2String = s2 === MAX_SENS ? '∞' : String(s2);
+
+  if (s1String === s2String) {
+    return s1String;
+  }
+
+  if (s1 === 0 && s2 === MAX_SENS) {
+    return chalk.magenta('?');
+  }
+
+  return `[${s1String},${s2String}]`;
+};

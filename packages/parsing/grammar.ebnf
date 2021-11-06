@@ -4,8 +4,9 @@ program ::= declaration* EOF;
 
 (* Declarations *)
 
-declaration ::= varDecl | statement;
+declaration ::= resDecl | varDecl | statement;
 varDecl ::= "var" IDENTIFIER "=" expression ";";
+resDecl ::= "resource" IDENTIFIER "=" expression ";";
 
 (* Statements *)
 
@@ -14,6 +15,7 @@ statement ::= exprStmt
             | block;
 exprStmt ::= expression ";";
 print ::= "print" expression ";";
+printEv ::= "printEv" expression ";";
 block ::= "{" declaration* "}";
 
 (* Expressions *)

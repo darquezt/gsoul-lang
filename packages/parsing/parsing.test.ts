@@ -476,6 +476,7 @@ describe('Parsing print statements', () => {
       Result(
         [
           Print({
+            showEvidence: false,
             expression: Literal({
               value: 2,
             }),
@@ -498,6 +499,7 @@ describe('Variable declarations', () => {
             assignment: Literal({
               value: 2,
             }),
+            resource: false,
           }),
         ],
         [],
@@ -515,6 +517,7 @@ describe('Variable declarations', () => {
         [
           VarStmt({
             name: x,
+            resource: false,
             assignment: Fun({
               binder: {
                 name: y,

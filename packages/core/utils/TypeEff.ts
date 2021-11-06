@@ -25,3 +25,9 @@ export const subst = (
     SenvUtils.subst(typeEff.effect, name, effect),
   );
 };
+
+export const format = (typeEff: TypeEff): string => {
+  return `${TypeUtils.format(typeEff.type)}@[${SenvUtils.format(
+    typeEff.effect,
+  )}]`;
+};

@@ -11,11 +11,13 @@
     "lib": "build"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.release.json"
+    "build": "tsc -p tsconfig.release.json",
+    "watch": "tsc -w -p tsconfig.release.json"
   },
   "dependencies": {
     "@gsens-lang/core": "^0.0.2",
-    "@gsens-lang/parsing": "^0.0.2"
+    "@gsens-lang/parsing": "^0.0.2",
+    "chalk": "^4.1.2"
   },
   "homepage": "https://github.com/darquezt/gsens-lang#readme",
   "repository": {

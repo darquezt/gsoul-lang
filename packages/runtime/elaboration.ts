@@ -273,6 +273,7 @@ const printStmt = (stmt: past.Print, tenv: TypeEnv): StatefulResult<Print> => {
     Print({
       expression: expr,
       typeEff: expr.typeEff,
+      showEvidence: stmt.showEvidence,
     }),
     tenv,
   );
@@ -297,7 +298,24 @@ const varStmt = (
   stmt: past.VarStmt,
   tenv: TypeEnv,
 ): StatefulResult<VarStmt> => {
-  const expr = expression(stmt.assignment, tenv);
+  let expr = expression(stmt.assignment, tenv);
+
+  if (stmt.resource) {
+    if (!SenvUtils.isEmpty(expr.typeEff.effect)) {
+      throw new ElaborationError('Resources cannot depend on other resources');
+    }
+
+    const typeEff = TypeEff(
+      expr.typeEff.type,
+      Senv({ [stmt.name.lexeme]: Sens(1) }),
+    );
+
+    expr = Ascription({
+      expression: expr,
+      typeEff: typeEff,
+      evidence: [expr.typeEff, typeEff],
+    });
+  }
 
   return StatefulResult(
     VarStmt({

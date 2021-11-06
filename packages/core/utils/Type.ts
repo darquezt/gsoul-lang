@@ -1,5 +1,8 @@
+import * as chalk from 'chalk';
+import { TypeEffUtils } from '.';
 import {
   factoryOf,
+  isKinded,
   KindedFactory,
   singletonFactoryOf,
   SingletonKindedFactory,
@@ -30,34 +33,30 @@ export type Type = Real | Bool | Nil | Arrow;
 
 // U T I L S
 
-// type FMapParams = {
-//   real: () => Real;
-//   bool: () => Bool;
-//   nil: () => Nil;
-//   arrow: (arrow: Arrow) => Arrow;
-// };
+export const subst = (ty: Type, name: Identifier, senv: Senv): Type => {
+  if (isKinded(ty, 'Real') || isKinded(ty, 'Nil') || isKinded(ty, 'Bool')) {
+    return ty;
+  }
 
-// const fmap = (params: FMapParams) => (ty: Type): Type => {
-//   const { real, bool, nil, arrow } = params;
-//   switch (ty.kind) {
-//     case 'Real':
-//       return real();
-//     case 'Bool':
-//       return bool();
-//     case 'Nil':
-//       return nil();
-//     case 'Arrow':
-//       return Arrow({
-//         binder: {
-//           identifier: ty.binder.identifier,
-//           type: fmap(params)(ty.binder.type),
-//         },
-//         retu
-//       });
-//   }
-// };
+  return Arrow({
+    binder: {
+      identifier: ty.binder.identifier,
+      type: subst(ty.binder.type, name, senv),
+    },
+    returnTypeEff: TypeEffUtils.subst(ty.returnTypeEff, name, senv),
+  });
+};
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const subst = (ty: Type, _name: Identifier, _senv: Senv): Type => {
-  return ty;
+export const format = (ty: Type): string => {
+  switch (ty.kind) {
+    case 'Real':
+      return chalk.yellow('Number');
+    case 'Bool':
+    case 'Nil':
+      return chalk.yellow(ty.kind);
+    case 'Arrow':
+      return chalk`(${ty.binder.identifier}:${format(
+        ty.binder.type,
+      )} -> ${TypeEffUtils.format(ty.returnTypeEff)})`;
+  }
 };

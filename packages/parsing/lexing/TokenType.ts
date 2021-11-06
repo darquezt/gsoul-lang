@@ -57,11 +57,13 @@ enum TokenType {
   OR = 'OR',
 
   PRINT = 'PRINT',
+  PRINTEV = 'PRINTEV',
   // RETURN = 'RETURN',
   // SUPER = 'SUPER',
   // THIS = 'THIS',
   TRUE = 'TRUE',
   VAR = 'VAR',
+  RESOURCE = 'RESOURCE',
   // WHILE = 'WHILE',
 
   INVALID = 'INVALID',

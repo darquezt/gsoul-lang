@@ -54,16 +54,19 @@ export function parse(tokens: Token[]): Result<Statement[]> {
   function declaration(): Statement | null {
     return synchronized(() => {
       if (check(TokenType.VAR)) {
-        return varDeclaration();
+        return varDeclaration(false);
+      }
+      if (check(TokenType.RESOURCE)) {
+        return varDeclaration(true);
       }
 
       return statement();
     });
   }
 
-  function varDeclaration(): Statement {
+  function varDeclaration(resource = false): Statement {
     consume(
-      TokenType.VAR,
+      resource ? TokenType.RESOURCE : TokenType.VAR,
       errorMessage({
         expected: '`var` keyword',
         beginning: 'a variable declaration',
@@ -90,12 +93,15 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       errorMessage({ expected: ';', after: 'variable declaration' }),
     );
 
-    return VarStmt({ name, assignment });
+    return VarStmt({ name, assignment, resource });
   }
 
   function statement(): Statement {
     if (match(TokenType.PRINT)) {
-      return printStatement();
+      return printStatement(false);
+    }
+    if (match(TokenType.PRINTEV)) {
+      return printStatement(true);
     }
     if (check(TokenType.LEFT_BRACE)) {
       return block();
@@ -146,7 +152,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     });
   }
 
-  function printStatement(): Statement {
+  function printStatement(showEvidence = false): Statement {
     const value = expression();
 
     consume(
@@ -159,6 +165,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
     return Print({
       expression: value,
+      showEvidence,
     });
   }
 

@@ -24,7 +24,8 @@ import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import Token from '@gsens-lang/parsing/lexing/Token';
 import TokenType from '@gsens-lang/parsing/lexing/TokenType';
 import { Real } from '@gsens-lang/core/utils/Type';
-import { SenvUtils } from '@gsens-lang/core/utils';
+import { SenvUtils, TypeEffUtils } from '@gsens-lang/core/utils';
+import { formatValue } from '../utils/format';
 
 type EmptyKont = {
   kind: 'EmptyKont';
@@ -92,6 +93,7 @@ const BlockKont: KindedFactory<BlockKont> = factoryOf('BlockKont');
 type PrintKont = {
   kind: 'PrintKont';
   kont: Kont;
+  showEvidence: boolean;
 };
 const PrintKont: KindedFactory<PrintKont> = factoryOf('PrintKont');
 
@@ -375,7 +377,15 @@ const step = ({
 
           case 'PrintKont': {
             // TODO: Pretty print
-            console.log(term);
+            if (kont.showEvidence) {
+              console.log(
+                `${EvidenceUtils.format(term.evidence)} ${formatValue(
+                  inner,
+                )} :: ${TypeEffUtils.format(term.typeEff)}`,
+              );
+            } else {
+              console.log(formatValue(inner));
+            }
 
             return State({ term }, store, kont.kont);
           }
@@ -453,7 +463,11 @@ const step = ({
     }
 
     case 'Print': {
-      return State({ term: term.expression }, store, PrintKont({ kont }));
+      return State(
+        { term: term.expression },
+        store,
+        PrintKont({ kont, showEvidence: term.showEvidence }),
+      );
     }
 
     case 'VarStmt': {
@@ -477,7 +491,7 @@ const step = ({
   }
 };
 
-export const evaluate = (expr: Expression | Statement): Expression => {
+export const evaluate = (expr: Expression | Statement): Value => {
   let state = inject(expr);
 
   while (
@@ -487,5 +501,5 @@ export const evaluate = (expr: Expression | Statement): Expression => {
     state = step(state);
   }
 
-  return state.term as Expression; // TODO: Improve this
+  return state.term as Value; // TODO: Improve this
 };

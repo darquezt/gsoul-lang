@@ -1,18 +1,35 @@
 import { CommandModule } from 'yargs';
 import { readFileSync } from 'fs';
 
-import { run as runCommmand } from '@gsens-lang/runtime';
+import { run as runCommand, formatValue } from '@gsens-lang/runtime';
 import { parse } from '@gsens-lang/parsing';
+import { syntaxError } from '../lib/errors';
 
 const runHandler = (file: string) => {
   try {
     const contents = readFileSync(file, { encoding: 'utf-8' });
 
-    const { result: statements } = parse(contents);
+    const { result: statements, failures } = parse(contents);
 
-    const value = runCommmand(statements);
+    if (failures.length > 0) {
+      const lines = contents.split('\n');
 
-    console.log(value);
+      failures.forEach((failure) => {
+        console.log(
+          syntaxError(
+            {
+              number: failure.token.line,
+              content: lines[failure.token.line - 1],
+            },
+            failure.reason,
+          ),
+        );
+      });
+    } else {
+      const value = runCommand(statements);
+
+      console.log(formatValue(value.expression));
+    }
   } catch (e) {
     console.error(e);
   }

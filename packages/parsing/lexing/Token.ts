@@ -7,7 +7,7 @@ export default class Token {
     public type: TokenType,
     public lexeme: string,
     public literal: TokenLiteral | null,
-    public line: number | null,
+    public line: number,
   ) {}
 
   toString(): string {

@@ -19,7 +19,8 @@
     "./*": "./build/*.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.release.json"
+    "build": "tsc -p tsconfig.release.json",
+    "watch": "tsc -w -p tsconfig.release.json"
   },
   "dependencies": {
     "@gsens-lang/core": "^0.0.2"

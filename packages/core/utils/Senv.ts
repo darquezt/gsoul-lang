@@ -1,3 +1,4 @@
+import * as chalk from 'chalk';
 import { map, mergeWith, omit } from 'ramda';
 import { Sens } from './Sens';
 import * as SensUtils from './Sens';
@@ -50,4 +51,18 @@ export const subst = (senv: Senv, name: Identifier, effect: Senv): Senv => {
   const scaledEffect = scaleBySens(effect, xSens);
 
   return add(withoutX, scaledEffect);
+};
+
+export const isEmpty = (senv: Senv): boolean => Object.keys(senv).length === 0;
+
+export const format = (senv: Senv): string => {
+  if (Object.keys(senv).length === 0) {
+    return '';
+  }
+
+  const senvString = Object.entries(senv)
+    .map(([variable, sens]) => `${SensUtils.format(sens)}${variable}`)
+    .join(' + ');
+
+  return chalk.green(senvString);
 };

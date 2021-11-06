@@ -73,13 +73,22 @@ export type Expression =
 export type ExprStmt = { kind: 'ExprStmt'; expression: Expression };
 export const ExprStmt = factoryOf<ExprStmt>('ExprStmt');
 
-export type Print = { kind: 'Print'; expression: Expression };
+export type Print = {
+  kind: 'Print';
+  expression: Expression;
+  showEvidence: boolean;
+};
 export const Print = factoryOf<Print>('Print');
 
 export type Block = { kind: 'Block'; statements: Statement[] };
 export const Block = factoryOf<Block>('Block');
 
-export type VarStmt = { kind: 'VarStmt'; name: Token; assignment: Expression };
+export type VarStmt = {
+  kind: 'VarStmt';
+  name: Token;
+  assignment: Expression;
+  resource: boolean;
+};
 export const VarStmt = factoryOf<VarStmt>('VarStmt');
 
 export type Statement = ExprStmt | Print | Block | VarStmt;

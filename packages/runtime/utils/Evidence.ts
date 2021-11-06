@@ -23,6 +23,7 @@ const interiorSens = ([s1, s2]: Sens, [s3, s4]: Sens): Evi<Sens> => {
     return [Sens(s1, s24), Sens(s13, s4)];
   }
 
+  console.log(s1, s2, s3, s4);
   throw new EvidenceError();
 };
 
@@ -260,4 +261,8 @@ export const subst = (ev: Evidence, name: string, senv: Senv): Evidence => {
     TypeEffUtils.subst(ev[0], name, senv),
     TypeEffUtils.subst(ev[1], name, senv),
   ];
+};
+
+export const format = ([teff1, teff2]: Evidence): string => {
+  return `⟨${TypeEffUtils.format(teff1)}, ${TypeEffUtils.format(teff2)}⟩`;
 };

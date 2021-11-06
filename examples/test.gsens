@@ -1,7 +1,22 @@
+resource y = 2;
+resource z = 4;
+print y;
 1;
+var f = fun (a : Number) {
+  a + y;
+};
+printEv f;
+printEv f(z);
 {
-  var x = 2;
-  print x;
+  var x = 2 + y + y + z;
+  printEv x;
 }
 3;
-4 :: Number@[2x + ?x]
+4 :: Number@[2x + ?x];
+print nil;
+
+true;
+
+false
+
+;
