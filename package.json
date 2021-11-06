@@ -18,7 +18,8 @@
     "test": "jest",
     "bootstrap": "lerna bootstrap",
     "cli": "node packages/cli/build/index.js",
-    "release": "lerna run build && lerna publish"
+    "release": "lerna run build && lerna publish",
+    "watch": "lerna run --parallel watch"
   },
   "dependencies": {
     "ramda": "^0.27.1",

@@ -20,6 +20,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.release.json",
+    "watch": "tsc -w -p tsconfig.release.json",
     "test": "echo \"Error: run tests from root\" && exit 1"
   },
   "dependencies": {
