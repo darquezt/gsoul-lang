@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/typechecking",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Typechecking module",
   "main": "index.ts",
   "license": "MIT",
@@ -12,8 +12,8 @@
     "watch": "tsc -w -p tsconfig.release.json"
   },
   "dependencies": {
-    "@gsens-lang/core": "^0.0.2",
-    "@gsens-lang/parsing": "^0.0.2"
+    "@gsens-lang/core": "^0.0.3",
+    "@gsens-lang/parsing": "^0.0.3"
   },
   "homepage": "https://github.com/darquezt/gsens-lang#readme",
   "repository": {
