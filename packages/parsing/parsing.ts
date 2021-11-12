@@ -181,6 +181,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       expr = Ascription({
         expression: expr,
         typeEff: ascrTE,
+        ascriptionToken: previous(),
       });
     }
 

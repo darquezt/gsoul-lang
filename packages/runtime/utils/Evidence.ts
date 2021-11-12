@@ -7,27 +7,65 @@ import {
   TypeEffUtils,
 } from '@gsens-lang/core/utils';
 import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
-import { isKinded } from '@gsens-lang/core/utils/ADT';
+import { factoryOf, isKinded } from '@gsens-lang/core/utils/ADT';
+import { Result } from './Result';
+import { Err, Ok } from '../utils/Result';
 
 type Evi<T> = Readonly<[T, T]>;
 
 export type Evidence = Evi<TypeEff>;
 
-export class EvidenceError extends Error {}
+export type EvidenceInteriorError = {
+  kind: 'EvidenceInteriorError';
+  reason: string;
+};
+export const EvidenceInteriorError = factoryOf<EvidenceInteriorError>(
+  'EvidenceInteriorError',
+);
 
-const interiorSens = ([s1, s2]: Sens, [s3, s4]: Sens): Evi<Sens> => {
+export type EvidenceTransitivityError = {
+  kind: 'EvidenceTransitivityError';
+  reason: string;
+};
+export const EvidenceTransitivityError = factoryOf<EvidenceTransitivityError>(
+  'EvidenceTransitivityError',
+);
+
+export type EvidenceTypeError = {
+  kind: 'EvidenceTypeError';
+  reason: string;
+};
+export const EvidenceTypeError = factoryOf<EvidenceTypeError>(
+  'EvidenceTypeError',
+);
+
+export type EvidenceError =
+  | EvidenceInteriorError
+  | EvidenceTransitivityError
+  | EvidenceTypeError;
+
+const interiorSens = (
+  [s1, s2]: Sens,
+  [s3, s4]: Sens,
+): Result<Evi<Sens>, EvidenceError> => {
   const s24 = Math.min(s2, s4);
   const s13 = Math.max(s1, s3);
 
   if (s1 <= s24 && s13 <= s4) {
-    return [Sens(s1, s24), Sens(s13, s4)];
+    return Ok([Sens(s1, s24), Sens(s13, s4)]);
   }
 
-  console.log(s1, s2, s3, s4);
-  throw new EvidenceError();
+  return Err(
+    EvidenceInteriorError({
+      reason: 'Interior is not defined',
+    }),
+  );
 };
 
-const interiorSenv = (senv1: Senv, senv2: Senv): Evi<Senv> => {
+const interiorSenv = (
+  senv1: Senv,
+  senv2: Senv,
+): Result<Evi<Senv>, EvidenceError> => {
   const senv1Keys = Object.keys(senv1);
   const senv2Keys = Object.keys(senv2);
   const keys = [...senv1Keys, ...senv2Keys];
@@ -36,32 +74,51 @@ const interiorSenv = (senv1: Senv, senv2: Senv): Evi<Senv> => {
   let eviSenv2 = Senv();
 
   for (const x of keys) {
-    const eviSens = interiorSens(
+    const eviSensRes = interiorSens(
       SenvUtils.access(senv1, x),
       SenvUtils.access(senv2, x),
     );
+
+    if (!eviSensRes.success) {
+      return eviSensRes;
+    }
+
+    const { result: eviSens } = eviSensRes;
 
     eviSenv1 = SenvUtils.extend(eviSenv1, x, eviSens[0]);
     eviSenv2 = SenvUtils.extend(eviSenv2, x, eviSens[1]);
   }
 
-  return [eviSenv1, eviSenv2];
+  return Ok([eviSenv1, eviSenv2]);
 };
 
 const baseTypes: string[] = [Real().kind, Bool().kind, Nil().kind];
 
-const interiorType = (t1: Type, t2: Type): Evi<Type> => {
+const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
   if (t1.kind === t2.kind && baseTypes.includes(t1.kind)) {
-    return [t1, t2];
+    return Ok([t1, t2]);
   }
   if (isKinded(t1, 'Arrow') && isKinded(t2, 'Arrow')) {
-    const evit11 = interiorType(t2.binder.type, t1.binder.type);
-    const eviT12 = interior(t1.returnTypeEff, t2.returnTypeEff);
+    const evit11Res = interiorType(t2.binder.type, t1.binder.type);
 
-    const [t21p, t11p] = evit11;
-    const [T12p, T22p] = eviT12;
+    if (!evit11Res.success) {
+      return evit11Res;
+    }
 
-    return [
+    const eviT12Res = interior(t1.returnTypeEff, t2.returnTypeEff);
+
+    if (!eviT12Res.success) {
+      return eviT12Res;
+    }
+
+    const {
+      result: [t21p, t11p],
+    } = evit11Res;
+    const {
+      result: [T12p, T22p],
+    } = eviT12Res;
+
+    return Ok([
       Arrow({
         binder: { identifier: t1.binder.identifier, type: t11p },
         returnTypeEff: T12p,
@@ -70,24 +127,42 @@ const interiorType = (t1: Type, t2: Type): Evi<Type> => {
         binder: { identifier: t2.binder.identifier, type: t21p },
         returnTypeEff: T22p,
       }),
-    ];
+    ]);
   }
 
-  throw new EvidenceError();
+  return Err(EvidenceInteriorError({ reason: 'Unsopported type' }));
 };
 
-export const interior = (te1: TypeEff, te2: TypeEff): Evidence => {
-  const eviType = interiorType(te1.type, te2.type);
-  const eviSenv = interiorSenv(te1.effect, te2.effect);
+export const interior = (
+  te1: TypeEff,
+  te2: TypeEff,
+): Result<Evidence, EvidenceError> => {
+  const eviTypeRes = interiorType(te1.type, te2.type);
 
-  return [TypeEff(eviType[0], eviSenv[0]), TypeEff(eviType[1], eviSenv[1])];
+  if (!eviTypeRes.success) {
+    return eviTypeRes;
+  }
+
+  const eviSenvRes = interiorSenv(te1.effect, te2.effect);
+
+  if (!eviSenvRes.success) {
+    return eviSenvRes;
+  }
+
+  const { result: eviType } = eviTypeRes;
+  const { result: eviSenv } = eviSenvRes;
+
+  return Ok([TypeEff(eviType[0], eviSenv[0]), TypeEff(eviType[1], eviSenv[1])]);
 };
 
 export const initialEvidence = (te1: TypeEff): Evidence => {
   return [te1, te1];
 };
 
-export const transSens = (ev1: Evi<Sens>, ev2: Evi<Sens>): Evi<Sens> => {
+export const transSens = (
+  ev1: Evi<Sens>,
+  ev2: Evi<Sens>,
+): Result<Evi<Sens>, EvidenceError> => {
   const [[s11, s12], [s13, s14]] = ev1;
   const [[s21, s22], [s23, s24]] = ev2;
 
@@ -95,13 +170,20 @@ export const transSens = (ev1: Evi<Sens>, ev2: Evi<Sens>): Evi<Sens> => {
   const s2p = Math.max(s13, s21, s23);
 
   if (!(s11 <= s1p) || !(s2p <= s24)) {
-    throw new EvidenceError();
+    return Err(
+      EvidenceTransitivityError({
+        reason: 'Consistent transitivity is not defined',
+      }),
+    );
   }
 
-  return [Sens(s11, s1p), Sens(s2p, s24)];
+  return Ok([Sens(s11, s1p), Sens(s2p, s24)]);
 };
 
-export const transSenv = (ev1: Evi<Senv>, ev2: Evi<Senv>): Evi<Senv> => {
+export const transSenv = (
+  ev1: Evi<Senv>,
+  ev2: Evi<Senv>,
+): Result<Evi<Senv>, EvidenceError> => {
   const [senv1, senv2] = ev1;
   const [senv3, senv4] = ev2;
 
@@ -115,19 +197,28 @@ export const transSenv = (ev1: Evi<Senv>, ev2: Evi<Senv>): Evi<Senv> => {
   let eviSenv2 = Senv();
 
   for (const x of keys) {
-    const eviSens = transSens(
+    const eviSensRes = transSens(
       [SenvUtils.access(senv1, x), SenvUtils.access(senv2, x)],
       [SenvUtils.access(senv3, x), SenvUtils.access(senv4, x)],
     );
+
+    if (!eviSensRes.success) {
+      return eviSensRes;
+    }
+
+    const { result: eviSens } = eviSensRes;
 
     eviSenv1 = SenvUtils.extend(eviSenv1, x, eviSens[0]);
     eviSenv2 = SenvUtils.extend(eviSenv2, x, eviSens[1]);
   }
 
-  return [eviSenv1, eviSenv2];
+  return Ok([eviSenv1, eviSenv2]);
 };
 
-const transType = (ev1: Evi<Type>, ev2: Evi<Type>): Evi<Type> => {
+const transType = (
+  ev1: Evi<Type>,
+  ev2: Evi<Type>,
+): Result<Evi<Type>, EvidenceError> => {
   const [t1, t2] = ev1;
   const [t3, t4] = ev2;
 
@@ -137,7 +228,7 @@ const transType = (ev1: Evi<Type>, ev2: Evi<Type>): Evi<Type> => {
     t1.kind === t4.kind &&
     baseTypes.includes(t1.kind)
   ) {
-    return ev1;
+    return Ok(ev1);
   }
 
   if (
@@ -146,19 +237,32 @@ const transType = (ev1: Evi<Type>, ev2: Evi<Type>): Evi<Type> => {
     isKinded(t3, 'Arrow') &&
     isKinded(t4, 'Arrow')
   ) {
-    const evit11 = transType(
+    const evit11Res = transType(
       [t4.binder.type, t3.binder.type],
       [t2.binder.type, t1.binder.type],
     );
-    const eviT12 = trans(
+
+    if (!evit11Res.success) {
+      return evit11Res;
+    }
+
+    const eviT12Res = trans(
       [t1.returnTypeEff, t2.returnTypeEff],
       [t3.returnTypeEff, t4.returnTypeEff],
     );
 
-    const [t21p, t11p] = evit11;
-    const [T12p, T22p] = eviT12;
+    if (!eviT12Res.success) {
+      return eviT12Res;
+    }
 
-    return [
+    const {
+      result: [t21p, t11p],
+    } = evit11Res;
+    const {
+      result: [T12p, T22p],
+    } = eviT12Res;
+
+    return Ok([
       Arrow({
         binder: { identifier: t1.binder.identifier, type: t11p },
         returnTypeEff: T12p,
@@ -167,33 +271,52 @@ const transType = (ev1: Evi<Type>, ev2: Evi<Type>): Evi<Type> => {
         binder: { identifier: t2.binder.identifier, type: t21p },
         returnTypeEff: T22p,
       }),
-    ];
+    ]);
   }
 
-  throw new EvidenceError();
+  return Err(EvidenceTransitivityError({ reason: 'Unsupported type' }));
 };
 
-export const trans = (ev1: Evidence, ev2: Evidence): Evidence => {
-  const eviType = transType(
+export const trans = (
+  ev1: Evidence,
+  ev2: Evidence,
+): Result<Evidence, EvidenceError> => {
+  const eviTypeRes = transType(
     [ev1[0].type, ev1[1].type],
     [ev2[0].type, ev2[1].type],
   );
-  const eviSenv = transSenv(
+
+  if (!eviTypeRes.success) {
+    return eviTypeRes;
+  }
+
+  const eviSenvRes = transSenv(
     [ev1[0].effect, ev1[1].effect],
     [ev2[0].effect, ev2[1].effect],
   );
 
-  return [TypeEff(eviType[0], eviSenv[0]), TypeEff(eviType[1], eviSenv[1])];
+  if (!eviSenvRes.success) {
+    return eviSenvRes;
+  }
+
+  const { result: eviType } = eviTypeRes;
+  const { result: eviSenv } = eviSenvRes;
+
+  return Ok([TypeEff(eviType[0], eviSenv[0]), TypeEff(eviType[1], eviSenv[1])]);
 };
 
 // INVERSION
 
-export const icod = (ev: Evidence): Evidence => {
+export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   if (!isKinded(ev[0].type, 'Arrow') || !isKinded(ev[1].type, 'Arrow')) {
-    throw new EvidenceError();
+    return Err(
+      EvidenceTypeError({
+        reason: 'Operator icod is not defined for types other than functions',
+      }),
+    );
   }
 
-  return [
+  return Ok([
     TypeEff(
       ev[0].type.returnTypeEff.type,
       SenvUtils.add(ev[0].effect, ev[0].type.returnTypeEff.effect),
@@ -202,15 +325,19 @@ export const icod = (ev: Evidence): Evidence => {
       ev[1].type.returnTypeEff.type,
       SenvUtils.add(ev[1].effect, ev[1].type.returnTypeEff.effect),
     ),
-  ];
+  ]);
 };
 
-export const idom = (ev: Evidence): Evidence => {
+export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
   if (!isKinded(ev[0].type, 'Arrow') || !isKinded(ev[1].type, 'Arrow')) {
-    throw new EvidenceError();
+    return Err(
+      EvidenceTypeError({
+        reason: 'Operator idom is not defined for types other than functions',
+      }),
+    );
   }
 
-  return [
+  return Ok([
     TypeEff(
       ev[1].type.binder.type,
       Senv({ [ev[1].type.binder.identifier]: Sens(1) }),
@@ -219,12 +346,15 @@ export const idom = (ev: Evidence): Evidence => {
       ev[0].type.binder.type,
       Senv({ [ev[0].type.binder.identifier]: Sens(1) }),
     ),
-  ];
+  ]);
 };
 
 // UTILS
 
-export const sum = (ev1: Evidence, ev2: Evidence): Evidence => {
+export const sum = (
+  ev1: Evidence,
+  ev2: Evidence,
+): Result<Evidence, EvidenceError> => {
   /**
    * Types must be the same
    */
@@ -233,13 +363,17 @@ export const sum = (ev1: Evidence, ev2: Evidence): Evidence => {
     ev1[0].type.kind !== ev2[0].type.kind ||
     ev1[0].type.kind !== ev2[1].type.kind
   ) {
-    throw new EvidenceError();
+    return Err(
+      EvidenceTypeError({
+        reason: 'All types in evidence should be of the same kind',
+      }),
+    );
   }
 
-  return [
+  return Ok([
     TypeEff(ev1[0].type, SenvUtils.add(ev1[0].effect, ev2[0].effect)),
     TypeEff(ev2[0].type, SenvUtils.add(ev1[1].effect, ev2[1].effect)),
-  ];
+  ]);
 };
 
 export const scale = (ev: Evidence, factor: number): Evidence => {

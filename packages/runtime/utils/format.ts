@@ -1,5 +1,5 @@
 import * as chalk from 'chalk';
-import { SimpleValue } from '../ast';
+import { SimpleValue } from '../elaboration/ast';
 
 export const formatValue = (value: SimpleValue): string => {
   switch (value.kind) {

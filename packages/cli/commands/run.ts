@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 
 import { run as runCommand, formatValue } from '@gsens-lang/runtime';
 import { parse } from '@gsens-lang/parsing';
-import { syntaxError } from '../lib/errors';
+import { runtimeError, syntaxError } from '../lib/errors';
 
 const runHandler = (file: string) => {
   try {
@@ -26,9 +26,14 @@ const runHandler = (file: string) => {
         );
       });
     } else {
-      const value = runCommand(statements);
+      const result = runCommand(statements);
 
-      console.log(formatValue(value.expression));
+      if (!result.success) {
+        const lines = contents.split('\n');
+        console.log(runtimeError(lines, result.error));
+      } else {
+        console.log(formatValue(result.result.expression));
+      }
     }
   } catch (e) {
     console.error(e);

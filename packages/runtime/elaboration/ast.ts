@@ -3,7 +3,7 @@ import { Senv, Type, TypeEff } from '@gsens-lang/core/utils';
 import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
 import { factoryOf, isKinded } from '@gsens-lang/core/utils/ADT';
 
-import { Evidence, Store } from './utils';
+import { Evidence, Store } from '../utils';
 
 /**
  * Expressions

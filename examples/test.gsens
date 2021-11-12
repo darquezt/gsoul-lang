@@ -2,18 +2,20 @@ resource y = 2;
 resource z = 4;
 print y;
 1;
-var f = fun (a : Number) {
+resource f = fun (a : Number) {
   a + y;
 };
 printEv f;
 printEv f(z);
 {
-  var x = 2 + y + y + z;
+  var x = 2 + y + (y :: Number@[?y]) + (z :: Number@[?z]);
   printEv x;
 }
 3;
 4 :: Number@[2x + ?x];
 print nil;
+
+print (y + y)  :: Number@[1y];
 
 true;
 

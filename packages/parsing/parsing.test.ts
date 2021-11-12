@@ -348,6 +348,7 @@ describe('Parsing ascriptions', () => {
     expect(lexAndParse('2::Number@[3x];')).toStrictEqual<Result<Statement[]>>(
       exprStmt(
         Ascription({
+          ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1),
           expression: Literal({
             value: 2,
           }),
@@ -368,6 +369,7 @@ describe('Parsing ascriptions', () => {
     >(
       exprStmt(
         Ascription({
+          ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1),
           expression: Literal({
             value: 2,
           }),
@@ -388,6 +390,7 @@ describe('Parsing ascriptions', () => {
     >(
       exprStmt(
         Ascription({
+          ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1),
           expression: Literal({
             value: 2,
           }),
@@ -410,7 +413,9 @@ describe('Parsing ascriptions', () => {
     >(
       exprStmt(
         Ascription({
+          ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1),
           expression: Ascription({
+            ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1),
             expression: Literal({
               value: 2,
             }),

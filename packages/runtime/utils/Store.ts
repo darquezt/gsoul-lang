@@ -1,4 +1,4 @@
-import { Value } from '../ast';
+import { Value } from '../elaboration/ast';
 
 export type Identifier = string;
 

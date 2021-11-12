@@ -18,7 +18,7 @@ import {
   Value,
   simpleValueIsKinded,
   RealLiteral,
-} from '../ast';
+} from '../elaboration/ast';
 import { Store, StoreUtils, Evidence, EvidenceUtils } from '../utils';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import Token from '@gsens-lang/parsing/lexing/Token';
@@ -26,6 +26,15 @@ import TokenType from '@gsens-lang/parsing/lexing/TokenType';
 import { Real } from '@gsens-lang/core/utils/Type';
 import { SenvUtils, TypeEffUtils } from '@gsens-lang/core/utils';
 import { formatValue } from '../utils/format';
+import {
+  InterpreterError,
+  InterpreterEvidenceError,
+  InterpreterReferenceError,
+  InterpreterTypeError,
+  InterpreterUnsupportedExpression,
+  InterpreterUnsupportedOperator,
+} from './errors';
+import { Err, Ok, Result } from '../utils/Result';
 
 type EmptyKont = {
   kind: 'EmptyKont';
@@ -37,12 +46,14 @@ const EmptyKont: SingletonKindedFactory<EmptyKont> = singletonFactoryOf(
 type ArgKont = {
   kind: 'ArgKont';
   state: State<{ expression: Expression }>;
+  paren: Token;
 };
 const ArgKont: KindedFactory<ArgKont> = factoryOf('ArgKont');
 
 type FnKont = {
   kind: 'FnKont';
   state: State<{ value: Value<Closure> }>;
+  paren: Token;
 };
 const FnKont: KindedFactory<FnKont> = factoryOf('FnKont');
 
@@ -134,9 +145,16 @@ const State = <T>(t: T, store: Store, kont: Kont): State<T> => ({
   kont,
 });
 
-const inject = (
-  term: Expression | Statement,
-): State<{ term: Expression | Statement }> => {
+const OkState = <T>(t: T, store: Store, kont: Kont): Ok<State<T>> =>
+  Ok({
+    ...t,
+    store,
+    kont,
+  });
+
+type StepState = State<{ term: Expression | Statement }>;
+
+const inject = (term: Expression | Statement): StepState => {
   return State({ term }, Store(), EmptyKont());
 };
 
@@ -144,12 +162,10 @@ const step = ({
   term,
   store,
   kont,
-}: State<{ term: Expression | Statement }>): State<{
-  term: Expression | Statement;
-}> => {
+}: StepState): Result<StepState, InterpreterError> => {
   switch (term.kind) {
     case 'Binary': {
-      return State(
+      return OkState(
         { term: term.left },
         store,
         RightOpKont({
@@ -160,7 +176,7 @@ const step = ({
     }
 
     case 'NonLinearBinary': {
-      return State(
+      return OkState(
         { term: term.left },
         store,
         NLRightOpKont({
@@ -174,18 +190,24 @@ const step = ({
       const value = StoreUtils.get(store, term.name.lexeme);
 
       if (!value) {
-        throw new Error('undefined variable');
+        return Err(
+          InterpreterReferenceError({
+            reason: `Variable ${term.name.lexeme} is not defined`,
+            variable: term.name,
+          }),
+        );
       }
 
-      return State({ term: ascribedValueToExpr(value) }, store, kont);
+      return OkState({ term: ascribedValueToExpr(value) }, store, kont);
     }
 
     case 'Call': {
-      return State(
+      return OkState(
         { term: term.callee },
         store,
         ArgKont({
           state: State({ expression: term.arg }, store, kont),
+          paren: term.paren,
         }),
       );
     }
@@ -197,7 +219,7 @@ const step = ({
       if (isSimpleValue(inner)) {
         switch (kont.kind) {
           case 'RightOpKont': {
-            return State(
+            return OkState(
               { term: kont.state.expression },
               store,
               LeftOpKont({
@@ -208,7 +230,7 @@ const step = ({
           }
 
           case 'NLRightOpKont': {
-            return State(
+            return OkState(
               { term: kont.state.expression },
               store,
               NLLeftOpKont({
@@ -221,53 +243,102 @@ const step = ({
           case 'LeftOpKont': {
             if (kont.op.type === TokenType.PLUS) {
               if (!isKinded(inner, 'RealLiteral')) {
-                throw new Error('Left operand of + must be a number');
+                return Err(
+                  InterpreterEvidenceError({
+                    reason: `Left operand of ${kont.op.lexeme} must be a number`,
+                  }),
+                );
               }
 
               const left = kont.state.value;
 
               if (!simpleValueIsKinded(left, 'RealLiteral')) {
-                throw new Error('Left operand of + must be a number');
+                return Err(
+                  InterpreterEvidenceError({
+                    reason: `Right operand of ${kont.op.lexeme} must be a number`,
+                  }),
+                );
               }
 
               const innerSum = left.expression.value + inner.value;
+              const sumEvidenceRes = EvidenceUtils.sum(
+                left.evidence,
+                term.evidence,
+              );
+
+              if (!sumEvidenceRes.success) {
+                return Err(
+                  InterpreterEvidenceError({
+                    reason: sumEvidenceRes.error.reason,
+                  }),
+                );
+              }
+
               const sum = AscribedValue({
                 expression: RealLiteral({
                   value: innerSum,
                 }),
-                evidence: EvidenceUtils.sum(left.evidence, term.evidence),
+                evidence: sumEvidenceRes.result,
                 typeEff: TypeEff(
                   Real(),
                   SenvUtils.add(left.typeEff.effect, term.typeEff.effect),
                 ),
               });
 
-              return State({ term: sum }, store, kont.state.kont);
+              return OkState({ term: sum }, store, kont.state.kont);
             }
 
-            throw new Error('FATAL: Unknown binary op');
+            return Err(
+              InterpreterUnsupportedOperator({
+                reason: `We're sorry. GSens does not support the ${kont.op.lexeme} operator yet`,
+                operator: kont.op,
+              }),
+            );
           }
 
           case 'NLLeftOpKont': {
             if (kont.op.type === TokenType.STAR) {
               if (!isKinded(inner, 'RealLiteral')) {
-                throw new Error('Left operand of * must be a number');
+                return Err(
+                  InterpreterTypeError({
+                    reason: `Left operand of ${kont.op.lexeme} must be a number`,
+                    operator: kont.op,
+                  }),
+                );
               }
 
               const left = kont.state.value;
 
               if (!simpleValueIsKinded(left, 'RealLiteral')) {
-                throw new Error('Left operand of * must be a number');
+                return Err(
+                  InterpreterTypeError({
+                    reason: `Right operand of ${kont.op.lexeme} must be a number`,
+                    operator: kont.op,
+                  }),
+                );
               }
 
               const innerProduct = left.expression.value * inner.value;
+
+              const sumEvidenceRes = EvidenceUtils.sum(
+                left.evidence,
+                term.evidence,
+              );
+
+              if (!sumEvidenceRes.success) {
+                return Err(
+                  InterpreterTypeError({
+                    reason: sumEvidenceRes.error.reason,
+                    operator: kont.op,
+                  }),
+                );
+              }
+
               const sum = AscribedValue({
                 expression: RealLiteral({
                   value: innerProduct,
                 }),
-                evidence: EvidenceUtils.scaleInf(
-                  EvidenceUtils.sum(left.evidence, term.evidence),
-                ),
+                evidence: EvidenceUtils.scaleInf(sumEvidenceRes.result),
                 typeEff: TypeEff(
                   Real(),
                   SenvUtils.scaleInf(
@@ -276,15 +347,20 @@ const step = ({
                 ),
               });
 
-              return State({ term: sum }, store, kont.state.kont);
+              return OkState({ term: sum }, store, kont.state.kont);
             }
 
-            throw new Error('FATAL: Unknown binary op');
+            return Err(
+              InterpreterUnsupportedOperator({
+                reason: `We're sorry. GSens does not support the ${kont.op.lexeme} operator yet`,
+                operator: kont.op,
+              }),
+            );
           }
 
           case 'ArgKont': {
             if (isKinded(inner, 'Closure')) {
-              return State(
+              return OkState(
                 { term: kont.state.expression },
                 kont.state.store,
                 FnKont({
@@ -293,6 +369,7 @@ const step = ({
                     store,
                     kont.state.kont,
                   ),
+                  paren: kont.paren,
                 }),
               );
             }
@@ -303,23 +380,43 @@ const step = ({
             const ascrFun = kont.state.value;
             const closure = ascrFun.expression;
 
-            const argEvi = EvidenceUtils.trans(
+            const idomRes = EvidenceUtils.idom(ascrFun.evidence);
+
+            if (!idomRes.success) {
+              return Err(
+                InterpreterTypeError({
+                  reason: idomRes.error.reason,
+                  operator: kont.paren,
+                }),
+              );
+            }
+
+            const argEviRes = EvidenceUtils.trans(
               term.evidence,
               EvidenceUtils.subst(
-                EvidenceUtils.idom(ascrFun.evidence),
+                idomRes.result,
                 closure.fun.binder.name.lexeme,
                 term.typeEff.effect,
               ),
             );
 
+            if (!argEviRes.success) {
+              return Err(
+                InterpreterTypeError({
+                  reason: argEviRes.error.reason,
+                  operator: kont.paren,
+                }),
+              );
+            }
+
             const arg = AscribedValue({
               typeEff: TypeEff(closure.fun.binder.type, term.typeEff.effect),
-              evidence: argEvi,
+              evidence: argEviRes.result,
               expression: inner,
             });
 
-            return State(
-              { term: closure.fun.body },
+            return OkState(
+              { term: closure.fun.body }, // TODO: Ascribe it!
               StoreUtils.extend(
                 closure.store,
                 closure.fun.binder.name.lexeme,
@@ -330,15 +427,23 @@ const step = ({
           }
 
           case 'AscrKont': {
-            const evidence = EvidenceUtils.trans(
+            const evidenceRes = EvidenceUtils.trans(
               term.evidence,
               kont.state.evidence,
             );
 
-            return State(
+            if (!evidenceRes.success) {
+              return Err(
+                InterpreterEvidenceError({
+                  reason: evidenceRes.error.reason,
+                }),
+              );
+            }
+
+            return OkState(
               {
                 term: Ascription({
-                  evidence,
+                  evidence: evidenceRes.result,
                   expression: inner,
                   typeEff: kont.state.typeEff,
                 }),
@@ -354,7 +459,7 @@ const step = ({
             // When all the statements in the block have finished evaluating
             // we restore the store and the kont
             if (statements.length === 0) {
-              return State({ term }, kont.state.store, kont.state.kont);
+              return OkState({ term }, kont.state.store, kont.state.kont);
             }
 
             // If there are more statements, we drop the value of the current one
@@ -362,7 +467,7 @@ const step = ({
 
             const [nextStmt, ...restStmts] = statements;
 
-            return State(
+            return OkState(
               { term: nextStmt },
               store,
               BlockKont({
@@ -376,7 +481,6 @@ const step = ({
           }
 
           case 'PrintKont': {
-            // TODO: Pretty print
             if (kont.showEvidence) {
               console.log(
                 `${EvidenceUtils.format(term.evidence)} ${formatValue(
@@ -387,11 +491,11 @@ const step = ({
               console.log(formatValue(inner));
             }
 
-            return State({ term }, store, kont.kont);
+            return OkState({ term }, store, kont.kont);
           }
 
           case 'VarKont': {
-            return State(
+            return OkState(
               { term },
               StoreUtils.extend(store, kont.state.variable, term as Value),
               kont.state.kont,
@@ -402,7 +506,7 @@ const step = ({
 
       // Closure creation
       if (isKinded(inner, 'Fun')) {
-        return State(
+        return OkState(
           {
             term: Ascription({
               ...term,
@@ -418,24 +522,20 @@ const step = ({
         );
       }
 
-      if (isKinded(inner, 'Ascription')) {
-        return State(
-          { term: inner },
-          store,
-          AscrKont({
-            state: State(
-              {
-                typeEff: term.typeEff,
-                evidence: term.evidence,
-              },
-              store,
-              kont,
-            ),
-          }),
-        );
-      }
-
-      throw new Error(`FATAL. Kind: ${inner.kind}`);
+      return OkState(
+        { term: inner },
+        store,
+        AscrKont({
+          state: State(
+            {
+              typeEff: term.typeEff,
+              evidence: term.evidence,
+            },
+            store,
+            kont,
+          ),
+        }),
+      );
     }
 
     /**
@@ -444,12 +544,12 @@ const step = ({
 
     case 'Block': {
       if (term.statements.length === 0) {
-        return State({ term: NilLiteral() }, store, kont);
+        return OkState({ term: NilLiteral() }, store, kont);
       }
 
       const [firstStmt, ...restStmts] = term.statements;
 
-      return State(
+      return OkState(
         { term: firstStmt },
         store,
         BlockKont({
@@ -459,11 +559,11 @@ const step = ({
     }
 
     case 'ExprStmt': {
-      return State({ term: term.expression }, store, kont);
+      return OkState({ term: term.expression }, store, kont);
     }
 
     case 'Print': {
-      return State(
+      return OkState(
         { term: term.expression },
         store,
         PrintKont({ kont, showEvidence: term.showEvidence }),
@@ -471,7 +571,7 @@ const step = ({
     }
 
     case 'VarStmt': {
-      return State(
+      return OkState(
         { term: term.assignment },
         store,
         VarKont({
@@ -487,19 +587,31 @@ const step = ({
     }
 
     default:
-      throw new Error(term.kind);
+      return Err(
+        InterpreterUnsupportedExpression({
+          reason: `We're sorry. GSens does not support this kinds of expressions yet (${term.kind})`,
+        }),
+      );
   }
 };
 
-export const evaluate = (expr: Expression | Statement): Value => {
+export const evaluate = (
+  expr: Expression | Statement,
+): Result<Value, InterpreterError> => {
   let state = inject(expr);
 
   while (
     !isValue(state.term as Expression) ||
     state.kont.kind !== 'EmptyKont'
   ) {
-    state = step(state);
+    const result = step(state);
+
+    if (!result.success) {
+      return result;
+    }
+
+    state = result.result;
   }
 
-  return state.term as Value; // TODO: Improve this
+  return Ok(state.term as Value); // TODO: Improve this
 };

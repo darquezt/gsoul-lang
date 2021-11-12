@@ -53,6 +53,7 @@ export type Ascription = {
   kind: 'Ascription';
   expression: Expression;
   typeEff: TypeEff;
+  ascriptionToken: Token;
 };
 export const Ascription = factoryOf<Ascription>('Ascription');
 

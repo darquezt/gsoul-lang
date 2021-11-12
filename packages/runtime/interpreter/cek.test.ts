@@ -14,7 +14,7 @@ import {
   Print,
   RealLiteral,
   Variable,
-} from '../ast';
+} from '../elaboration/ast';
 import { initialEvidence } from '../utils/Evidence';
 import { evaluate } from './cek';
 
