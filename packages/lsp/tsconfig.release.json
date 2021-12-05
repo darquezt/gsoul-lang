@@ -10,6 +10,12 @@
   "references": [
     {
       "path": "../parsing/tsconfig.release.json"
+    },
+    {
+      "path": "../typechecking/tsconfig.release.json"
+    },
+    {
+      "path": "../core/tsconfig.release.json"
     }
   ],
   "include": [

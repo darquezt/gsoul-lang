@@ -8,6 +8,7 @@ export default class Token {
     public lexeme: string,
     public literal: TokenLiteral | null,
     public line: number,
+    public col: number,
   ) {}
 
   toString(): string {

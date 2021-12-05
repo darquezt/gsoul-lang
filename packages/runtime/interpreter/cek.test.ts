@@ -17,11 +17,12 @@ import {
 } from '../elaboration/ast';
 import { initialEvidence } from '../utils/Evidence';
 import { evaluate } from './cek';
+import { Ok } from '../utils/Result';
 
 const RealEmptySenv = TypeEff(Real(), Senv());
 
-const variableToken = (name: string, line = 1): Token =>
-  new Token(TokenType.IDENTIFIER, name, null, line);
+const variableToken = (name: string, line = 1, col = 1): Token =>
+  new Token(TokenType.IDENTIFIER, name, null, line, col);
 
 describe('CEK', () => {
   test('function application', () => {
@@ -101,20 +102,22 @@ describe('CEK', () => {
       callee: fun,
       arg,
       typeEff: RealEmptySenv,
-      paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1),
+      paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 1),
     });
 
     const val = evaluate(app);
 
-    const result = Ascription({
-      expression: {
-        kind: 'RealLiteral',
+    const result = Ok(
+      Ascription({
+        expression: {
+          kind: 'RealLiteral',
+          typeEff: { type: Real(), effect: Senv() },
+          value: 4,
+        },
         typeEff: { type: Real(), effect: Senv() },
-        value: 4,
-      },
-      typeEff: { type: Real(), effect: Senv() },
-      evidence: initialEvidence({ type: Real(), effect: Senv() }),
-    });
+        evidence: initialEvidence({ type: Real(), effect: Senv() }),
+      }),
+    );
 
     expect(val).toStrictEqual(result);
   });
@@ -142,19 +145,21 @@ describe('CEK', () => {
     const sum = Binary({
       left,
       right,
-      operator: new Token(TokenType.PLUS, '+', null, 1),
+      operator: new Token(TokenType.PLUS, '+', null, 1, 1),
       typeEff: RealEmptySenv,
     });
 
     const val = evaluate(sum);
 
-    const result = Ascription({
-      expression: RealLiteral({
-        value: leftInner + rightInner,
+    const result = Ok(
+      Ascription({
+        expression: RealLiteral({
+          value: leftInner + rightInner,
+        }),
+        typeEff: RealEmptySenv,
+        evidence: initialEvidence(RealEmptySenv),
       }),
-      typeEff: RealEmptySenv,
-      evidence: initialEvidence(RealEmptySenv),
-    });
+    );
 
     expect(val).toStrictEqual(result);
   });
@@ -185,19 +190,21 @@ describe('CEK', () => {
     const sum = NonLinearBinary({
       left,
       right,
-      operator: new Token(TokenType.STAR, '*', null, 1),
+      operator: new Token(TokenType.STAR, '*', null, 1, 1),
       typeEff: TypeEff(Real(), Senv({ x: MaxSens(), y: MaxSens() })),
     });
 
     const val = evaluate(sum);
 
-    const result = Ascription({
-      expression: RealLiteral({
-        value: leftInner * rightInner,
+    const result = Ok(
+      Ascription({
+        expression: RealLiteral({
+          value: leftInner * rightInner,
+        }),
+        typeEff: sum.typeEff,
+        evidence: [RealEmptySenv, sum.typeEff],
       }),
-      typeEff: sum.typeEff,
-      evidence: [RealEmptySenv, sum.typeEff],
-    });
+    );
 
     expect(val).toStrictEqual(result);
   });

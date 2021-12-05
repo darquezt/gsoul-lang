@@ -18,9 +18,12 @@ const runHandler = (file: string) => {
         console.log(
           syntaxError(
             {
-              number: failure.token.line,
+              line: failure.token.line,
+              col: failure.token.col,
+              errorLength: failure.token.lexeme.length,
               content: lines[failure.token.line - 1],
             },
+            file,
             failure.reason,
           ),
         );
@@ -30,7 +33,7 @@ const runHandler = (file: string) => {
 
       if (!result.success) {
         const lines = contents.split('\n');
-        console.log(runtimeError(lines, result.error));
+        console.log(runtimeError(result.error, { file, lines }));
       } else {
         console.log(formatValue(result.result.expression));
       }

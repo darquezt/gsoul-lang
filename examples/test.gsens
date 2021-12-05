@@ -1,12 +1,13 @@
-resource y = 2;
-resource z = 4;
+resource var y = 2;
+resource var z = 4;
 print y;
 1;
-resource f = fun (a : Number) {
+resource var myfun = fun (a : Number) {
   a + y;
 };
-printEv f;
-printEv f(z);
+resource var asd = y + z;
+printEv myFun;
+printEv myFun(z);
 {
   var x = 2 + y + (y :: Number@[?y]) + (z :: Number@[?z]);
   printEv x;
@@ -15,10 +16,12 @@ printEv f(z);
 4 :: Number@[2x + ?x];
 print nil;
 
-print (y + y)  :: Number@[1y];
+print (y + y)  :: Number@[?y];
+
+print 3*2;
+
+
 
 true;
 
-false
-
-;
+false;

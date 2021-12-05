@@ -1,4 +1,4 @@
-import * as chalk from 'chalk';
+import chalk from 'chalk';
 import { SimpleValue } from '../elaboration/ast';
 
 export const formatValue = (value: SimpleValue): string => {

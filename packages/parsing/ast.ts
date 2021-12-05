@@ -9,7 +9,7 @@ import { factoryOf } from '@gsens-lang/core/utils/ADT';
 
 type LiteralValue = number | boolean | null;
 
-export type Literal = { kind: 'Literal'; value: LiteralValue };
+export type Literal = { kind: 'Literal'; value: LiteralValue; token: Token };
 export const Literal = factoryOf<Literal>('Literal');
 
 export type Binary = {
@@ -77,6 +77,7 @@ export const ExprStmt = factoryOf<ExprStmt>('ExprStmt');
 export type Print = {
   kind: 'Print';
   expression: Expression;
+  token: Token;
   showEvidence: boolean;
 };
 export const Print = factoryOf<Print>('Print');

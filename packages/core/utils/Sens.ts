@@ -3,11 +3,8 @@ import { match, __ } from 'ts-pattern';
 
 export type Sens = Readonly<[number, number]>;
 
-export const MAX_SENS = 9007199254740991 as const;
+export const MAX_SENS = Infinity;
 export const UNKNOWN_SENS = [0, MAX_SENS] as const;
-
-export type UnknownSens = typeof UNKNOWN_SENS;
-export type MaxSens = [typeof MAX_SENS, typeof MAX_SENS];
 
 const isUndefined = (s?: number): s is undefined => !s && s !== 0;
 
@@ -23,11 +20,11 @@ export const Sens = (lower?: number, upper?: number): Sens => {
   return [lower as number, upper as number];
 };
 
-export const UnknownSens = (): UnknownSens => {
+export const UnknownSens = (): Sens => {
   return UNKNOWN_SENS;
 };
 
-export const MaxSens = (): MaxSens => {
+export const MaxSens = (): Sens => {
   return [MAX_SENS, MAX_SENS];
 };
 

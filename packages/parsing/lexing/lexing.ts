@@ -20,6 +20,7 @@ export const scanTokens = (source: string): Token[] => {
   let start = 0;
   let current = 0;
   let line = 1;
+  let col = 1;
 
   const isAtEnd = (): boolean => current >= source.length;
 
@@ -102,9 +103,11 @@ export const scanTokens = (source: string): Token[] => {
       case ' ':
       case '\r':
       case '\t':
+        col += c.length;
         break;
       case '\n':
         line++;
+        col = 1;
         break;
       // case '"':
       //   string();
@@ -210,7 +213,9 @@ export const scanTokens = (source: string): Token[] => {
   function addToken(type: TokenType, literal: TokenLiteral | null = null) {
     const lexeme = getLexeme();
 
-    tokens.push(new Token(type, lexeme, literal, line));
+    tokens.push(new Token(type, lexeme, literal, line, col));
+
+    col += lexeme.length;
   }
 
   function match(expected: string): boolean {
@@ -232,7 +237,7 @@ export const scanTokens = (source: string): Token[] => {
     scanToken();
   }
 
-  tokens.push(new Token(TokenType.EOF, 'end', null, line));
+  tokens.push(new Token(TokenType.EOF, 'end', null, line, col));
 
   return tokens;
 };

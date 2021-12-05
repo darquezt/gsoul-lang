@@ -56,7 +56,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       if (check(TokenType.VAR)) {
         return varDeclaration(false);
       }
-      if (check(TokenType.RESOURCE)) {
+      if (match(TokenType.RESOURCE)) {
         return varDeclaration(true);
       }
 
@@ -66,7 +66,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
   function varDeclaration(resource = false): Statement {
     consume(
-      resource ? TokenType.RESOURCE : TokenType.VAR,
+      TokenType.VAR,
       errorMessage({
         expected: '`var` keyword',
         beginning: 'a variable declaration',
@@ -153,6 +153,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
   }
 
   function printStatement(showEvidence = false): Statement {
+    const token = previous();
     const value = expression();
 
     consume(
@@ -164,6 +165,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     );
 
     return Print({
+      token,
       expression: value,
       showEvidence,
     });
@@ -177,11 +179,12 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     let expr: Expression = equality();
 
     while (match(TokenType.COLON_COLON)) {
+      const doubleColon = previous();
       const ascrTE = typeEff();
       expr = Ascription({
         expression: expr,
         typeEff: ascrTE,
-        ascriptionToken: previous(),
+        ascriptionToken: doubleColon,
       });
     }
 
@@ -306,11 +309,11 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
   function primary(): Expression {
     if (match(TokenType.FALSE)) {
-      return Literal({ value: false });
+      return Literal({ value: false, token: previous() });
     } else if (match(TokenType.TRUE)) {
-      return Literal({ value: true });
+      return Literal({ value: true, token: previous() });
     } else if (match(TokenType.NILLIT)) {
-      return Literal({ value: null });
+      return Literal({ value: null, token: previous() });
     } else if (match(TokenType.FUN)) {
       consume(
         TokenType.LEFT_PAREN,
@@ -353,6 +356,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     } else if (match(TokenType.NUMBERLIT)) {
       return Literal({
         value: previous().literal as number,
+        token: previous(),
       });
     } else if (match(TokenType.IDENTIFIER)) {
       return Variable({

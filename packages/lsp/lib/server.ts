@@ -9,16 +9,21 @@ import {
   CompletionItem,
   CompletionItemKind,
   TextDocumentSyncKind,
+  MarkupKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
 import { parse } from '@gsens-lang/parsing';
+import { typeCheck, TypingSeeker } from '@gsens-lang/typechecking';
+import { TypeEffUtils } from '@gsens-lang/core/utils';
 
 const connection = createConnection(ProposedFeatures.all);
 
 connection.console.log('running');
 
 const documents = new TextDocuments(TextDocument);
+
+const typings: Map<string, TypingSeeker> = new Map();
 
 connection.onInitialize(() => {
   connection.console.info('Initializing GSens language server');
@@ -32,21 +37,51 @@ connection.onInitialize(() => {
 
 const parseFile = (doc: TextDocument): void => {
   try {
-    const { failures } = parse(doc.getText());
+    const { failures, result: parsedFile } = parse(doc.getText());
 
     const diagnostics: Diagnostic[] = [];
 
-    failures.map(({ reason, token }) => {
-      const line = token.line ?? 0;
+    failures.forEach(({ reason, token }) => {
+      const line = token.line - 1;
+      const col = token.col - 1;
 
       const diagnostic = Diagnostic.create(
-        { start: { line, character: 0 }, end: { line, character: 1024 } },
+        {
+          start: { line, character: col },
+          end: { line, character: col + token.lexeme.length },
+        },
         reason ?? 'Syntax error',
         DiagnosticSeverity.Error,
       );
 
       diagnostics.push(diagnostic);
     });
+
+    if (diagnostics.length === 0) {
+      const typecheckingResult = typeCheck(parsedFile);
+
+      if (!typecheckingResult.success) {
+        const { token, reason } = typecheckingResult;
+
+        const line = token.line - 1;
+        const col = token.col - 1;
+
+        const diagnostic = Diagnostic.create(
+          {
+            start: { line, character: col },
+            end: { line, character: col + token.lexeme.length },
+          },
+          reason ?? 'Type Error',
+          DiagnosticSeverity.Error,
+        );
+
+        diagnostics.push(diagnostic);
+      } else {
+        const { typings: docTypings } = typecheckingResult;
+
+        typings.set(doc.uri, docTypings);
+      }
+    }
 
     connection.sendDiagnostics({
       uri: doc.uri,
@@ -68,6 +103,42 @@ documents.onDidChangeContent((event) => {
 });
 
 const keywords = ['fun', 'var', 'print']; // TODO: Export them from parsing module
+
+connection.onHover((params) => {
+  const docTypings = typings.get(params.textDocument.uri);
+
+  if (!docTypings) {
+    return;
+  }
+
+  const typingAssoc = docTypings.get(
+    params.position.line,
+    params.position.character,
+  );
+
+  if (!typingAssoc) {
+    return;
+  }
+  const [token, typeEff] = typingAssoc;
+  const printedTE = TypeEffUtils.format(typeEff);
+
+  return {
+    contents: {
+      kind: MarkupKind.Markdown,
+      value: printedTE,
+    },
+    range: {
+      start: {
+        line: token.line - 1,
+        character: token.col - 1,
+      },
+      end: {
+        line: token.line - 1,
+        character: token.col + token.lexeme.length - 1,
+      },
+    },
+  };
+});
 
 connection.onCompletion(() => {
   connection.console.info('completion');
