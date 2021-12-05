@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/typechecking",
-  "version": "0.0.4-alpha.0",
+  "version": "0.0.4-alpha.1",
   "description": "Typechecking module",
   "main": "index.ts",
   "license": "MIT",
