@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/lsp",
-  "version": "0.0.3",
+  "version": "0.0.4-alpha.0",
   "description": "Language server protocol module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "lib/lsp.js",
@@ -24,9 +24,9 @@
     "test": "echo \"Error: run tests from root\" && exit 1"
   },
   "dependencies": {
-    "@gsens-lang/core": "^0.0.3",
-    "@gsens-lang/parsing": "^0.0.3",
-    "@gsens-lang/typechecking": "^0.0.3",
+    "@gsens-lang/core": "^0.0.4-alpha.0",
+    "@gsens-lang/parsing": "^0.0.4-alpha.0",
+    "@gsens-lang/typechecking": "^0.0.4-alpha.0",
     "vscode-languageserver": "^7.0.0",
     "vscode-languageserver-textdocument": "^1.0.2"
   },

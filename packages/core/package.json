@@ -1,6 +1,6 @@
 {
   "name": "@gsens-lang/core",
-  "version": "0.0.3",
+  "version": "0.0.4-alpha.0",
   "description": "Core utility module",
   "main": "index.ts",
   "license": "MIT",
