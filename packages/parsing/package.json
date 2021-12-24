@@ -16,7 +16,8 @@
   ],
   "exports": {
     ".": "./build/index.js",
-    "./*": "./build/*.js"
+    "./lib/lexing": "./build/lib/lexing/index.js",
+    "./lib/ast": "./build/lib/ast.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.release.json",

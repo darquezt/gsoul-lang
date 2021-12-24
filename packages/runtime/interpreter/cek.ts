@@ -21,8 +21,7 @@ import {
 } from '../elaboration/ast';
 import { Store, StoreUtils, Evidence, EvidenceUtils } from '../utils';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
-import Token from '@gsens-lang/parsing/lexing/Token';
-import TokenType from '@gsens-lang/parsing/lexing/TokenType';
+import { Token, TokenType } from '@gsens-lang/parsing/lib/lexing';
 import { Real } from '@gsens-lang/core/utils/Type';
 import { SenvUtils, TypeEffUtils } from '@gsens-lang/core/utils';
 import { formatValue } from '../utils/format';

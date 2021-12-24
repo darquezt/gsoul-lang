@@ -17,7 +17,7 @@ import {
   Variable,
   VarStmt,
 } from './ast';
-import { errorMessage } from './errors';
+import { errorMessage } from './utils/errors';
 import { scanTokens } from './lexing/lexing';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';

@@ -1,15 +1,12 @@
-import { scanTokens } from '@gsens-lang/parsing/lexing/lexing';
-import { parse } from '@gsens-lang/parsing/parsing';
+import { Token, TokenType } from '@gsens-lang/parsing/lib/lexing';
+import { parse } from '@gsens-lang/parsing';
 import { Senv, TypeEff } from '@gsens-lang/core/utils';
 import { Bool, Real } from '@gsens-lang/core/utils/Type';
 import { TypeCheckingResult, typeCheck, TypeCheckingSuccess } from './checker';
 import { TypingSeeker } from '..';
-import Token from '@gsens-lang/parsing/lexing/Token';
-import TokenType from '@gsens-lang/parsing/lexing/TokenType';
 
 const pipeline = (source: string): TypeCheckingResult => {
-  const tokens = scanTokens(source);
-  const parsed = parse(tokens);
+  const parsed = parse(source);
 
   return typeCheck(parsed.result);
 };

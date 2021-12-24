@@ -1,4 +1,4 @@
-import { Program } from '@gsens-lang/parsing/ast';
+import { Program } from '@gsens-lang/parsing/lib/ast';
 import { Value } from './elaboration/ast';
 import { elaborate } from './elaboration/elaboration';
 import { ElaborationError } from './elaboration/errors';

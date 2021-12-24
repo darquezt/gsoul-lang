@@ -1,4 +1,4 @@
-import * as past from '@gsens-lang/parsing/ast';
+import * as past from '@gsens-lang/parsing/lib/ast';
 import {
   Sens,
   Senv,

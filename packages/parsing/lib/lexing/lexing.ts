@@ -1,6 +1,9 @@
 import Token, { TokenLiteral } from './Token';
 import TokenType from './TokenType';
 
+/**
+ * A mapping between source keywords and their corresponding TokenTypes
+ */
 const keywords: Record<string, TokenType> = {
   true: TokenType.TRUE,
   false: TokenType.FALSE,
@@ -15,12 +18,22 @@ const keywords: Record<string, TokenType> = {
   fun: TokenType.FUN,
 };
 
+/**
+ * A.k.a the lexer function
+ *
+ * @param source A piece of code
+ * @returns A list of the scanned tokens from the source
+ */
 export const scanTokens = (source: string): Token[] => {
   const tokens: Token[] = [];
   let start = 0;
   let current = 0;
   let line = 1;
   let col = 1;
+
+  // ===================
+  // BEGIN LOCAL UTILITY FUNCTIONS
+  // ===================
 
   const isAtEnd = (): boolean => current >= source.length;
 
@@ -231,6 +244,10 @@ export const scanTokens = (source: string): Token[] => {
   function getLexeme(): string {
     return source.slice(start, current);
   }
+
+  // ===================
+  // END LOCAL UTILITY FUNCTIONS
+  // ===================
 
   while (!isAtEnd()) {
     start = current;

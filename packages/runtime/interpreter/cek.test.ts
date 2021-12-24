@@ -1,5 +1,4 @@
-import Token from '@gsens-lang/parsing/lexing/Token';
-import TokenType from '@gsens-lang/parsing/lexing/TokenType';
+import { Token, TokenType } from '@gsens-lang/parsing/lib/lexing';
 import { Sens, Senv, TypeEff } from '@gsens-lang/core/utils';
 import { MaxSens } from '@gsens-lang/core/utils/Sens';
 import { Arrow, Real } from '@gsens-lang/core/utils/Type';

@@ -20,7 +20,7 @@ import {
 } from './ast';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
-import { errorMessage } from './errors';
+import { errorMessage } from './utils/errors';
 
 // const MAX_ARGS = 255;
 
@@ -517,6 +517,18 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     return new ParseError(token, message);
   }
 
+  /**
+   * It tries to execute a parser and return its result.
+   * In the case of an error during the parser execution:
+   *    1. The source is synchronized, e.g. the input is thrown away until reaching an end of statement
+   *    2. A new failure is created and pushed into `failures` for blaming the bad syntax
+   *    3. `null` is returned
+   *
+   * In the case of an unknown error (not related to parsing), the error is thrown up.
+   *
+   * @param parser A Parser function
+   * @returns The result of the parser or `null`
+   */
   function synchronized<T>(parser: () => T): T | null {
     try {
       const parsed = parser();
@@ -533,6 +545,12 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     }
   }
 
+  /**
+   * It discards tokens until a new statement is reached
+   *
+   * _Note: This is a best effort synchronization and is not meant to be perfect_
+   * @returns void
+   */
   function synchronize(): void {
     advance();
 
@@ -543,7 +561,9 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
       switch (peek().type) {
         case TokenType.VAR:
+        case TokenType.RESOURCE:
         case TokenType.PRINT:
+        case TokenType.PRINTEV:
           return;
       }
 

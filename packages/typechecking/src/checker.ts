@@ -12,7 +12,7 @@ import {
   Statement,
   Variable,
   VarStmt,
-} from '@gsens-lang/parsing/ast';
+} from '@gsens-lang/parsing/lib/ast';
 import {
   Sens,
   Senv,
@@ -25,7 +25,7 @@ import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
 import { isKinded } from '@gsens-lang/core/utils/ADT';
 
 import { isSubType, isSubTypeEff } from './subtyping';
-import Token from '@gsens-lang/parsing/lexing/Token';
+import { Token } from '@gsens-lang/parsing/lib/lexing';
 import { TypeAssoc, TypeAssocs, TypingSeeker } from './utils/typingSeeker';
 
 export type PureSuccess = {

@@ -1,5 +1,5 @@
 import { TypeEff } from '@gsens-lang/core/utils';
-import Token from '@gsens-lang/parsing/lexing/Token';
+import { Token } from '@gsens-lang/parsing/lib/lexing';
 
 export type TypeAssoc = [Token, TypeEff];
 export type TypeAssocs = Array<TypeAssoc>;

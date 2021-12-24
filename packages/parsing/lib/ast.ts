@@ -3,9 +3,9 @@ import { Type } from '@gsens-lang/core/utils/Type';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import { factoryOf } from '@gsens-lang/core/utils/ADT';
 
-/**
- * Expressions
- */
+// ===================
+// EXPRESSIONS
+// ===================
 
 type LiteralValue = number | boolean | null;
 
@@ -67,9 +67,9 @@ export type Expression =
   | Fun
   | Ascription;
 
-/**
- * Statements
- */
+// ===================
+// STATEMENTS
+// ===================
 
 export type ExprStmt = { kind: 'ExprStmt'; expression: Expression };
 export const ExprStmt = factoryOf<ExprStmt>('ExprStmt');
