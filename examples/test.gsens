@@ -2,10 +2,10 @@ resource var y = 2;
 resource var z = 4;
 print y;
 1;
-resource var myfun = fun (a : Number) {
+resource var myFun = fun (a : Number) {
   a + y;
 };
-resource var asd = y + z;
+var asd = y + z;
 printEv myFun;
 printEv myFun(z);
 {
@@ -20,8 +20,11 @@ print (y + y)  :: Number@[?y];
 
 print 3*2;
 
-
-
 true;
 
 false;
+
+printEv fun (a: Number) {
+  printEv a;
+  printEv a + a :: Number@[?a];
+} (2);
