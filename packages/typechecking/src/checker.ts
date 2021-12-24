@@ -332,10 +332,18 @@ const varStmt = (stmt: VarStmt, tenv: TypeEnv): StatefulResult => {
     return exprTC;
   }
 
+  if (stmt.resource && !SenvUtils.isEmpty(exprTC.typeEff.effect)) {
+    return Failure(stmt.name, 'A resource cannot depend on other resources');
+  }
+
+  const typeEff = stmt.resource
+    ? TypeEff(exprTC.typeEff.type, Senv({ [stmt.name.lexeme]: Sens(1) }))
+    : exprTC.typeEff;
+
   return StatefulSuccess(
     exprTC.typeEff,
-    TypeEnvUtils.extend(tenv, stmt.name.lexeme, exprTC.typeEff),
-    [[stmt.name, exprTC.typeEff] as TypeAssoc].concat(exprTC.typings),
+    TypeEnvUtils.extend(tenv, stmt.name.lexeme, typeEff),
+    [[stmt.name, typeEff] as TypeAssoc].concat(exprTC.typings),
   );
 };
 
