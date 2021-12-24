@@ -31,6 +31,8 @@ connection.onInitialize(() => {
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Full,
+      completionProvider: {},
+      hoverProvider: true,
     },
   };
 });
@@ -112,8 +114,8 @@ connection.onHover((params) => {
   }
 
   const typingAssoc = docTypings.get(
-    params.position.line,
-    params.position.character,
+    params.position.line + 1,
+    params.position.character + 1,
   );
 
   if (!typingAssoc) {
