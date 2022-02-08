@@ -1,0 +1,7 @@
+slet a = 1;
+
+let f = fun (x : Number![1a]) {
+  (x + x) :: Number![?a] :: Number![1a];
+};
+
+print f(a);

@@ -1,5 +1,4 @@
 import * as chalk from 'chalk';
-import { match, __ } from 'ts-pattern';
 
 export type Sens = Readonly<[number, number]>;
 
@@ -29,23 +28,28 @@ export const MaxSens = (): Sens => {
 };
 
 const addBounds = (a: number, b: number): number => {
-  return match([a, b])
-    .with([MAX_SENS, __], () => MAX_SENS)
-    .with([__, MAX_SENS], () => MAX_SENS)
-    .otherwise(() => a + b);
+  if (a === MAX_SENS || b === MAX_SENS) {
+    return MAX_SENS;
+  }
+
+  return a + b;
 };
 
 export const add = (a: Sens, b: Sens): Sens => {
   return [addBounds(a[0], b[0]), addBounds(a[1], b[1])];
 };
 
-const multiplyBounds = (a: number, b: number) =>
-  match([a, b])
-    .with([0, MAX_SENS], () => 0)
-    .with([MAX_SENS, 0], () => 0)
-    .with([__, MAX_SENS], () => MAX_SENS)
-    .with([MAX_SENS, __], () => MAX_SENS)
-    .otherwise(() => a * b);
+const multiplyBounds = (a: number, b: number) => {
+  if (a === 0 || b === 0) {
+    return 0;
+  }
+
+  if (a === MAX_SENS || b === MAX_SENS) {
+    return MAX_SENS;
+  }
+
+  return a + b;
+};
 
 export const mult = (a: Sens, b: Sens): Sens => {
   return [multiplyBounds(a[0], b[0]), multiplyBounds(a[1], b[1])];

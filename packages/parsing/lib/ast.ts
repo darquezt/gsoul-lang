@@ -1,5 +1,4 @@
 import Token from './lexing/Token';
-import { Type } from '@gsens-lang/core/utils/Type';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import { factoryOf } from '@gsens-lang/core/utils/ADT';
 
@@ -9,53 +8,83 @@ import { factoryOf } from '@gsens-lang/core/utils/ADT';
 
 type LiteralValue = number | boolean | null;
 
-export type Literal = { kind: 'Literal'; value: LiteralValue; token: Token };
-export const Literal = factoryOf<Literal>('Literal');
+export enum ExprKind {
+  Literal = 'Literal',
+  Binary = 'Binary',
+  NonLinearBinary = 'NonLinearBinary',
+  Call = 'Call',
+  Grouping = 'Grouping',
+  Variable = 'Variable',
+  Fun = 'Fun',
+  Ascription = 'Ascription',
+  Print = 'Print',
+  Block = 'Block',
+}
+
+export type Literal = {
+  kind: ExprKind.Literal;
+  value: LiteralValue;
+  token: Token;
+};
+export const Literal = factoryOf<Literal>(ExprKind.Literal);
 
 export type Binary = {
-  kind: 'Binary';
+  kind: ExprKind.Binary;
   operator: Token;
   left: Expression;
   right: Expression;
 };
-export const Binary = factoryOf<Binary>('Binary');
+export const Binary = factoryOf<Binary>(ExprKind.Binary);
 
 export type NonLinearBinary = {
-  kind: 'NonLinearBinary';
+  kind: ExprKind.NonLinearBinary;
   operator: Token;
   left: Expression;
   right: Expression;
 };
-export const NonLinearBinary = factoryOf<NonLinearBinary>('NonLinearBinary');
+export const NonLinearBinary = factoryOf<NonLinearBinary>(
+  ExprKind.NonLinearBinary,
+);
 
 export type Call = {
-  kind: 'Call';
+  kind: ExprKind.Call;
   callee: Expression;
   arg: Expression;
   paren: Token;
 };
-export const Call = factoryOf<Call>('Call');
+export const Call = factoryOf<Call>(ExprKind.Call);
 
-export type Grouping = { kind: 'Grouping'; expression: Expression };
-export const Grouping = factoryOf<Grouping>('Grouping');
+export type Grouping = { kind: ExprKind.Grouping; expression: Expression };
+export const Grouping = factoryOf<Grouping>(ExprKind.Grouping);
 
-export type Variable = { kind: 'Variable'; name: Token };
-export const Variable = factoryOf<Variable>('Variable');
+export type Variable = { kind: ExprKind.Variable; name: Token };
+export const Variable = factoryOf<Variable>(ExprKind.Variable);
 
 export type Fun = {
-  kind: 'Fun';
-  binder: { name: Token; type: Type };
-  body: Statement;
+  kind: ExprKind.Fun;
+  binder: { name: Token; type: TypeEff };
+  body: Expression;
 };
-export const Fun = factoryOf<Fun>('Fun');
+export const Fun = factoryOf<Fun>(ExprKind.Fun);
 
 export type Ascription = {
-  kind: 'Ascription';
+  kind: ExprKind.Ascription;
   expression: Expression;
   typeEff: TypeEff;
   ascriptionToken: Token;
 };
-export const Ascription = factoryOf<Ascription>('Ascription');
+export const Ascription = factoryOf<Ascription>(ExprKind.Ascription);
+
+export type Print = {
+  kind: ExprKind.Print;
+  expression: Expression;
+  token: Token;
+  showEvidence: boolean;
+};
+export const Print = factoryOf<Print>(ExprKind.Print);
+
+export type Block = { kind: ExprKind.Block; statements: Statement[] };
+export const Block = factoryOf<Block>(ExprKind.Block);
 
 export type Expression =
   | Literal
@@ -65,34 +94,40 @@ export type Expression =
   | Grouping
   | Variable
   | Fun
+  | Block
+  | Print
   | Ascription;
 
 // ===================
 // STATEMENTS
 // ===================
 
-export type ExprStmt = { kind: 'ExprStmt'; expression: Expression };
-export const ExprStmt = factoryOf<ExprStmt>('ExprStmt');
+export enum StmtKind {
+  ExprStmt = 'ExprStmt',
+  VarStmt = 'VarStmt',
+}
 
-export type Print = {
-  kind: 'Print';
-  expression: Expression;
-  token: Token;
-  showEvidence: boolean;
-};
-export const Print = factoryOf<Print>('Print');
-
-export type Block = { kind: 'Block'; statements: Statement[] };
-export const Block = factoryOf<Block>('Block');
+export type ExprStmt = { kind: StmtKind.ExprStmt; expression: Expression };
+export const ExprStmt = factoryOf<ExprStmt>(StmtKind.ExprStmt);
 
 export type VarStmt = {
-  kind: 'VarStmt';
+  kind: StmtKind.VarStmt;
   name: Token;
   assignment: Expression;
   resource: boolean;
 };
-export const VarStmt = factoryOf<VarStmt>('VarStmt');
+export const VarStmt = factoryOf<VarStmt>(StmtKind.VarStmt);
 
-export type Statement = ExprStmt | Print | Block | VarStmt;
+export type Statement = ExprStmt | VarStmt;
 
 export type Program = Statement[];
+
+// UTILS
+
+export const isExpr = (e: Statement | Expression): e is Expression => {
+  return Object.values(ExprKind).some((kind) => kind === e.kind);
+};
+
+export const isStmt = (s: Statement | Expression): s is Statement => {
+  return Object.values(StmtKind).some((kind) => kind === s.kind);
+};

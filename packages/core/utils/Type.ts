@@ -2,7 +2,6 @@ import * as chalk from 'chalk';
 import { TypeEffUtils } from '.';
 import {
   factoryOf,
-  isKinded,
   KindedFactory,
   singletonFactoryOf,
   SingletonKindedFactory,
@@ -24,27 +23,41 @@ export const Nil: SingletonKindedFactory<Nil> = singletonFactoryOf('Nil');
 
 export type Arrow = {
   kind: 'Arrow';
-  binder: { identifier: Identifier; type: Type };
-  returnTypeEff: TypeEff;
+  domain: TypeEff;
+  codomain: TypeEff;
 };
 export const Arrow: KindedFactory<Arrow> = factoryOf<Arrow>('Arrow');
 
-export type Type = Real | Bool | Nil | Arrow;
+export type PolySenv = {
+  kind: 'PolySenv';
+  identifier: Identifier;
+  typeEff: TypeEff;
+};
+export const PolySenv: KindedFactory<PolySenv> = factoryOf<PolySenv>(
+  'PolySenv',
+);
+
+export type Type = Real | Bool | Nil | Arrow | PolySenv;
 
 // U T I L S
 
 export const subst = (ty: Type, name: Identifier, senv: Senv): Type => {
-  if (isKinded(ty, 'Real') || isKinded(ty, 'Nil') || isKinded(ty, 'Bool')) {
-    return ty;
+  switch (ty.kind) {
+    case 'Real':
+    case 'Nil':
+    case 'Bool':
+      return ty;
+    case 'Arrow':
+      return Arrow({
+        domain: TypeEffUtils.subst(ty.domain, name, senv),
+        codomain: TypeEffUtils.subst(ty.codomain, name, senv),
+      });
+    case 'PolySenv':
+      return PolySenv({
+        identifier: ty.identifier,
+        typeEff: TypeEffUtils.subst(ty.typeEff, name, senv),
+      });
   }
-
-  return Arrow({
-    binder: {
-      identifier: ty.binder.identifier,
-      type: subst(ty.binder.type, name, senv),
-    },
-    returnTypeEff: TypeEffUtils.subst(ty.returnTypeEff, name, senv),
-  });
 };
 
 export const format = (ty: Type): string => {
@@ -55,8 +68,12 @@ export const format = (ty: Type): string => {
     case 'Nil':
       return chalk.yellow(ty.kind);
     case 'Arrow':
-      return chalk`(${ty.binder.identifier}:${format(
-        ty.binder.type,
-      )} -> ${TypeEffUtils.format(ty.returnTypeEff)})`;
+      return chalk`${TypeEffUtils.format(ty.domain)} -> ${TypeEffUtils.format(
+        ty.codomain,
+      )})`;
+    case 'PolySenv':
+      return chalk`forall {green ${ty.identifier}} . ${TypeEffUtils.format(
+        ty.typeEff,
+      )}`;
   }
 };

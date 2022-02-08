@@ -201,33 +201,24 @@ const fun = (
 ): Result<Ascription, ElaborationError> => {
   const varName = expr.binder.name.lexeme;
 
-  const bodyElaboration = statement(
+  const bodyElaboration = expression(
     expr.body,
-    TypeEnvUtils.extend(
-      tenv,
-      varName,
-      TypeEff(expr.binder.type, Senv({ [varName]: Sens(1) })),
-    ),
+    TypeEnvUtils.extend(tenv, varName, expr.binder.type),
   );
 
   if (!bodyElaboration.success) {
     return bodyElaboration;
   }
 
-  const {
-    result: { term: body },
-  } = bodyElaboration;
+  const { result: body } = bodyElaboration;
 
   const lambda = Fun({
     binder: expr.binder,
     body,
     typeEff: TypeEff(
       Arrow({
-        binder: {
-          identifier: varName,
-          type: expr.binder.type,
-        },
-        returnTypeEff: body.typeEff,
+        domain: expr.binder.type,
+        codomain: body.typeEff,
       }),
       Senv(),
     ),
@@ -275,11 +266,9 @@ const app = (
 
   const { result: arg } = argElaboration;
 
-  const calleeArgType = calleeType.binder.type;
+  const calleeArgType = calleeType.domain;
 
-  const argTypeEff = TypeEff(calleeArgType, arg.typeEff.effect);
-
-  const evidence = interior(arg.typeEff, argTypeEff);
+  const evidence = interior(arg.typeEff, calleeArgType);
 
   if (!evidence.success) {
     return Err(
@@ -287,31 +276,24 @@ const app = (
         reason:
           'Argument type is not subtype of the expected type in the function',
         operator: expr.paren,
-        superType: argTypeEff,
+        superType: calleeArgType,
         type: arg.typeEff,
       }),
     );
   }
 
-  const returnEffect = SenvUtils.add(
-    callee.typeEff.effect,
-    SenvUtils.subst(
-      calleeType.returnTypeEff.effect,
-      calleeType.binder.identifier,
-      arg.typeEff.effect,
-    ),
-  );
+  const returnEffect = SenvUtils.add(callee.typeEff.effect, arg.typeEff.effect);
 
   return Ok(
     Call({
       callee,
       arg: Ascription({
         evidence: evidence.result,
-        typeEff: argTypeEff,
+        typeEff: calleeArgType,
         expression: arg,
       }),
       paren: expr.paren,
-      typeEff: TypeEff(calleeType.returnTypeEff.type, returnEffect),
+      typeEff: TypeEff(calleeType.codomain.type, returnEffect),
     }),
   );
 };
@@ -351,22 +333,74 @@ const ascription = (
   );
 };
 
+const printExpr = (
+  expr: past.Print,
+  tenv: TypeEnv,
+): Result<Print, ElaborationError> => {
+  const exprElaboration = expression(expr.expression, tenv);
+
+  if (!exprElaboration.success) {
+    return exprElaboration;
+  }
+
+  const { result: inner } = exprElaboration;
+
+  return Ok(
+    Print({
+      expression: inner,
+      typeEff: inner.typeEff,
+      showEvidence: expr.showEvidence,
+    }),
+  );
+};
+
+const block = (
+  expr: past.Block,
+  tenv: TypeEnv,
+): Result<Block, ElaborationError> => {
+  let result = TypeEff<Type, Senv>(Nil(), Senv());
+  let currentTenv = tenv;
+  const statements: Statement[] = [];
+
+  for (const decl of expr.statements) {
+    const stmtElaboration = statement(decl, currentTenv);
+
+    if (!stmtElaboration.success) {
+      return stmtElaboration;
+    }
+
+    const { result: stmt } = stmtElaboration;
+
+    result = stmt.term.typeEff;
+    currentTenv = stmt.tenv;
+
+    statements.push(stmt.term);
+  }
+
+  return Ok(
+    Block({
+      statements,
+      typeEff: result,
+    }),
+  );
+};
+
 export const expression = (
   expr: past.Expression,
   tenv: TypeEnv = {},
 ): Result<Expression, ElaborationError> => {
   switch (expr.kind) {
-    case 'Binary':
+    case past.ExprKind.Binary:
       return binary(expr, tenv);
-    case 'Call':
+    case past.ExprKind.Call:
       return app(expr, tenv);
-    case 'NonLinearBinary':
+    case past.ExprKind.NonLinearBinary:
       return nonLinearBinary(expr, tenv);
-    case 'Variable':
+    case past.ExprKind.Variable:
       return variable(expr, tenv);
-    case 'Fun':
+    case past.ExprKind.Fun:
       return fun(expr, tenv);
-    case 'Literal': {
+    case past.ExprKind.Literal: {
       if (typeof expr.value === 'number') {
         return Ok(realLit(expr));
       } else if (typeof expr.value === 'boolean') {
@@ -380,35 +414,15 @@ export const expression = (
         }),
       );
     }
-    case 'Ascription':
+    case past.ExprKind.Ascription:
       return ascription(expr, tenv);
-    case 'Grouping':
+    case past.ExprKind.Grouping:
       return expression(expr.expression, tenv);
+    case past.ExprKind.Print:
+      return printExpr(expr, tenv);
+    case past.ExprKind.Block:
+      return block(expr, tenv);
   }
-};
-
-const printStmt = (
-  stmt: past.Print,
-  tenv: TypeEnv,
-): Result<Stateful<Print>, ElaborationError> => {
-  const exprElaboration = expression(stmt.expression, tenv);
-
-  if (!exprElaboration.success) {
-    return exprElaboration;
-  }
-
-  const { result: expr } = exprElaboration;
-
-  return Ok(
-    Stateful(
-      Print({
-        expression: expr,
-        typeEff: expr.typeEff,
-        showEvidence: stmt.showEvidence,
-      }),
-      tenv,
-    ),
-  );
 };
 
 const exprStmt = (
@@ -480,53 +494,15 @@ const varStmt = (
   );
 };
 
-const block = (
-  stmt: past.Block,
-  tenv: TypeEnv,
-): Result<Stateful<Block>, ElaborationError> => {
-  let result = TypeEff<Type, Senv>(Nil(), Senv());
-  let currentTenv = tenv;
-  const statements: Statement[] = [];
-
-  for (const decl of stmt.statements) {
-    const stmtElaboration = statement(decl, currentTenv);
-
-    if (!stmtElaboration.success) {
-      return stmtElaboration;
-    }
-
-    const { result: stmt } = stmtElaboration;
-
-    result = stmt.term.typeEff;
-    currentTenv = stmt.tenv;
-
-    statements.push(stmt.term);
-  }
-
-  return Ok(
-    Stateful(
-      Block({
-        statements,
-        typeEff: result,
-      }),
-      tenv,
-    ),
-  );
-};
-
 export const statement = (
   stmt: past.Statement,
   tenv: TypeEnv = {},
 ): Result<Stateful<Statement>, ElaborationError> => {
   switch (stmt.kind) {
-    case 'Print':
-      return printStmt(stmt, tenv);
-    case 'ExprStmt':
+    case past.StmtKind.ExprStmt:
       return exprStmt(stmt, tenv);
-    case 'VarStmt':
+    case past.StmtKind.VarStmt:
       return varStmt(stmt, tenv);
-    case 'Block':
-      return block(stmt, tenv);
   }
 };
 
@@ -535,16 +511,16 @@ export const statement = (
  */
 export const elaborate = (
   stmts: past.Statement[],
-): Result<Statement, ElaborationError> => {
+): Result<Expression, ElaborationError> => {
   const block = past.Block({
     statements: stmts,
   });
 
-  const result = statement(block, TypeEnv());
+  const result = expression(block, TypeEnv());
 
   if (!result.success) {
     return result;
   }
 
-  return Ok(result.result.term);
+  return Ok(result.result);
 };

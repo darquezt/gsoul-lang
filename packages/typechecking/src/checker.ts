@@ -4,12 +4,14 @@ import {
   Block,
   Call,
   Expression,
+  ExprKind,
   ExprStmt,
   Fun,
   Literal,
   NonLinearBinary,
   Print,
   Statement,
+  StmtKind,
   Variable,
   VarStmt,
 } from '@gsens-lang/parsing/lib/ast';
@@ -24,7 +26,7 @@ import {
 import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
 import { isKinded } from '@gsens-lang/core/utils/ADT';
 
-import { isSubType, isSubTypeEff } from './subtyping';
+import { isSubTypeEff } from './subtyping';
 import { Token } from '@gsens-lang/parsing/lib/lexing';
 import { TypeAssoc, TypeAssocs, TypingSeeker } from './utils/typingSeeker';
 
@@ -180,13 +182,9 @@ const fun = (expr: Fun, tenv: TypeEnv): PureResult => {
 
   const varName = binder.name.lexeme;
 
-  const bodyTC = statement(
+  const bodyTC = expression(
     body,
-    TypeEnvUtils.extend(
-      tenv,
-      varName,
-      TypeEff(binder.type, Senv({ [varName]: Sens(1) })),
-    ),
+    TypeEnvUtils.extend(tenv, varName, binder.type),
   );
 
   if (!bodyTC.success) {
@@ -196,11 +194,8 @@ const fun = (expr: Fun, tenv: TypeEnv): PureResult => {
   return PureSuccess(
     TypeEff(
       Arrow({
-        binder: {
-          identifier: varName,
-          type: binder.type,
-        },
-        returnTypeEff: bodyTC.typeEff,
+        domain: binder.type,
+        codomain: bodyTC.typeEff,
       }),
       Senv(),
     ),
@@ -227,11 +222,11 @@ const app = (expr: Call, tenv: TypeEnv): PureResult => {
     return argTC;
   }
 
-  const calleeArgType = calleeType.binder.type;
+  const calleeArgType = calleeType.domain;
 
-  const argType = argTC.typeEff.type;
+  const argType = argTC.typeEff;
 
-  if (!isSubType(calleeArgType, argType)) {
+  if (!isSubTypeEff(argType, calleeArgType)) {
     return Failure(
       expr.paren,
       'Argument type is not subtype of the expected type in the function',
@@ -240,15 +235,11 @@ const app = (expr: Call, tenv: TypeEnv): PureResult => {
 
   const returnEffect = SenvUtils.add(
     calleeTC.typeEff.effect,
-    SenvUtils.subst(
-      calleeType.returnTypeEff.effect,
-      calleeType.binder.identifier,
-      argTC.typeEff.effect,
-    ),
+    argTC.typeEff.effect,
   );
 
   return PureSuccess(
-    TypeEff(calleeType.returnTypeEff.type, returnEffect),
+    TypeEff(calleeType.codomain.type, returnEffect),
     calleeTC.typings.concat(argTC.typings),
   );
 };
@@ -270,22 +261,56 @@ const ascription = (expr: Ascription, tenv: TypeEnv): PureResult => {
   return PureSuccess(expr.typeEff, innerTC.typings);
 };
 
+const printExpr = (expr: Print, tenv: TypeEnv): PureResult => {
+  const exprTC = expression(expr.expression, tenv);
+
+  if (!exprTC.success) {
+    return exprTC;
+  }
+
+  return PureSuccess(
+    exprTC.typeEff,
+    [[expr.token, exprTC.typeEff] as TypeAssoc].concat(exprTC.typings),
+  );
+};
+
+const block = (expr: Block, tenv: TypeEnv): PureResult => {
+  let result = TypeEff(Nil(), Senv()) as TypeEff;
+  let currentTenv = tenv;
+  const typings: TypeAssocs = [];
+
+  for (const decl of expr.statements) {
+    const declTC = statement(decl, currentTenv);
+
+    if (!declTC.success) {
+      return declTC;
+    }
+
+    typings.push(...declTC.typings);
+
+    result = declTC.typeEff;
+    currentTenv = declTC.tenv;
+  }
+
+  return PureSuccess(result, typings);
+};
+
 export const expression = (
   expr: Expression,
   tenv: TypeEnv = {},
 ): PureResult => {
   switch (expr.kind) {
-    case 'Binary':
+    case ExprKind.Binary:
       return binary(expr, tenv);
-    case 'Call':
+    case ExprKind.Call:
       return app(expr, tenv);
-    case 'NonLinearBinary':
+    case ExprKind.NonLinearBinary:
       return nonLinearBinary(expr, tenv);
-    case 'Variable':
+    case ExprKind.Variable:
       return variable(expr, tenv);
-    case 'Fun':
+    case ExprKind.Fun:
       return fun(expr, tenv);
-    case 'Literal': {
+    case ExprKind.Literal: {
       const { value } = expr;
       if (typeof value === 'number') {
         return realLit(expr);
@@ -294,25 +319,15 @@ export const expression = (
       }
       return nilLit(expr);
     }
-    case 'Ascription':
+    case ExprKind.Ascription:
       return ascription(expr, tenv);
-    case 'Grouping':
+    case ExprKind.Grouping:
       return expression(expr.expression, tenv);
+    case ExprKind.Print:
+      return printExpr(expr, tenv);
+    case ExprKind.Block:
+      return block(expr, tenv);
   }
-};
-
-const printStmt = (stmt: Print, tenv: TypeEnv): StatefulResult => {
-  const exprTC = expression(stmt.expression, tenv);
-
-  if (!exprTC.success) {
-    return exprTC;
-  }
-
-  return StatefulSuccess(
-    exprTC.typeEff,
-    tenv,
-    [[stmt.token, exprTC.typeEff] as TypeAssoc].concat(exprTC.typings),
-  );
 };
 
 const exprStmt = (stmt: ExprStmt, tenv: TypeEnv): StatefulResult => {
@@ -347,45 +362,20 @@ const varStmt = (stmt: VarStmt, tenv: TypeEnv): StatefulResult => {
   );
 };
 
-const block = (stmt: Block, tenv: TypeEnv): StatefulResult => {
-  let result = TypeEff(Nil(), Senv()) as TypeEff;
-  let currentTenv = tenv;
-  const typings: TypeAssocs = [];
-
-  for (const decl of stmt.statements) {
-    const declTC = statement(decl, currentTenv);
-
-    if (!declTC.success) {
-      return declTC;
-    }
-
-    typings.push(...declTC.typings);
-
-    result = declTC.typeEff;
-    currentTenv = declTC.tenv;
-  }
-
-  return StatefulSuccess(result, tenv, typings);
-};
-
 export const statement = (
   stmt: Statement,
   tenv: TypeEnv = {},
 ): StatefulResult => {
   switch (stmt.kind) {
-    case 'Print':
-      return printStmt(stmt, tenv);
-    case 'ExprStmt':
+    case StmtKind.ExprStmt:
       return exprStmt(stmt, tenv);
-    case 'VarStmt':
+    case StmtKind.VarStmt:
       return varStmt(stmt, tenv);
-    case 'Block':
-      return block(stmt, tenv);
   }
 };
 
 export const typeCheck = (statements: Statement[]): TypeCheckingResult => {
-  const tc = statement(Block({ statements }));
+  const tc = expression(Block({ statements }));
 
   if (!tc.success) {
     return tc;

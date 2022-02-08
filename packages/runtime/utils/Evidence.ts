@@ -99,13 +99,13 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
     return Ok([t1, t2]);
   }
   if (isKinded(t1, 'Arrow') && isKinded(t2, 'Arrow')) {
-    const evit11Res = interiorType(t2.binder.type, t1.binder.type);
+    const evit11Res = interior(t2.domain, t1.domain);
 
     if (!evit11Res.success) {
       return evit11Res;
     }
 
-    const eviT12Res = interior(t1.returnTypeEff, t2.returnTypeEff);
+    const eviT12Res = interior(t1.codomain, t2.codomain);
 
     if (!eviT12Res.success) {
       return eviT12Res;
@@ -120,12 +120,12 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
 
     return Ok([
       Arrow({
-        binder: { identifier: t1.binder.identifier, type: t11p },
-        returnTypeEff: T12p,
+        domain: t11p,
+        codomain: T12p,
       }),
       Arrow({
-        binder: { identifier: t2.binder.identifier, type: t21p },
-        returnTypeEff: T22p,
+        domain: t21p,
+        codomain: T22p,
       }),
     ]);
   }
@@ -237,18 +237,15 @@ const transType = (
     isKinded(t3, 'Arrow') &&
     isKinded(t4, 'Arrow')
   ) {
-    const evit11Res = transType(
-      [t4.binder.type, t3.binder.type],
-      [t2.binder.type, t1.binder.type],
-    );
+    const evit11Res = trans([t4.domain, t3.domain], [t2.domain, t1.domain]);
 
     if (!evit11Res.success) {
       return evit11Res;
     }
 
     const eviT12Res = trans(
-      [t1.returnTypeEff, t2.returnTypeEff],
-      [t3.returnTypeEff, t4.returnTypeEff],
+      [t1.codomain, t2.codomain],
+      [t3.codomain, t4.codomain],
     );
 
     if (!eviT12Res.success) {
@@ -264,12 +261,12 @@ const transType = (
 
     return Ok([
       Arrow({
-        binder: { identifier: t1.binder.identifier, type: t11p },
-        returnTypeEff: T12p,
+        domain: t11p,
+        codomain: T12p,
       }),
       Arrow({
-        binder: { identifier: t2.binder.identifier, type: t21p },
-        returnTypeEff: T22p,
+        domain: t21p,
+        codomain: T22p,
       }),
     ]);
   }
@@ -318,12 +315,12 @@ export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
 
   return Ok([
     TypeEff(
-      ev[0].type.returnTypeEff.type,
-      SenvUtils.add(ev[0].effect, ev[0].type.returnTypeEff.effect),
+      ev[0].type.codomain.type,
+      SenvUtils.add(ev[0].effect, ev[0].type.codomain.effect),
     ),
     TypeEff(
-      ev[1].type.returnTypeEff.type,
-      SenvUtils.add(ev[1].effect, ev[1].type.returnTypeEff.effect),
+      ev[1].type.codomain.type,
+      SenvUtils.add(ev[1].effect, ev[1].type.codomain.effect),
     ),
   ]);
 };
@@ -337,16 +334,7 @@ export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
     );
   }
 
-  return Ok([
-    TypeEff(
-      ev[1].type.binder.type,
-      Senv({ [ev[1].type.binder.identifier]: Sens(1) }),
-    ),
-    TypeEff(
-      ev[0].type.binder.type,
-      Senv({ [ev[0].type.binder.identifier]: Sens(1) }),
-    ),
-  ]);
+  return Ok([ev[1].type.domain, ev[0].type.domain]);
 };
 
 // UTILS

@@ -25,11 +25,8 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
     return true;
   }
   if (type1.kind === 'Arrow' && type2.kind === 'Arrow') {
-    const argSubtyping = isSubType(type2.binder.type, type1.binder.type);
-    const bodySubtyping = isSubTypeEff(
-      type1.returnTypeEff,
-      type2.returnTypeEff,
-    );
+    const argSubtyping = isSubTypeEff(type2.domain, type1.domain);
+    const bodySubtyping = isSubTypeEff(type1.codomain, type2.codomain);
 
     return argSubtyping && bodySubtyping;
   }

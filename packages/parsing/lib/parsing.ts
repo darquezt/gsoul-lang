@@ -1,5 +1,6 @@
-import { Sens, Senv, SenvUtils, Type, TypeEff } from '@gsens-lang/core/utils';
+import { Sens, Senv, SenvUtils, TypeEff } from '@gsens-lang/core/utils';
 import { UnknownSens } from '@gsens-lang/core/utils/Sens';
+import { MaxSenv } from '@gsens-lang/core/utils/Senv';
 import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
 
 import {
@@ -53,10 +54,10 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
   function declaration(): Statement | null {
     return synchronized(() => {
-      if (check(TokenType.VAR)) {
+      if (check(TokenType.LET)) {
         return varDeclaration(false);
       }
-      if (match(TokenType.RESOURCE)) {
+      if (check(TokenType.SLET)) {
         return varDeclaration(true);
       }
 
@@ -66,9 +67,9 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
   function varDeclaration(resource = false): Statement {
     consume(
-      TokenType.VAR,
+      resource ? TokenType.SLET : TokenType.LET,
       errorMessage({
-        expected: '`var` keyword',
+        expected: resource ? '`slet` keyword' : '`let` keyword',
         beginning: 'a variable declaration',
       }),
     );
@@ -97,20 +98,10 @@ export function parse(tokens: Token[]): Result<Statement[]> {
   }
 
   function statement(): Statement {
-    if (match(TokenType.PRINT)) {
-      return printStatement(false);
-    }
-    if (match(TokenType.PRINTEV)) {
-      return printStatement(true);
-    }
-    if (check(TokenType.LEFT_BRACE)) {
-      return block();
-    }
-
     return expressionStatement();
   }
 
-  function block(): Statement {
+  function block(): Expression {
     consume(
       TokenType.LEFT_BRACE,
       errorMessage({ expected: '{', beginning: 'a block' }),
@@ -152,17 +143,9 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     });
   }
 
-  function printStatement(showEvidence = false): Statement {
+  function printExpression(showEvidence = false): Expression {
     const token = previous();
     const value = expression();
-
-    consume(
-      TokenType.SEMICOLON,
-      errorMessage({
-        expected: ';',
-        end: 'a statement',
-      }),
-    );
 
     return Print({
       token,
@@ -172,6 +155,16 @@ export function parse(tokens: Token[]): Result<Statement[]> {
   }
 
   function expression(): Expression {
+    if (match(TokenType.PRINT)) {
+      return printExpression(false);
+    }
+    if (match(TokenType.PRINTEV)) {
+      return printExpression(true);
+    }
+    if (check(TokenType.LEFT_BRACE)) {
+      return block();
+    }
+
     return ascription();
   }
 
@@ -336,7 +329,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
           after: 'argument name',
         }),
       );
-      const type = preType();
+      const type = typeEff();
       consume(
         TokenType.RIGHT_PAREN,
         errorMessage({
@@ -398,13 +391,6 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
   function senv(): Senv {
     consume(
-      TokenType.AT,
-      errorMessage({
-        expected: '@',
-        beginning: 'a sensitivity environment',
-      }),
-    );
-    consume(
       TokenType.LEFT_BRACKET,
       errorMessage({
         expected: '[',
@@ -458,51 +444,74 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     return Senv(s);
   }
 
-  function preType(): Type {
-    if (match(TokenType.NUMBER)) {
-      return Real();
-    } else if (match(TokenType.BOOL)) {
-      return Bool();
-    } else if (match(TokenType.NIL)) {
-      return Nil();
-    } else if (match(TokenType.LEFT_PAREN, TokenType.IDENTIFIER)) {
-      const id = previous();
-      const argType = preType();
-      consume(
-        TokenType.ARROW,
-        errorMessage({
-          expected: '->',
-          after: 'argument type',
-        }),
-      );
-      const returnTypeEff = typeEff();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({ expected: ')', end: 'a function type' }),
-      );
+  function typeEff(): TypeEff {
+    let t: TypeEff | null = null;
 
-      return Arrow({
-        binder: {
-          identifier: id.lexeme,
-          type: argType,
-        },
-        returnTypeEff,
-      });
+    if (match(TokenType.NUMBER, TokenType.BOOL, TokenType.NIL)) {
+      const typeToken = previous();
+
+      const effect = match(TokenType.BANG) ? senv() : MaxSenv();
+
+      switch (typeToken.type) {
+        case TokenType.NUMBER: {
+          t = TypeEff(Real(), effect);
+          break;
+        }
+        case TokenType.BOOL: {
+          t = TypeEff(Bool(), effect);
+          break;
+        }
+        case TokenType.NIL: {
+          t = TypeEff(Nil(), effect);
+          break;
+        }
+      }
     }
 
-    throw error(
-      peek(),
-      errorMessage({
-        expected: 'a type',
-      }),
-    );
-  }
+    if (match(TokenType.LEFT_PAREN)) {
+      t = typeEff();
 
-  function typeEff(): TypeEff {
-    const ty = preType();
-    const s = senv();
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: 'aclosing paranthesis )',
+          end: 'this type-and-effect',
+        }),
+      );
 
-    return TypeEff(ty, s);
+      if (match(TokenType.BANG)) {
+        const effect = senv();
+
+        t = TypeEff(t.type, SenvUtils.add(t.effect, effect));
+      }
+    }
+
+    if (!t) {
+      throw error(
+        peek(),
+        errorMessage({ expected: 'a type or a type-and-effect' }),
+      );
+    }
+
+    while (match(TokenType.ARROW)) {
+      switch (previous().type) {
+        case TokenType.ARROW: {
+          const codomain = typeEff();
+
+          t = TypeEff(
+            Arrow({
+              domain: t,
+              codomain,
+            }),
+            Senv(),
+          );
+
+          break;
+        }
+      }
+    }
+
+    return t;
   }
 
   function consume(type: TokenType, message: string): Token {
@@ -560,8 +569,8 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       }
 
       switch (peek().type) {
-        case TokenType.VAR:
-        case TokenType.RESOURCE:
+        case TokenType.LET:
+        case TokenType.SLET:
         case TokenType.PRINT:
         case TokenType.PRINTEV:
           return;

@@ -5,10 +5,21 @@ import * as SensUtils from './Sens';
 
 export type Identifier = string;
 
+const InftySenvKind = '__Infty';
 export type Senv = Record<Identifier, Sens>;
 export const Senv = (map: Senv = {}): Senv => map;
 
+/**
+ * @returns A dummy senv with a special key to discriminate from a true senv
+ */
+export const MaxSenv = (): Senv =>
+  Senv({ [InftySenvKind]: SensUtils.MaxSens() });
+
 export const access = (senv: Senv, name: Identifier): Sens => {
+  if (senv[InftySenvKind]) {
+    return SensUtils.MaxSens();
+  }
+
   const sens = senv[name];
 
   if (!sens) {

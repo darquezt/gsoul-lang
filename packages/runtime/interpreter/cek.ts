@@ -18,11 +18,13 @@ import {
   Value,
   simpleValueIsKinded,
   RealLiteral,
+  ExprKind,
+  StmtKind,
 } from '../elaboration/ast';
 import { Store, StoreUtils, Evidence, EvidenceUtils } from '../utils';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import { Token, TokenType } from '@gsens-lang/parsing/lib/lexing';
-import { Real } from '@gsens-lang/core/utils/Type';
+import { Arrow, Real } from '@gsens-lang/core/utils/Type';
 import { SenvUtils, TypeEffUtils } from '@gsens-lang/core/utils';
 import { formatValue } from '../utils/format';
 import {
@@ -163,7 +165,7 @@ const step = ({
   kont,
 }: StepState): Result<StepState, InterpreterError> => {
   switch (term.kind) {
-    case 'Binary': {
+    case ExprKind.Binary: {
       return OkState(
         { term: term.left },
         store,
@@ -174,7 +176,7 @@ const step = ({
       );
     }
 
-    case 'NonLinearBinary': {
+    case ExprKind.NonLinearBinary: {
       return OkState(
         { term: term.left },
         store,
@@ -185,7 +187,7 @@ const step = ({
       );
     }
 
-    case 'Variable': {
+    case ExprKind.Variable: {
       const value = StoreUtils.get(store, term.name.lexeme);
 
       if (!value) {
@@ -200,7 +202,7 @@ const step = ({
       return OkState({ term: ascribedValueToExpr(value) }, store, kont);
     }
 
-    case 'Call': {
+    case ExprKind.Call: {
       return OkState(
         { term: term.callee },
         store,
@@ -211,7 +213,7 @@ const step = ({
       );
     }
 
-    case 'Ascription': {
+    case ExprKind.Ascription: {
       const inner = term.expression;
 
       // Expression finished evaluating
@@ -241,7 +243,7 @@ const step = ({
 
           case 'LeftOpKont': {
             if (kont.op.type === TokenType.PLUS) {
-              if (!isKinded(inner, 'RealLiteral')) {
+              if (!isKinded(inner, ExprKind.RealLiteral)) {
                 return Err(
                   InterpreterEvidenceError({
                     reason: `Left operand of ${kont.op.lexeme} must be a number`,
@@ -251,7 +253,7 @@ const step = ({
 
               const left = kont.state.value;
 
-              if (!simpleValueIsKinded(left, 'RealLiteral')) {
+              if (!simpleValueIsKinded(left, ExprKind.RealLiteral)) {
                 return Err(
                   InterpreterEvidenceError({
                     reason: `Right operand of ${kont.op.lexeme} must be a number`,
@@ -297,7 +299,7 @@ const step = ({
 
           case 'NLLeftOpKont': {
             if (kont.op.type === TokenType.STAR) {
-              if (!isKinded(inner, 'RealLiteral')) {
+              if (!isKinded(inner, ExprKind.RealLiteral)) {
                 return Err(
                   InterpreterTypeError({
                     reason: `Left operand of ${kont.op.lexeme} must be a number`,
@@ -308,7 +310,7 @@ const step = ({
 
               const left = kont.state.value;
 
-              if (!simpleValueIsKinded(left, 'RealLiteral')) {
+              if (!simpleValueIsKinded(left, ExprKind.RealLiteral)) {
                 return Err(
                   InterpreterTypeError({
                     reason: `Right operand of ${kont.op.lexeme} must be a number`,
@@ -358,7 +360,7 @@ const step = ({
           }
 
           case 'ArgKont': {
-            if (isKinded(inner, 'Closure')) {
+            if (isKinded(inner, ExprKind.Closure)) {
               return OkState(
                 { term: kont.state.expression },
                 kont.state.store,
@@ -392,11 +394,7 @@ const step = ({
 
             const argEviRes = EvidenceUtils.trans(
               term.evidence,
-              EvidenceUtils.subst(
-                idomRes.result,
-                closure.fun.binder.name.lexeme,
-                term.typeEff.effect,
-              ),
+              idomRes.result,
             );
 
             if (!argEviRes.success) {
@@ -409,13 +407,36 @@ const step = ({
             }
 
             const arg = AscribedValue({
-              typeEff: TypeEff(closure.fun.binder.type, term.typeEff.effect),
+              typeEff: closure.fun.binder.type,
               evidence: argEviRes.result,
               expression: inner,
             });
 
+            const bodyEviRes = EvidenceUtils.icod(ascrFun.evidence);
+
+            if (!bodyEviRes.success) {
+              return Err(
+                InterpreterTypeError({
+                  reason: bodyEviRes.error.reason,
+                  operator: kont.paren,
+                }),
+              );
+            }
+
+            const codomain = (ascrFun.typeEff.type as Arrow).codomain;
+            const bodyEffect = SenvUtils.add(
+              ascrFun.typeEff.effect,
+              codomain.effect,
+            );
+
+            const body = Ascription({
+              expression: closure.fun.body,
+              evidence: bodyEviRes.result,
+              typeEff: TypeEff(codomain.type, bodyEffect),
+            });
+
             return OkState(
-              { term: closure.fun.body }, // TODO: Ascribe it!
+              { term: body }, // TODO: Ascribe it!
               StoreUtils.extend(
                 closure.store,
                 closure.fun.binder.name.lexeme,
@@ -504,7 +525,7 @@ const step = ({
       }
 
       // Closure creation
-      if (isKinded(inner, 'Fun')) {
+      if (isKinded(inner, ExprKind.Fun)) {
         return OkState(
           {
             term: Ascription({
@@ -541,7 +562,7 @@ const step = ({
      * Statements
      */
 
-    case 'Block': {
+    case ExprKind.Block: {
       if (term.statements.length === 0) {
         return OkState({ term: NilLiteral() }, store, kont);
       }
@@ -557,11 +578,11 @@ const step = ({
       );
     }
 
-    case 'ExprStmt': {
+    case StmtKind.ExprStmt: {
       return OkState({ term: term.expression }, store, kont);
     }
 
-    case 'Print': {
+    case ExprKind.Print: {
       return OkState(
         { term: term.expression },
         store,
@@ -569,7 +590,7 @@ const step = ({
       );
     }
 
-    case 'VarStmt': {
+    case StmtKind.VarStmt: {
       return OkState(
         { term: term.assignment },
         store,

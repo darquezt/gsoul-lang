@@ -5,8 +5,8 @@ program ::= declaration* EOF;
 (* Declarations *)
 
 declaration ::= resDecl | varDecl | statement;
-varDecl ::= "var" IDENTIFIER "=" expression ";";
-resDecl ::= "resource" IDENTIFIER "=" expression ";";
+varDecl ::= "let" IDENTIFIER "=" expression ";";
+resDecl ::= "slet" IDENTIFIER "=" expression ";";
 
 (* Statements *)
 
@@ -21,7 +21,7 @@ block ::= "{" declaration* "}";
 (* Expressions *)
 
 expression ::= ascription;
-ascription ::= equality ("::" typeEff)*;
+ascription ::= equality ("::" typeEff)* | equality ("::" type)* | equality ("::" senv)*;
 (* Logic ops and assignments can be added here *)
 equality ::= comparison; (* Equality and inequality should be added here *)
 comparison ::= additive ("<=" additive)*;
@@ -30,19 +30,27 @@ multiplicative ::= unary ("*" unary)*; (* Division should be added here *)
 unary ::= call; (* Unary operators may be added before `call` in the future *)
 call ::= primary "(" arguments ")";
 
-primary ::= "true" | "false"
-          | "null"
+primary ::= "true" | "false"
+          | "nil"
           | "fun" "(" parameters ")" block
           | NUMBER
           | IDENTIFIER
-          | "(" expression ")";
+          | "(" expression ")";
 
 (* Types *)
 
+typeEff ::= type "!" senv; (* Should the @[] be in the def of senv? *)
+type ::= "Number" | "Bool" | "Nil"
+       | typeEff  "->"  typeEff | "forall" IDENTIFIER "." typeEff;
+
+
+typeEff ::= "Number" | "Bool" | "Nil" | typeEff "->" typeEff | typeEff "!" senv;
+baseTypeEff ::= baseType "!" senv;
+type ::= baseType | typeEff "->" typeEff;
+baseType = ;
+
+senv ::= "[" ( sensitivity IDENTIFIER ("+" sensitivity IDENTIFIER)* )? "]";
 sensitivity ::= NUMBER | "?";
-senv ::= ( sensitivity IDENTIFIER ("+" sensitivity IDENTIFIER)* )?;
-type ::= "Number" | "Bool" | "Null" | "(" parameters  "->"  typeEff ")";
-typeEff ::= type "@" "[" senv "]"; (* Should the @[] be in the def of senv? *)
 
 (* Utility *)
 

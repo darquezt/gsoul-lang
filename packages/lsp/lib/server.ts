@@ -90,7 +90,9 @@ const parseFile = (doc: TextDocument): void => {
       diagnostics,
     });
   } catch (e) {
-    connection.console.error(e);
+    connection.console.error(
+      JSON.stringify(e, ['message', 'arguments', 'type', 'name', 'stack'], 2),
+    );
   }
 };
 

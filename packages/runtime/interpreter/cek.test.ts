@@ -27,12 +27,15 @@ describe('CEK', () => {
   test('function application', () => {
     const body = Block({
       statements: [
-        Print({
-          expression: Variable({
-            name: variableToken('x'),
+        ExprStmt({
+          expression: Print({
+            expression: Variable({
+              name: variableToken('x'),
+              typeEff: RealEmptySenv,
+            }),
+            showEvidence: false,
             typeEff: RealEmptySenv,
           }),
-          showEvidence: false,
           typeEff: RealEmptySenv,
         }),
         ExprStmt({
@@ -53,38 +56,29 @@ describe('CEK', () => {
       expression: Fun({
         binder: {
           name: variableToken('x'),
-          type: Real(),
+          type: RealEmptySenv,
         },
         body,
         typeEff: {
           type: Arrow({
-            binder: {
-              identifier: 'x',
-              type: Real(),
-            },
-            returnTypeEff: RealEmptySenv,
+            domain: RealEmptySenv,
+            codomain: RealEmptySenv,
           }),
           effect: Senv(),
         },
       }),
       typeEff: TypeEff(
         Arrow({
-          binder: {
-            identifier: 'x',
-            type: Real(),
-          },
-          returnTypeEff: RealEmptySenv,
+          domain: RealEmptySenv,
+          codomain: RealEmptySenv,
         }),
         Senv(),
       ),
       evidence: initialEvidence(
         TypeEff(
           Arrow({
-            binder: {
-              identifier: 'x',
-              type: Real(),
-            },
-            returnTypeEff: RealEmptySenv,
+            domain: RealEmptySenv,
+            codomain: RealEmptySenv,
           }),
           Senv(),
         ),
@@ -108,11 +102,9 @@ describe('CEK', () => {
 
     const result = Ok(
       Ascription({
-        expression: {
-          kind: 'RealLiteral',
-          typeEff: { type: Real(), effect: Senv() },
+        expression: RealLiteral({
           value: 4,
-        },
+        }),
         typeEff: { type: Real(), effect: Senv() },
         evidence: initialEvidence({ type: Real(), effect: Senv() }),
       }),

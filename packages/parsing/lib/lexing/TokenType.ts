@@ -62,8 +62,8 @@ enum TokenType {
   // SUPER = 'SUPER',
   // THIS = 'THIS',
   TRUE = 'TRUE',
-  VAR = 'VAR',
-  RESOURCE = 'RESOURCE',
+  LET = 'LET',
+  SLET = 'SLET',
   // WHILE = 'WHILE',
 
   INVALID = 'INVALID',

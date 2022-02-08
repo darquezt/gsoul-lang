@@ -1,6 +1,6 @@
 import { Sens, Senv, TypeEff } from '@gsens-lang/core/utils';
 import { UnknownSens } from '@gsens-lang/core/utils/Sens';
-import { Nil, Real } from '@gsens-lang/core/utils/Type';
+import { Nil, Real, Arrow, Bool } from '@gsens-lang/core/utils/Type';
 import {
   Ascription,
   Binary,
@@ -22,6 +22,7 @@ import { scanTokens } from './lexing/lexing';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
 import { Failure, parse, Result } from './parsing';
+import { MaxSenv } from '@gsens-lang/core/utils/Senv';
 
 const lexAndParse = (source: string) => parse(scanTokens(source));
 
@@ -126,20 +127,20 @@ describe('Parsing', () => {
 
   describe('functions', () => {
     test('A simple function', () => {
-      expect(lexAndParse('fun(x:Number) { x; };')).toStrictEqual<
+      expect(lexAndParse('fun(x:Number![]) { x; };')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
           Fun({
             binder: {
               name: variableToken('x', 1, 5),
-              type: Real(),
+              type: TypeEff(Real(), Senv()),
             },
             body: Block({
               statements: [
                 ExprStmt({
                   expression: Variable({
-                    name: variableToken('x', 1, 17),
+                    name: variableToken('x', 1, 20),
                   }),
                 }),
               ],
@@ -150,20 +151,20 @@ describe('Parsing', () => {
     });
 
     test('A simple function with Nil type', () => {
-      expect(lexAndParse('fun(x:Nil) { x; };')).toStrictEqual<
+      expect(lexAndParse('fun(x:Nil![]) { x; };')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
           Fun({
             binder: {
               name: variableToken('x', 1, 5),
-              type: Nil(),
+              type: TypeEff(Nil(), Senv()),
             },
             body: Block({
               statements: [
                 ExprStmt({
                   expression: Variable({
-                    name: variableToken('x', 1, 14),
+                    name: variableToken('x', 1, 17),
                   }),
                 }),
               ],
@@ -216,7 +217,7 @@ describe('Parsing', () => {
     });
 
     test('Inline function call', () => {
-      expect(lexAndParse('(fun(x:Number) {x;})(2);')).toStrictEqual<
+      expect(lexAndParse('(fun(x:Number![]) {x;})(2);')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
@@ -225,13 +226,13 @@ describe('Parsing', () => {
               expression: Fun({
                 binder: {
                   name: variableToken('x', 1, 6),
-                  type: Real(),
+                  type: TypeEff(Real(), Senv()),
                 },
                 body: Block({
                   statements: [
                     ExprStmt({
                       expression: Variable({
-                        name: variableToken('x', 1, 17),
+                        name: variableToken('x', 1, 20),
                       }),
                     }),
                   ],
@@ -240,9 +241,9 @@ describe('Parsing', () => {
             }),
             arg: Literal({
               value: 2,
-              token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 22),
+              token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 25),
             }),
-            paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 23),
+            paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 26),
           }),
         ),
       );
@@ -359,7 +360,7 @@ describe('Parsing', () => {
 
   describe('ascriptions', () => {
     test('A simple ascription', () => {
-      expect(lexAndParse('2::Number@[3x];')).toStrictEqual<Result<Statement[]>>(
+      expect(lexAndParse('2::Number![3x];')).toStrictEqual<Result<Statement[]>>(
         exprStmt(
           Ascription({
             ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1, 2),
@@ -379,7 +380,7 @@ describe('Parsing', () => {
     });
 
     test('An ascription with floating point sensitivities', () => {
-      expect(lexAndParse('2::Number@[31.34x];')).toStrictEqual<
+      expect(lexAndParse('2::Number![31.34x];')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
@@ -401,7 +402,7 @@ describe('Parsing', () => {
     });
 
     test('An ascription with an unknown sensitivity', () => {
-      expect(lexAndParse('2::Number@[2y + ?x + 3z];')).toStrictEqual<
+      expect(lexAndParse('2::Number![2y + ?x + 3z];')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
@@ -425,7 +426,7 @@ describe('Parsing', () => {
     });
 
     test('A multi-ascription', () => {
-      expect(lexAndParse('2::Number@[3x]::Number@[4x];')).toStrictEqual<
+      expect(lexAndParse('2::Number![3x]::Number![4x];')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
@@ -466,18 +467,75 @@ describe('Parsing', () => {
         ),
       );
     });
+
+    test('with complex arrow types', () => {
+      expect(
+        lexAndParse(
+          'nil :: ((Number![2x] -> Number![4x])![2x + 1y] -> Bool![?z])![];',
+        ),
+      ).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          Ascription({
+            ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1, 5),
+            expression: Literal({
+              value: null,
+              token: new Token(TokenType.NILLIT, 'nil', null, 1, 1),
+            }),
+            typeEff: TypeEff(
+              Arrow({
+                domain: TypeEff(
+                  Arrow({
+                    domain: TypeEff(Real(), Senv({ x: Sens(2) })),
+                    codomain: TypeEff(Real(), Senv({ x: Sens(4) })),
+                  }),
+                  Senv({ x: Sens(2), y: Sens(1) }),
+                ),
+                codomain: TypeEff(Bool(), Senv({ z: UnknownSens() })),
+              }),
+              Senv(),
+            ),
+          }),
+        ),
+      );
+    });
+
+    test('with implicit effects', () => {
+      expect(
+        lexAndParse('nil :: Number![2x] -> (Number -> Bool)![4y];'),
+      ).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          Ascription({
+            ascriptionToken: new Token(TokenType.COLON_COLON, '::', null, 1, 5),
+            expression: Literal({
+              value: null,
+              token: new Token(TokenType.NILLIT, 'nil', null, 1, 1),
+            }),
+            typeEff: TypeEff(
+              Arrow({
+                domain: TypeEff(Real(), Senv({ x: Sens(2) })),
+                codomain: TypeEff(
+                  Arrow({
+                    domain: TypeEff(Real(), MaxSenv()),
+                    codomain: TypeEff(Bool(), MaxSenv()),
+                  }),
+                  Senv({ y: Sens(4) }),
+                ),
+              }),
+              Senv(),
+            ),
+          }),
+        ),
+      );
+    });
   });
 
   describe('block statements', () => {
     test('An empty block', () => {
-      expect(lexAndParse('{}')).toStrictEqual<Result<Statement[]>>(
-        Result(
-          [
-            Block({
-              statements: [],
-            }),
-          ],
-          [],
+      expect(lexAndParse('{};')).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          Block({
+            statements: [],
+          }),
         ),
       );
     });
@@ -485,24 +543,21 @@ describe('Parsing', () => {
     test('A block with multiple statements', () => {
       const x = variableToken('x', 1, 5);
 
-      expect(lexAndParse('{1; x;}')).toStrictEqual<Result<Statement[]>>(
-        Result(
-          [
-            Block({
-              statements: [
-                ExprStmt({
-                  expression: Literal({
-                    value: 1,
-                    token: new Token(TokenType.NUMBERLIT, '1', 1, 1, 2),
-                  }),
+      expect(lexAndParse('{1; x;};')).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          Block({
+            statements: [
+              ExprStmt({
+                expression: Literal({
+                  value: 1,
+                  token: new Token(TokenType.NUMBERLIT, '1', 1, 1, 2),
                 }),
-                ExprStmt({
-                  expression: Variable({ name: x }),
-                }),
-              ],
-            }),
-          ],
-          [],
+              }),
+              ExprStmt({
+                expression: Variable({ name: x }),
+              }),
+            ],
+          }),
         ),
       );
     });
@@ -511,18 +566,15 @@ describe('Parsing', () => {
   describe('print statements', () => {
     test('A simple print', () => {
       expect(lexAndParse('print 2;')).toStrictEqual<Result<Statement[]>>(
-        Result(
-          [
-            Print({
-              showEvidence: false,
-              expression: Literal({
-                value: 2,
-                token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 7),
-              }),
-              token: new Token(TokenType.PRINT, 'print', null, 1, 1),
+        exprStmt(
+          Print({
+            showEvidence: false,
+            expression: Literal({
+              value: 2,
+              token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 7),
             }),
-          ],
-          [],
+            token: new Token(TokenType.PRINT, 'print', null, 1, 1),
+          }),
         ),
       );
     });
@@ -531,7 +583,7 @@ describe('Parsing', () => {
   describe('Variable declarations', () => {
     test('A simple assignment', () => {
       const x = variableToken('x', 1, 5);
-      expect(lexAndParse('var x = 2;')).toStrictEqual<Result<Statement[]>>(
+      expect(lexAndParse('let x = 2;')).toStrictEqual<Result<Statement[]>>(
         Result(
           [
             VarStmt({
@@ -550,7 +602,7 @@ describe('Parsing', () => {
 
     test('A function assignment', () => {
       const x = variableToken('x', 1, 5);
-      expect(lexAndParse('var x = fun(y: Number) {y;};')).toStrictEqual<
+      expect(lexAndParse('let x = fun(y: Number![]) {y;};')).toStrictEqual<
         Result<Statement[]>
       >(
         Result(
@@ -561,13 +613,13 @@ describe('Parsing', () => {
               assignment: Fun({
                 binder: {
                   name: variableToken('y', 1, 13),
-                  type: Real(),
+                  type: TypeEff(Real(), Senv()),
                 },
                 body: Block({
                   statements: [
                     ExprStmt({
                       expression: Variable({
-                        name: variableToken('y', 1, 25),
+                        name: variableToken('y', 1, 28),
                       }),
                     }),
                   ],
@@ -613,7 +665,7 @@ describe('Parsing', () => {
     });
 
     test('Multiple failures', () => {
-      const { failures } = lexAndParse('2 + * 4 <=; f(; var 8 = 2; var;');
+      const { failures } = lexAndParse('2 + * 4 <=; f(; slet 8 = 2; let;');
 
       expect(failures).toHaveLength(4);
     });

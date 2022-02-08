@@ -1,15 +1,15 @@
 import { cyan } from 'chalk';
-import { SimpleValue } from '../elaboration/ast';
+import { ExprKind, SimpleValue } from '../elaboration/ast';
 
 export const formatValue = (value: SimpleValue): string => {
   switch (value.kind) {
-    case 'RealLiteral':
+    case ExprKind.RealLiteral:
       return cyan(value.value);
-    case 'BoolLiteral':
+    case ExprKind.BoolLiteral:
       return cyan(String(value.value));
-    case 'NilLiteral':
+    case ExprKind.NilLiteral:
       return cyan('nil');
-    case 'Closure':
+    case ExprKind.Closure:
       return cyan('[Closure]');
   }
 };
