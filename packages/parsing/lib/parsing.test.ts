@@ -8,11 +8,13 @@ import {
   Call,
   Expression,
   ExprStmt,
+  Forall,
   Fun,
   Grouping,
   Literal,
   NonLinearBinary,
   Print,
+  SCall,
   Statement,
   Variable,
   VarStmt,
@@ -173,6 +175,40 @@ describe('Parsing', () => {
         ),
       );
     });
+
+    test('A simple forall', () => {
+      expect(lexAndParse('forall x. nil;')).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          Forall({
+            sensVars: [variableToken('x', 1, 8)],
+            expr: Literal({
+              value: null,
+              token: new Token(TokenType.NILLIT, 'nil', null, 1, 11),
+            }),
+          }),
+        ),
+      );
+    });
+
+    test('A forall with multiple variables', () => {
+      expect(lexAndParse('forall x y z. nil;')).toStrictEqual<
+        Result<Statement[]>
+      >(
+        exprStmt(
+          Forall({
+            sensVars: [
+              variableToken('x', 1, 8),
+              variableToken('y', 1, 10),
+              variableToken('z', 1, 12),
+            ],
+            expr: Literal({
+              value: null,
+              token: new Token(TokenType.NILLIT, 'nil', null, 1, 15),
+            }),
+          }),
+        ),
+      );
+    });
   });
 
   describe('calls', () => {
@@ -191,6 +227,33 @@ describe('Parsing', () => {
               token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 14),
             }),
             paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 15),
+          }),
+        ),
+      );
+    });
+
+    test('Variable with multiple calls', () => {
+      const someFunction = variableToken('someFunction');
+      expect(lexAndParse('someFunction(2)(3);')).toStrictEqual<
+        Result<Statement[]>
+      >(
+        exprStmt(
+          Call({
+            callee: Call({
+              callee: Variable({
+                name: someFunction,
+              }),
+              arg: Literal({
+                value: 2,
+                token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 14),
+              }),
+              paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 15),
+            }),
+            arg: Literal({
+              value: 3,
+              token: new Token(TokenType.NUMBERLIT, '3', 3, 1, 17),
+            }),
+            paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 18),
           }),
         ),
       );
@@ -244,6 +307,42 @@ describe('Parsing', () => {
               token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 25),
             }),
             paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 26),
+          }),
+        ),
+      );
+    });
+
+    test('A sensitivity call', () => {
+      expect(lexAndParse('f [2x];')).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          SCall({
+            callee: Variable({
+              name: variableToken('f', 1, 1),
+            }),
+            arg: Senv({ x: Sens(2) }),
+            bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 3),
+          }),
+        ),
+      );
+    });
+
+    test('Multiple sensitivity calls', () => {
+      expect(lexAndParse('f [2x] [] [4z];')).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          SCall({
+            callee: SCall({
+              callee: SCall({
+                callee: Variable({
+                  name: variableToken('f', 1, 1),
+                }),
+                arg: Senv({ x: Sens(2) }),
+                bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 3),
+              }),
+              arg: Senv(),
+              bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 8),
+            }),
+            arg: Senv({ z: Sens(4) }),
+            bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 11),
           }),
         ),
       );

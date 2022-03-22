@@ -48,7 +48,7 @@ const multiplyBounds = (a: number, b: number) => {
     return MAX_SENS;
   }
 
-  return a + b;
+  return a * b;
 };
 
 export const mult = (a: Sens, b: Sens): Sens => {

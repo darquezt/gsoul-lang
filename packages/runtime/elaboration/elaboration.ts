@@ -7,8 +7,9 @@ import {
   TypeEnv,
   TypeEnvUtils,
   TypeEff,
+  TypeEffUtils,
 } from '@gsens-lang/core/utils';
-import { Arrow, Nil } from '@gsens-lang/core/utils/Type';
+import { Arrow, ForallT, Nil } from '@gsens-lang/core/utils/Type';
 
 import {
   Ascription,
@@ -18,11 +19,13 @@ import {
   Call,
   Expression,
   ExprStmt,
+  Forall,
   Fun,
   NilLiteral,
   NonLinearBinary,
   Print,
   RealLiteral,
+  SCall,
   Statement,
   Variable,
   VarStmt,
@@ -235,6 +238,41 @@ const fun = (
   );
 };
 
+const forall = (
+  expr: past.Forall,
+  tenv: TypeEnv,
+): Result<Ascription, ElaborationError> => {
+  const bodyElaboration = expression(expr.expr, tenv);
+
+  if (!bodyElaboration.success) {
+    return bodyElaboration;
+  }
+
+  const { result: body } = bodyElaboration;
+
+  const lambda = Forall({
+    sensVars: expr.sensVars,
+    expr: body,
+    typeEff: TypeEff(
+      ForallT({
+        sensVars: expr.sensVars.map((v) => v.lexeme),
+        codomain: body.typeEff,
+      }),
+      Senv(),
+    ),
+  });
+
+  const evidence = initialEvidence(lambda.typeEff);
+
+  return Ok(
+    Ascription({
+      expression: lambda,
+      evidence,
+      typeEff: lambda.typeEff,
+    }),
+  );
+};
+
 const app = (
   expr: past.Call,
   tenv: TypeEnv,
@@ -294,6 +332,55 @@ const app = (
       }),
       paren: expr.paren,
       typeEff: TypeEff(calleeType.codomain.type, returnEffect),
+    }),
+  );
+};
+
+const sapp = (
+  expr: past.SCall,
+  tenv: TypeEnv,
+): Result<SCall, ElaborationError> => {
+  const calleeElaboration = expression(expr.callee, tenv);
+
+  if (!calleeElaboration.success) {
+    return calleeElaboration;
+  }
+
+  const { result: callee } = calleeElaboration;
+
+  const calleeType = callee.typeEff.type;
+
+  if (calleeType.kind !== 'ForallT') {
+    return Err(
+      ElaborationTypeError({
+        reason: 'Expression called is not a sensitivity quantification',
+        operator: expr.bracket,
+      }),
+    );
+  }
+
+  const {
+    sensVars: [svar, ...sensVars],
+    codomain,
+  } = calleeType;
+
+  const typeEff =
+    sensVars.length === 0
+      ? TypeEffUtils.subst(codomain, svar, expr.arg)
+      : TypeEff(
+          ForallT({
+            sensVars,
+            codomain: TypeEffUtils.subst(codomain, svar, expr.arg),
+          }),
+          callee.typeEff.effect,
+        );
+
+  return Ok(
+    SCall({
+      callee,
+      arg: expr.arg,
+      bracket: expr.bracket,
+      typeEff,
     }),
   );
 };
@@ -394,12 +481,16 @@ export const expression = (
       return binary(expr, tenv);
     case past.ExprKind.Call:
       return app(expr, tenv);
+    case past.ExprKind.SCall:
+      return sapp(expr, tenv);
     case past.ExprKind.NonLinearBinary:
       return nonLinearBinary(expr, tenv);
     case past.ExprKind.Variable:
       return variable(expr, tenv);
     case past.ExprKind.Fun:
       return fun(expr, tenv);
+    case past.ExprKind.Forall:
+      return forall(expr, tenv);
     case past.ExprKind.Literal: {
       if (typeof expr.value === 'number') {
         return Ok(realLit(expr));

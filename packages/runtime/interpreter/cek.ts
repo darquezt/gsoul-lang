@@ -20,12 +20,15 @@ import {
   RealLiteral,
   ExprKind,
   StmtKind,
+  SClosure,
+  Forall,
+  ExpressionUtils,
 } from '../elaboration/ast';
 import { Store, StoreUtils, Evidence, EvidenceUtils } from '../utils';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import { Token, TokenType } from '@gsens-lang/parsing/lib/lexing';
-import { Arrow, Real } from '@gsens-lang/core/utils/Type';
-import { SenvUtils, TypeEffUtils } from '@gsens-lang/core/utils';
+import { Arrow, ForallT, Real } from '@gsens-lang/core/utils/Type';
+import { Senv, SenvUtils, TypeEffUtils } from '@gsens-lang/core/utils';
 import { formatValue } from '../utils/format';
 import {
   InterpreterError,
@@ -37,91 +40,128 @@ import {
 } from './errors';
 import { Err, Ok, Result } from '../utils/Result';
 
+enum KontKind {
+  EmptyKont = 'EmptyKont',
+  ArgKont = 'ArgKont',
+  FnKont = 'FnKont',
+  ForallKont = 'ForallKont',
+  ForallSubstKont = 'ForallSubstKont',
+  RightOpKont = 'RightOpKont',
+  LeftOpKont = 'LeftOpKont',
+  NLRightOpKont = 'NLRightOpKont',
+  NLLeftOpKont = 'NLLeftOpKont',
+  AscrKont = 'AscrKont',
+  BlockKont = 'BlockKont',
+  PrintKont = 'PrintKont',
+  VarKont = 'VarKont',
+}
+
 type EmptyKont = {
-  kind: 'EmptyKont';
+  kind: KontKind.EmptyKont;
 };
 const EmptyKont: SingletonKindedFactory<EmptyKont> = singletonFactoryOf(
-  'EmptyKont',
+  KontKind.EmptyKont,
 );
 
+// Lambda app konts
+
 type ArgKont = {
-  kind: 'ArgKont';
+  kind: KontKind.ArgKont;
   state: State<{ expression: Expression }>;
   paren: Token;
 };
-const ArgKont: KindedFactory<ArgKont> = factoryOf('ArgKont');
+const ArgKont: KindedFactory<ArgKont> = factoryOf(KontKind.ArgKont);
 
 type FnKont = {
-  kind: 'FnKont';
+  kind: KontKind.FnKont;
   state: State<{ value: Value<Closure> }>;
   paren: Token;
 };
-const FnKont: KindedFactory<FnKont> = factoryOf('FnKont');
+const FnKont: KindedFactory<FnKont> = factoryOf(KontKind.FnKont);
+
+// Sensitivity polymorphism konts
+
+type ForallKont = {
+  kind: KontKind.ForallKont;
+  state: State<{ senv: Senv }>;
+  bracket: Token;
+};
+const ForallKont: KindedFactory<ForallKont> = factoryOf(KontKind.ForallKont);
+
+type ForallSubstKont = {
+  kind: KontKind.ForallSubstKont;
+  state: State<{ name: string; senv: Senv }>;
+};
+const ForallSubstKont: KindedFactory<ForallSubstKont> = factoryOf(
+  KontKind.ForallSubstKont,
+);
+
+// Binary operations konts
 
 type RightOpKont = {
-  kind: 'RightOpKont';
+  kind: KontKind.RightOpKont;
   state: State<{ expression: Expression }>;
   op: Token;
 };
-const RightOpKont: KindedFactory<RightOpKont> = factoryOf('RightOpKont');
+const RightOpKont: KindedFactory<RightOpKont> = factoryOf(KontKind.RightOpKont);
 
 type LeftOpKont = {
-  kind: 'LeftOpKont';
+  kind: KontKind.LeftOpKont;
   state: State<{ value: Value }>;
   op: Token;
 };
-const LeftOpKont: KindedFactory<LeftOpKont> = factoryOf('LeftOpKont');
+const LeftOpKont: KindedFactory<LeftOpKont> = factoryOf(KontKind.LeftOpKont);
 
 type NLRightOpKont = {
-  kind: 'NLRightOpKont';
+  kind: KontKind.NLRightOpKont;
   state: State<{ expression: Expression }>;
   op: Token;
 };
-const NLRightOpKont: KindedFactory<NLRightOpKont> = factoryOf('NLRightOpKont');
+const NLRightOpKont: KindedFactory<NLRightOpKont> = factoryOf(
+  KontKind.NLRightOpKont,
+);
 
 type NLLeftOpKont = {
-  kind: 'NLLeftOpKont';
+  kind: KontKind.NLLeftOpKont;
   state: State<{ value: Value }>;
   op: Token;
 };
-const NLLeftOpKont: KindedFactory<NLLeftOpKont> = factoryOf('NLLeftOpKont');
+const NLLeftOpKont: KindedFactory<NLLeftOpKont> = factoryOf(
+  KontKind.NLLeftOpKont,
+);
+
+// Ascription konts
 
 type AscrKont = {
-  kind: 'AscrKont';
+  kind: KontKind.AscrKont;
   state: State<{ typeEff: TypeEff; evidence: Evidence }>;
 };
-const AscrKont: KindedFactory<AscrKont> = factoryOf('AscrKont');
+const AscrKont: KindedFactory<AscrKont> = factoryOf(KontKind.AscrKont);
 
-/**
- * Statement konts
- */
+// Block konts
 
 type BlockKont = {
-  kind: 'BlockKont';
+  kind: KontKind.BlockKont;
   state: State<{ statements: Statement[] }>;
 };
-const BlockKont: KindedFactory<BlockKont> = factoryOf('BlockKont');
+const BlockKont: KindedFactory<BlockKont> = factoryOf(KontKind.BlockKont);
+
+// Print konts
 
 type PrintKont = {
-  kind: 'PrintKont';
+  kind: KontKind.PrintKont;
   kont: Kont;
   showEvidence: boolean;
 };
-const PrintKont: KindedFactory<PrintKont> = factoryOf('PrintKont');
+const PrintKont: KindedFactory<PrintKont> = factoryOf(KontKind.PrintKont);
+
+// Variable declaration konts
 
 type VarKont = {
-  kind: 'VarKont';
+  kind: KontKind.VarKont;
   state: State<{ variable: string }>;
 };
-const VarKont: KindedFactory<VarKont> = factoryOf('VarKont');
-
-// type AscrKont = {
-//   kind: 'AscrKont';
-//   typeEff: TypeEff;
-//   evidence: Evidence;
-//   kont: Kont;
-// };
-// const AscrKont: KindedFactory<AscrKont> = factoryOf('AscrKont');
+const VarKont: KindedFactory<VarKont> = factoryOf(KontKind.VarKont);
 
 type Kont =
   | EmptyKont
@@ -131,6 +171,8 @@ type Kont =
   | NLLeftOpKont
   | ArgKont
   | FnKont
+  | ForallKont
+  | ForallSubstKont
   | AscrKont
   | BlockKont
   | VarKont
@@ -213,13 +255,24 @@ const step = ({
       );
     }
 
+    case ExprKind.SCall: {
+      return OkState(
+        { term: term.callee },
+        store,
+        ForallKont({
+          state: State({ senv: term.arg }, store, kont),
+          bracket: term.bracket,
+        }),
+      );
+    }
+
     case ExprKind.Ascription: {
       const inner = term.expression;
 
       // Expression finished evaluating
       if (isSimpleValue(inner)) {
         switch (kont.kind) {
-          case 'RightOpKont': {
+          case KontKind.RightOpKont: {
             return OkState(
               { term: kont.state.expression },
               store,
@@ -230,7 +283,7 @@ const step = ({
             );
           }
 
-          case 'NLRightOpKont': {
+          case KontKind.NLRightOpKont: {
             return OkState(
               { term: kont.state.expression },
               store,
@@ -241,7 +294,7 @@ const step = ({
             );
           }
 
-          case 'LeftOpKont': {
+          case KontKind.LeftOpKont: {
             if (kont.op.type === TokenType.PLUS) {
               if (!isKinded(inner, ExprKind.RealLiteral)) {
                 return Err(
@@ -297,7 +350,7 @@ const step = ({
             );
           }
 
-          case 'NLLeftOpKont': {
+          case KontKind.NLLeftOpKont: {
             if (kont.op.type === TokenType.STAR) {
               if (!isKinded(inner, ExprKind.RealLiteral)) {
                 return Err(
@@ -359,7 +412,7 @@ const step = ({
             );
           }
 
-          case 'ArgKont': {
+          case KontKind.ArgKont: {
             if (isKinded(inner, ExprKind.Closure)) {
               return OkState(
                 { term: kont.state.expression },
@@ -377,7 +430,7 @@ const step = ({
             break; // TODO: Handle this case
           }
 
-          case 'FnKont': {
+          case KontKind.FnKont: {
             const ascrFun = kont.state.value;
             const closure = ascrFun.expression;
 
@@ -436,7 +489,7 @@ const step = ({
             });
 
             return OkState(
-              { term: body }, // TODO: Ascribe it!
+              { term: body },
               StoreUtils.extend(
                 closure.store,
                 closure.fun.binder.name.lexeme,
@@ -446,7 +499,96 @@ const step = ({
             );
           }
 
-          case 'AscrKont': {
+          case KontKind.ForallKont: {
+            if (isKinded(inner, ExprKind.SClosure)) {
+              const {
+                sensVars: [svar, ...sensVars],
+                expr: body,
+              } = inner.forall;
+
+              const evidenceRes = EvidenceUtils.iscod(
+                term.evidence,
+                svar.lexeme,
+                kont.state.senv,
+              );
+
+              if (!evidenceRes.success) {
+                return Err(
+                  InterpreterTypeError({
+                    reason: evidenceRes.error.reason,
+                    operator: kont.bracket,
+                  }),
+                );
+              }
+
+              const evidence = evidenceRes.result;
+
+              const newTypeEff =
+                sensVars.length === 0
+                  ? inner.forall.typeEff.type.codomain
+                  : TypeEff(
+                      ForallT({
+                        sensVars: sensVars.map((v) => v.lexeme),
+                        codomain: inner.forall.typeEff.type.codomain,
+                      }),
+                      inner.typeEff.effect,
+                    );
+
+              const newAscrTypeEff =
+                sensVars.length === 0
+                  ? (term.typeEff.type as ForallT).codomain
+                  : TypeEff(
+                      ForallT({
+                        sensVars: sensVars.map((v) => v.lexeme),
+                        codomain: (term.typeEff.type as ForallT).codomain,
+                      }),
+                      term.typeEff.effect,
+                    );
+
+              const result = Ascription({
+                evidence,
+                expression:
+                  sensVars.length === 0
+                    ? body
+                    : Forall({
+                        sensVars,
+                        expr: body,
+                        typeEff: newTypeEff as TypeEff<ForallT, Senv>,
+                      }),
+                typeEff: newAscrTypeEff,
+              });
+
+              return OkState(
+                { term: result },
+                inner.store,
+                ForallSubstKont({
+                  state: {
+                    name: svar.lexeme,
+                    senv: kont.state.senv,
+                    store: kont.state.store,
+                    kont: kont.state.kont,
+                  },
+                }),
+              );
+            }
+            break;
+          }
+
+          case KontKind.ForallSubstKont: {
+            return OkState(
+              {
+                term: ExpressionUtils.subst(
+                  term,
+                  kont.state.name,
+                  kont.state.senv,
+                ),
+              },
+              kont.state.store,
+              kont.state.kont,
+            );
+          }
+
+          case KontKind.AscrKont: {
             const evidenceRes = EvidenceUtils.trans(
               term.evidence,
               kont.state.evidence,
@@ -473,7 +615,7 @@ const step = ({
             );
           }
 
-          case 'BlockKont': {
+          case KontKind.BlockKont: {
             const { statements } = kont.state;
 
             // When all the statements in the block have finished evaluating
@@ -500,7 +642,7 @@ const step = ({
             );
           }
 
-          case 'PrintKont': {
+          case KontKind.PrintKont: {
             if (kont.showEvidence) {
               console.log(
                 `${EvidenceUtils.format(term.evidence)} ${formatValue(
@@ -514,7 +656,7 @@ const step = ({
             return OkState({ term }, store, kont.kont);
           }
 
-          case 'VarKont': {
+          case KontKind.VarKont: {
             return OkState(
               { term },
               StoreUtils.extend(store, kont.state.variable, term as Value),
@@ -532,6 +674,25 @@ const step = ({
               ...term,
               expression: Closure({
                 fun: inner,
+                typeEff: inner.typeEff,
+                store,
+              }),
+            }),
+          },
+          store,
+          kont,
+        );
+      }
+
+      // SClosure creation
+
+      if (isKinded(inner, ExprKind.Forall)) {
+        return OkState(
+          {
+            term: Ascription({
+              ...term,
+              expression: SClosure({
+                forall: inner,
                 typeEff: inner.typeEff,
                 store,
               }),
@@ -622,7 +783,7 @@ export const evaluate = (
 
   while (
     !isValue(state.term as Expression) ||
-    state.kont.kind !== 'EmptyKont'
+    state.kont.kind !== KontKind.EmptyKont
   ) {
     const result = step(state);
 

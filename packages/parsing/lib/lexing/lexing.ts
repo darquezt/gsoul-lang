@@ -16,6 +16,8 @@ const keywords: Record<string, TokenType> = {
   Number: TokenType.NUMBER,
   Bool: TokenType.BOOL,
   fun: TokenType.FUN,
+  forall: TokenType.FORALL,
+  Forall: TokenType.FORALLT,
 };
 
 /**

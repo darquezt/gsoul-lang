@@ -51,6 +51,8 @@ enum TokenType {
   ELSE = 'ELSE',
   FALSE = 'FALSE',
   FUN = 'FUN',
+  FORALL = 'FORALL',
+  FORALLT = 'FORALLT',
   // FOR = 'FOR',
   IF = 'IF',
   NILLIT = 'NILLIT',

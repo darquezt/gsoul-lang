@@ -35,9 +35,8 @@ export type EvidenceTypeError = {
   kind: 'EvidenceTypeError';
   reason: string;
 };
-export const EvidenceTypeError = factoryOf<EvidenceTypeError>(
-  'EvidenceTypeError',
-);
+export const EvidenceTypeError =
+  factoryOf<EvidenceTypeError>('EvidenceTypeError');
 
 export type EvidenceError =
   | EvidenceInteriorError
@@ -322,6 +321,42 @@ export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
       ev[1].type.codomain.type,
       SenvUtils.add(ev[1].effect, ev[1].type.codomain.effect),
     ),
+  ]);
+};
+
+export const iscod = (
+  ev: Evidence,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _name: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _effect: Senv,
+): Result<Evidence, EvidenceError> => {
+  console.log('ISCOD', format(ev));
+  if (!isKinded(ev[0].type, 'ForallT') || !isKinded(ev[1].type, 'ForallT')) {
+    return Err(
+      EvidenceTypeError({
+        reason: 'Operator iscod is not defined for types other than foralls',
+      }),
+    );
+  }
+
+  return Ok([
+    TypeEff(
+      ev[0].type.codomain.type,
+      SenvUtils.add(ev[0].effect, ev[0].type.codomain.effect),
+    ),
+    // TypeEffUtils.subst(
+    //   name,
+    //   effect,
+    // ),
+    TypeEff(
+      ev[1].type.codomain.type,
+      SenvUtils.add(ev[1].effect, ev[1].type.codomain.effect),
+    ),
+    // TypeEffUtils.subst(
+    //   name,
+    //   effect,
+    // ),
   ]);
 };
 

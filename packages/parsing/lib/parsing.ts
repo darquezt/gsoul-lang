@@ -18,6 +18,8 @@ import {
   Binary,
   Block,
   NonLinearBinary,
+  Forall,
+  SCall,
 } from './ast';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
@@ -262,7 +264,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
   }
 
   function call(): Expression {
-    const callee = primary();
+    let callee = primary();
 
     // // eslint-disable-next-line no-constant-condition
     // while (true) {
@@ -279,22 +281,35 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     //     break;
     //   }
     // }
-    if (match(TokenType.LEFT_PAREN)) {
-      const arg = expression();
+    while (check(TokenType.LEFT_PAREN) || check(TokenType.LEFT_BRACKET)) {
+      if (match(TokenType.LEFT_PAREN)) {
+        const arg = expression();
 
-      const paren = consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          end: 'a function call',
-        }),
-      );
+        const paren = consume(
+          TokenType.RIGHT_PAREN,
+          errorMessage({
+            expected: ')',
+            end: 'a function call',
+          }),
+        );
 
-      return Call({
-        callee,
-        arg,
-        paren,
-      });
+        callee = Call({
+          callee,
+          arg,
+          paren,
+        });
+      }
+
+      if (check(TokenType.LEFT_BRACKET)) {
+        const bracket = peek();
+        const arg = senv();
+
+        callee = SCall({
+          callee,
+          arg,
+          bracket,
+        });
+      }
     }
 
     return callee;
@@ -346,6 +361,37 @@ export function parse(tokens: Token[]): Result<Statement[]> {
         },
         body,
       });
+    } else if (match(TokenType.FORALL)) {
+      if (check(TokenType.DOT)) {
+        error(
+          peek(),
+          errorMessage({
+            expected: 'at least one identifier',
+            after: '`forall` constructor',
+          }),
+        );
+      }
+
+      const sensVars: Token[] = [];
+
+      while (!match(TokenType.DOT)) {
+        const sensVar = consume(
+          TokenType.IDENTIFIER,
+          errorMessage({
+            expected: 'an identifier',
+            after: '`forall` constructor',
+          }),
+        );
+
+        sensVars.push(sensVar);
+      }
+
+      const expr = expression();
+
+      return Forall({
+        sensVars,
+        expr,
+      });
     } else if (match(TokenType.NUMBERLIT)) {
       return Literal({
         value: previous().literal as number,
@@ -394,7 +440,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       TokenType.LEFT_BRACKET,
       errorMessage({
         expected: '[',
-        after: 'a sensitivity environment',
+        beginning: 'a sensitivity environment',
       }),
     );
 

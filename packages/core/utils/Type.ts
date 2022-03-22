@@ -28,16 +28,14 @@ export type Arrow = {
 };
 export const Arrow: KindedFactory<Arrow> = factoryOf<Arrow>('Arrow');
 
-export type PolySenv = {
-  kind: 'PolySenv';
-  identifier: Identifier;
-  typeEff: TypeEff;
+export type ForallT = {
+  kind: 'ForallT';
+  sensVars: Identifier[];
+  codomain: TypeEff;
 };
-export const PolySenv: KindedFactory<PolySenv> = factoryOf<PolySenv>(
-  'PolySenv',
-);
+export const ForallT: KindedFactory<ForallT> = factoryOf<ForallT>('ForallT');
 
-export type Type = Real | Bool | Nil | Arrow | PolySenv;
+export type Type = Real | Bool | Nil | Arrow | ForallT;
 
 // U T I L S
 
@@ -52,10 +50,10 @@ export const subst = (ty: Type, name: Identifier, senv: Senv): Type => {
         domain: TypeEffUtils.subst(ty.domain, name, senv),
         codomain: TypeEffUtils.subst(ty.codomain, name, senv),
       });
-    case 'PolySenv':
-      return PolySenv({
-        identifier: ty.identifier,
-        typeEff: TypeEffUtils.subst(ty.typeEff, name, senv),
+    case 'ForallT':
+      return ForallT({
+        sensVars: ty.sensVars,
+        codomain: TypeEffUtils.subst(ty.codomain, name, senv),
       });
   }
 };
@@ -70,10 +68,10 @@ export const format = (ty: Type): string => {
     case 'Arrow':
       return chalk`${TypeEffUtils.format(ty.domain)} -> ${TypeEffUtils.format(
         ty.codomain,
-      )})`;
-    case 'PolySenv':
-      return chalk`forall {green ${ty.identifier}} . ${TypeEffUtils.format(
-        ty.typeEff,
       )}`;
+    case 'ForallT':
+      return chalk`forall {green ${ty.sensVars.join(
+        ' ',
+      )}} . ${TypeEffUtils.format(ty.codomain)}`;
   }
 };

@@ -1,6 +1,7 @@
 import Token from './lexing/Token';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import { factoryOf } from '@gsens-lang/core/utils/ADT';
+import { Senv } from '@gsens-lang/core/utils';
 
 // ===================
 // EXPRESSIONS
@@ -13,9 +14,11 @@ export enum ExprKind {
   Binary = 'Binary',
   NonLinearBinary = 'NonLinearBinary',
   Call = 'Call',
+  SCall = 'SCall',
   Grouping = 'Grouping',
   Variable = 'Variable',
   Fun = 'Fun',
+  Forall = 'Forall',
   Ascription = 'Ascription',
   Print = 'Print',
   Block = 'Block',
@@ -54,6 +57,14 @@ export type Call = {
 };
 export const Call = factoryOf<Call>(ExprKind.Call);
 
+export type SCall = {
+  kind: ExprKind.SCall;
+  callee: Expression;
+  arg: Senv;
+  bracket: Token;
+};
+export const SCall = factoryOf<SCall>(ExprKind.SCall);
+
 export type Grouping = { kind: ExprKind.Grouping; expression: Expression };
 export const Grouping = factoryOf<Grouping>(ExprKind.Grouping);
 
@@ -66,6 +77,13 @@ export type Fun = {
   body: Expression;
 };
 export const Fun = factoryOf<Fun>(ExprKind.Fun);
+
+export type Forall = {
+  kind: ExprKind.Forall;
+  sensVars: Token[];
+  expr: Expression;
+};
+export const Forall = factoryOf<Forall>(ExprKind.Forall);
 
 export type Ascription = {
   kind: ExprKind.Ascription;
@@ -91,9 +109,11 @@ export type Expression =
   | Binary
   | NonLinearBinary
   | Call
+  | SCall
   | Grouping
   | Variable
   | Fun
+  | Forall
   | Block
   | Print
   | Ascription;

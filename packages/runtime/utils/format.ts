@@ -11,5 +11,7 @@ export const formatValue = (value: SimpleValue): string => {
       return cyan('nil');
     case ExprKind.Closure:
       return cyan('[Closure]');
+    case ExprKind.SClosure:
+      return cyan('[SClosure]');
   }
 };

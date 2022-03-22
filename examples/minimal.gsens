@@ -1,7 +1,27 @@
-slet a = 1;
+let a = 1;
 
 let f = fun (x : Number![1a]) {
   (x + x) :: Number![?a] :: Number![1a];
 };
 
 print f(a);
+
+slet a = 1;
+
+let f = [x] fun (x : Number![1x]) {
+  (x + x) :: Number![?x] :: Number![1x];
+};
+
+let y = [y] a;
+
+f(a :: Number![1a]);
+([x] fun (x : Number![1x]) {
+  (x + x) :: Number![?x] :: Number![1x];
+})(a :: Number![1a]);
+[x] (fun (x : Number![1x]) {
+  (x + x) :: Number![?x] :: Number![1x];
+}(a :: Number![1x])) [1a];
+
+
+
+f(a);

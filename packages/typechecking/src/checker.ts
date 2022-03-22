@@ -6,10 +6,12 @@ import {
   Expression,
   ExprKind,
   ExprStmt,
+  Forall,
   Fun,
   Literal,
   NonLinearBinary,
   Print,
+  SCall,
   Statement,
   StmtKind,
   Variable,
@@ -22,8 +24,9 @@ import {
   TypeEnv,
   TypeEnvUtils,
   TypeEff,
+  TypeEffUtils,
 } from '@gsens-lang/core/utils';
-import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
+import { Arrow, Bool, ForallT, Nil, Real } from '@gsens-lang/core/utils/Type';
 import { isKinded } from '@gsens-lang/core/utils/ADT';
 
 import { isSubTypeEff } from './subtyping';
@@ -203,6 +206,27 @@ const fun = (expr: Fun, tenv: TypeEnv): PureResult => {
   );
 };
 
+const forall = (expr: Forall, tenv: TypeEnv): PureResult => {
+  const { expr: inner, sensVars } = expr;
+
+  const bodyTC = expression(inner, tenv);
+
+  if (!bodyTC.success) {
+    return bodyTC;
+  }
+
+  return PureSuccess(
+    TypeEff(
+      ForallT({
+        sensVars: sensVars.map((v) => v.lexeme),
+        codomain: bodyTC.typeEff,
+      }),
+      Senv(),
+    ),
+    bodyTC.typings,
+  );
+};
+
 const app = (expr: Call, tenv: TypeEnv): PureResult => {
   const calleeTC = expression(expr.callee, tenv);
 
@@ -242,6 +266,41 @@ const app = (expr: Call, tenv: TypeEnv): PureResult => {
     TypeEff(calleeType.codomain.type, returnEffect),
     calleeTC.typings.concat(argTC.typings),
   );
+};
+
+const sapp = (expr: SCall, tenv: TypeEnv): PureResult => {
+  const calleeTC = expression(expr.callee, tenv);
+
+  if (!calleeTC.success) {
+    return calleeTC;
+  }
+
+  const calleeType = calleeTC.typeEff.type;
+
+  if (calleeType.kind !== 'ForallT') {
+    return Failure(
+      expr.bracket,
+      'Expression called is not a sensitive quantification',
+    );
+  }
+
+  const {
+    sensVars: [svar, ...sensVars],
+    codomain,
+  } = calleeType;
+
+  const returnTypeEff =
+    sensVars.length === 0
+      ? TypeEffUtils.subst(codomain, svar, expr.arg)
+      : TypeEff(
+          ForallT({
+            sensVars,
+            codomain: TypeEffUtils.subst(codomain, svar, expr.arg),
+          }),
+          calleeTC.typeEff.effect,
+        );
+
+  return PureSuccess(returnTypeEff, calleeTC.typings);
 };
 
 const ascription = (expr: Ascription, tenv: TypeEnv): PureResult => {
@@ -304,12 +363,16 @@ export const expression = (
       return binary(expr, tenv);
     case ExprKind.Call:
       return app(expr, tenv);
+    case ExprKind.SCall:
+      return sapp(expr, tenv);
     case ExprKind.NonLinearBinary:
       return nonLinearBinary(expr, tenv);
     case ExprKind.Variable:
       return variable(expr, tenv);
     case ExprKind.Fun:
       return fun(expr, tenv);
+    case ExprKind.Forall:
+      return forall(expr, tenv);
     case ExprKind.Literal: {
       const { value } = expr;
       if (typeof value === 'number') {

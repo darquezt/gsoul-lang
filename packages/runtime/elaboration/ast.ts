@@ -1,9 +1,9 @@
 import { Token } from '@gsens-lang/parsing/lib/lexing';
-import { Senv, TypeEff } from '@gsens-lang/core/utils';
-import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
+import { Senv, SenvUtils, TypeEff, TypeEffUtils } from '@gsens-lang/core/utils';
+import { Arrow, Bool, ForallT, Nil, Real } from '@gsens-lang/core/utils/Type';
 import { factoryOf, isKinded } from '@gsens-lang/core/utils/ADT';
 
-import { Evidence, Store } from '../utils';
+import { Evidence, EvidenceUtils, Store, StoreUtils } from '../utils';
 
 /**
  * Expressions
@@ -18,10 +18,13 @@ export enum ExprKind {
   Binary = 'Binary',
   NonLinearBinary = 'NonLinearBinary',
   Call = 'Call',
+  SCall = 'SCall',
   Grouping = 'Grouping',
   Variable = 'Variable',
   Fun = 'Fun',
   Closure = 'Closure',
+  Forall = 'Forall',
+  SClosure = 'SClosure',
   Ascription = 'Ascription',
   Print = 'Print',
   Block = 'Block',
@@ -87,6 +90,14 @@ export type Call = Term<{
 }>;
 export const Call = factoryOf<Call>(ExprKind.Call);
 
+export type SCall = Term<{
+  kind: ExprKind.SCall;
+  callee: Expression;
+  arg: Senv;
+  bracket: Token;
+}>;
+export const SCall = factoryOf<SCall>(ExprKind.SCall);
+
 export type Grouping = Term<{
   kind: ExprKind.Grouping;
   expression: Expression;
@@ -106,12 +117,29 @@ export type Fun = Term<
 >;
 export const Fun = factoryOf<Fun>(ExprKind.Fun);
 
+export type Forall = Term<
+  {
+    kind: ExprKind.Forall;
+    sensVars: Token[];
+    expr: Expression;
+  },
+  TypeEff<ForallT, Senv>
+>;
+export const Forall = factoryOf<Forall>(ExprKind.Forall);
+
 export type Closure = Term<{
   kind: ExprKind.Closure;
   fun: Fun;
   store: Store;
 }>;
 export const Closure = factoryOf<Closure>(ExprKind.Closure);
+
+export type SClosure = Term<{
+  kind: ExprKind.SClosure;
+  forall: Forall;
+  store: Store;
+}>;
+export const SClosure = factoryOf<SClosure>(ExprKind.SClosure);
 
 export type Ascription = Term<{
   kind: ExprKind.Ascription;
@@ -134,17 +162,6 @@ export const AscribedValue = <T extends SimpleValue>(
   ...params,
 });
 
-export type SimpleValue = RealLiteral | BoolLiteral | NilLiteral | Closure;
-
-export const isSimpleValue = (expr: Expression): expr is SimpleValue => {
-  return [
-    ExprKind.RealLiteral,
-    ExprKind.BoolLiteral,
-    ExprKind.NilLiteral,
-    ExprKind.Closure,
-  ].some((kind) => kind === expr.kind);
-};
-
 export type Print = Term<{
   kind: ExprKind.Print;
   expression: Expression;
@@ -154,6 +171,23 @@ export const Print = factoryOf<Print>(ExprKind.Print);
 
 export type Block = Term<{ kind: ExprKind.Block; statements: Statement[] }>;
 export const Block = factoryOf<Block>(ExprKind.Block);
+
+export type SimpleValue =
+  | RealLiteral
+  | BoolLiteral
+  | NilLiteral
+  | Closure
+  | SClosure;
+
+export const isSimpleValue = (expr: Expression): expr is SimpleValue => {
+  return [
+    ExprKind.RealLiteral,
+    ExprKind.BoolLiteral,
+    ExprKind.NilLiteral,
+    ExprKind.Closure,
+    ExprKind.SClosure,
+  ].some((kind) => kind === expr.kind);
+};
 
 export type Value<T extends SimpleValue = SimpleValue> = AscribedValue<T>;
 
@@ -186,13 +220,122 @@ export type Expression =
   | Binary
   | NonLinearBinary
   | Call
+  | SCall
   | Grouping
   | Variable
   | Fun
   | Closure
+  | Forall
+  | SClosure
   | Print
   | Block
   | Ascription;
+
+const subst = (expr: Expression, name: string, senv: Senv): Expression => {
+  const inductiveCall = <E extends Record<K, Expression>, K extends keyof E>(
+    key: K,
+    e: E,
+  ) => {
+    return { [key]: subst(e[key], name, senv) };
+  };
+
+  const typeEff = TypeEffUtils.subst(expr.typeEff, name, senv);
+  switch (expr.kind) {
+    case ExprKind.RealLiteral:
+    case ExprKind.BoolLiteral:
+    case ExprKind.NilLiteral:
+      return expr;
+    case ExprKind.Binary:
+    case ExprKind.NonLinearBinary:
+      return Binary({
+        ...expr,
+        ...inductiveCall('left', expr),
+        ...inductiveCall('right', expr),
+        typeEff,
+      });
+    case ExprKind.Call:
+      return Call({
+        ...expr,
+        ...inductiveCall('callee', expr),
+        ...inductiveCall('arg', expr),
+        typeEff,
+      });
+    case ExprKind.SCall:
+      return SCall({
+        ...expr,
+        ...inductiveCall('callee', expr),
+        arg: SenvUtils.subst(expr.arg, name, senv),
+        typeEff,
+      });
+    case ExprKind.Grouping:
+      return Grouping({
+        ...expr,
+        ...inductiveCall('expression', expr),
+        typeEff,
+      });
+    case ExprKind.Variable:
+      return Variable({
+        ...expr,
+        typeEff,
+      });
+    case ExprKind.Fun:
+      return Fun({
+        ...expr,
+        ...inductiveCall('body', expr),
+        binder: {
+          ...expr.binder,
+          type: TypeEffUtils.subst(expr.binder.type, name, senv),
+        },
+        typeEff: typeEff as TypeEff<Arrow, Senv>,
+      });
+    case ExprKind.Closure: {
+      const clos = Closure({
+        ...expr,
+        ...inductiveCall('fun', expr),
+        store: StoreUtils.subst(expr.store, name, senv),
+        typeEff,
+      });
+
+      return clos;
+    }
+    case ExprKind.Forall:
+      return Forall({
+        ...expr,
+        ...inductiveCall('expr', expr),
+        typeEff: typeEff as TypeEff<ForallT, Senv>,
+      });
+    case ExprKind.SClosure:
+      return SClosure({
+        ...expr,
+        store: StoreUtils.subst(expr.store, name, senv),
+        ...inductiveCall('forall', expr),
+        typeEff,
+      });
+    case ExprKind.Print:
+      return Print({
+        ...expr,
+        ...inductiveCall('expression', expr),
+        typeEff,
+      });
+    case ExprKind.Block:
+      return Block({
+        ...expr,
+        statements: expr.statements.map((s) => substStmt(s, name, senv)),
+        typeEff,
+      });
+    case ExprKind.Ascription:
+      return Ascription({
+        ...expr,
+        ...inductiveCall('expression', expr),
+        evidence: EvidenceUtils.subst(expr.evidence, name, senv),
+        typeEff,
+      });
+  }
+};
+
+export const ExpressionUtils = {
+  subst,
+};
 
 /**
  * Statements
@@ -217,3 +360,22 @@ export type VarStmt = Term<{
 export const VarStmt = factoryOf<VarStmt>(StmtKind.VarStmt);
 
 export type Statement = ExprStmt | VarStmt;
+
+const substStmt = (stmt: Statement, name: string, senv: Senv): Statement => {
+  const typeEff = TypeEffUtils.subst(stmt.typeEff, name, senv);
+
+  switch (stmt.kind) {
+    case StmtKind.ExprStmt:
+      return ExprStmt({
+        ...stmt,
+        expression: ExpressionUtils.subst(stmt.expression, name, senv),
+        typeEff,
+      });
+    case StmtKind.VarStmt:
+      return VarStmt({
+        ...stmt,
+        assignment: ExpressionUtils.subst(stmt.assignment, name, senv),
+        typeEff,
+      });
+  }
+};

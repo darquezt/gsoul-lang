@@ -28,11 +28,12 @@ comparison ::= additive ("<=" additive)*;
 additive ::= factor ("+" factor)*; (* Minus op should be added here *)
 multiplicative ::= unary ("*" unary)*; (* Division should be added here *)
 unary ::= call; (* Unary operators may be added before `call` in the future *)
-call ::= primary "(" arguments ")";
+call ::= primary ("(" arguments ")")* | primary senv*;
 
 primary ::= "true" | "false"
           | "nil"
           | "fun" "(" parameters ")" block
+          | "forall" IDENTIFIER "." expression
           | NUMBER
           | IDENTIFIER
           | "(" expression ")";
