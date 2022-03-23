@@ -16,6 +16,7 @@ import {
   Print,
   SCall,
   Statement,
+  Tuple,
   Variable,
   VarStmt,
 } from './ast';
@@ -622,6 +623,26 @@ describe('Parsing', () => {
               }),
               Senv(),
             ),
+          }),
+        ),
+      );
+    });
+  });
+
+  describe('tuples', () => {
+    test('a simple tuple', () => {
+      expect(lexAndParse('tuple(2, 3);')).toStrictEqual<Result<Statement[]>>(
+        exprStmt(
+          Tuple({
+            first: Literal({
+              value: 2,
+              token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 7),
+            }),
+            second: Literal({
+              value: 3,
+              token: new Token(TokenType.NUMBERLIT, '3', 3, 1, 10),
+            }),
+            constructorToken: new Token(TokenType.TUPLE, 'tuple', null, 1, 1),
           }),
         ),
       );

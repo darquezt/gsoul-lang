@@ -19,6 +19,7 @@ export enum ExprKind {
   Variable = 'Variable',
   Fun = 'Fun',
   Forall = 'Forall',
+  Tuple = 'Tuple',
   Ascription = 'Ascription',
   Print = 'Print',
   Block = 'Block',
@@ -85,6 +86,14 @@ export type Forall = {
 };
 export const Forall = factoryOf<Forall>(ExprKind.Forall);
 
+export type Tuple = {
+  kind: ExprKind.Tuple;
+  first: Expression;
+  second: Expression;
+  constructorToken: Token;
+};
+export const Tuple = factoryOf<Tuple>(ExprKind.Tuple);
+
 export type Ascription = {
   kind: ExprKind.Ascription;
   expression: Expression;
@@ -114,6 +123,7 @@ export type Expression =
   | Variable
   | Fun
   | Forall
+  | Tuple
   | Block
   | Print
   | Ascription;

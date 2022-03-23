@@ -68,6 +68,8 @@ enum TokenType {
   SLET = 'SLET',
   // WHILE = 'WHILE',
 
+  TUPLE = 'TUPLE', // Multiplicative pairs
+
   INVALID = 'INVALID',
 
   EOF = 'EOF',

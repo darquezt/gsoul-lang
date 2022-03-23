@@ -20,6 +20,7 @@ import {
   NonLinearBinary,
   Forall,
   SCall,
+  Tuple,
 } from './ast';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
@@ -391,6 +392,37 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       return Forall({
         sensVars,
         expr,
+      });
+    } else if (match(TokenType.TUPLE)) {
+      const constructorToken = previous();
+      consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: 'tuple constructor',
+        }),
+      );
+      const first = expression();
+      consume(
+        TokenType.COMMA,
+        errorMessage({
+          expected: ',',
+          after: 'tuple component',
+        }),
+      );
+      const second = expression();
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: 'tuple components',
+        }),
+      );
+
+      return Tuple({
+        first,
+        second,
+        constructorToken,
       });
     } else if (match(TokenType.NUMBERLIT)) {
       return Literal({

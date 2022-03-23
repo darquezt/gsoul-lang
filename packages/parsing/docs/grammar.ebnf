@@ -34,6 +34,7 @@ primary ::= "true" | "false"
           | "nil"
           | "fun" "(" parameters ")" block
           | "forall" IDENTIFIER "." expression
+          | "tuple" "(" expression, expression ")"
           | NUMBER
           | IDENTIFIER
           | "(" expression ")";
