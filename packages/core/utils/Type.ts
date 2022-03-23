@@ -35,7 +35,15 @@ export type ForallT = {
 };
 export const ForallT: KindedFactory<ForallT> = factoryOf<ForallT>('ForallT');
 
-export type Type = Real | Bool | Nil | Arrow | ForallT;
+export type MProduct = {
+  kind: 'MProduct';
+  first: TypeEff;
+  second: TypeEff;
+};
+export const MProduct: KindedFactory<MProduct> =
+  factoryOf<MProduct>('MProduct');
+
+export type Type = Real | Bool | Nil | Arrow | ForallT | MProduct;
 
 // U T I L S
 
@@ -55,6 +63,11 @@ export const subst = (ty: Type, name: Identifier, senv: Senv): Type => {
         sensVars: ty.sensVars,
         codomain: TypeEffUtils.subst(ty.codomain, name, senv),
       });
+    case 'MProduct':
+      return MProduct({
+        first: TypeEffUtils.subst(ty.first, name, senv),
+        second: TypeEffUtils.subst(ty.second, name, senv),
+      });
   }
 };
 
@@ -73,5 +86,9 @@ export const format = (ty: Type): string => {
       return chalk`forall {green ${ty.sensVars.join(
         ' ',
       )}} . ${TypeEffUtils.format(ty.codomain)}`;
+    case 'MProduct':
+      return chalk`${TypeEffUtils.format(ty.first)} ⊗ ${TypeEffUtils.format(
+        ty.second,
+      )}`;
   }
 };

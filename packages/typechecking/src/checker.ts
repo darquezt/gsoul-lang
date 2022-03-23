@@ -14,6 +14,7 @@ import {
   SCall,
   Statement,
   StmtKind,
+  Tuple,
   Variable,
   VarStmt,
 } from '@gsens-lang/parsing/lib/ast';
@@ -26,7 +27,14 @@ import {
   TypeEff,
   TypeEffUtils,
 } from '@gsens-lang/core/utils';
-import { Arrow, Bool, ForallT, Nil, Real } from '@gsens-lang/core/utils/Type';
+import {
+  Arrow,
+  Bool,
+  ForallT,
+  MProduct,
+  Nil,
+  Real,
+} from '@gsens-lang/core/utils/Type';
 import { isKinded } from '@gsens-lang/core/utils/ADT';
 
 import { isSubTypeEff } from './subtyping';
@@ -354,6 +362,31 @@ const block = (expr: Block, tenv: TypeEnv): PureResult => {
   return PureSuccess(result, typings);
 };
 
+const tuple = (expr: Tuple, tenv: TypeEnv): PureResult => {
+  const firstTC = expression(expr.first, tenv);
+
+  if (!firstTC.success) {
+    return firstTC;
+  }
+
+  const secondTC = expression(expr.second, tenv);
+
+  if (!secondTC.success) {
+    return secondTC;
+  }
+
+  return PureSuccess(
+    TypeEff(
+      MProduct({
+        first: firstTC.typeEff,
+        second: secondTC.typeEff,
+      }),
+      Senv(),
+    ),
+    firstTC.typings.concat(secondTC.typings),
+  );
+};
+
 export const expression = (
   expr: Expression,
   tenv: TypeEnv = {},
@@ -390,6 +423,8 @@ export const expression = (
       return printExpr(expr, tenv);
     case ExprKind.Block:
       return block(expr, tenv);
+    case ExprKind.Tuple:
+      return tuple(expr, tenv);
   }
 };
 

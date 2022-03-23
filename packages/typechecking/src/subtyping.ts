@@ -14,7 +14,15 @@ export const isSubSenv = (senv1: Senv, senv2: Senv): boolean => {
   );
 };
 
+/**
+ * @deprecated
+ */
+class UnsupportedSubtypingError extends Error {}
+
 export const isSubType = (type1: Type, type2: Type): boolean => {
+  if (type1.kind !== type2.kind) {
+    return false;
+  }
   if (type1.kind === 'Real' && type2.kind === 'Real') {
     return true;
   }
@@ -30,8 +38,19 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
 
     return argSubtyping && bodySubtyping;
   }
+  if (type1.kind === 'ForallT' && type2.kind === 'ForallT') {
+    return isSubTypeEff(type1.codomain, type2.codomain);
+  }
+  if (type1.kind === 'MProduct' && type2.kind === 'MProduct') {
+    const firstSubtyping = isSubTypeEff(type2.first, type1.first);
+    const secondSubtyping = isSubTypeEff(type1.second, type2.second);
 
-  return false;
+    return firstSubtyping && secondSubtyping;
+  }
+
+  throw new UnsupportedSubtypingError(
+    `We are sorry, gsens does not support subtyping between these types yet (${type1.kind}, ${type2.kind})`,
+  );
 };
 
 export const isSubTypeEff = (te1: TypeEff, te2: TypeEff): boolean => {
