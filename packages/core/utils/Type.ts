@@ -2,6 +2,7 @@ import * as chalk from 'chalk';
 import { TypeEffUtils } from '.';
 import {
   factoryOf,
+  isKinded,
   KindedFactory,
   singletonFactoryOf,
   SingletonKindedFactory,
@@ -9,86 +10,143 @@ import {
 import { Identifier, Senv } from './Senv';
 import { TypeEff } from './TypeEff';
 
-const RealKind = 'Real';
-export type Real = { kind: typeof RealKind };
-export const Real: SingletonKindedFactory<Real> = singletonFactoryOf('Real');
+export enum TypeKind {
+  Real = 'Real',
+  Bool = 'Bool',
+  Nil = 'Nil',
+  Arrow = 'Arrow',
+  ForallT = 'ForallT',
+  MProduct = 'MProduct',
+  AProduct = 'AProduct',
+}
 
-const BoolKind = 'Bool';
-export type Bool = { kind: typeof BoolKind };
-export const Bool: SingletonKindedFactory<Bool> = singletonFactoryOf('Bool');
+export type Real = { kind: TypeKind.Real };
+export const Real: SingletonKindedFactory<Real> = singletonFactoryOf(
+  TypeKind.Real,
+);
 
-const NilKind = 'Nil';
-export type Nil = { kind: typeof NilKind };
-export const Nil: SingletonKindedFactory<Nil> = singletonFactoryOf('Nil');
+export type Bool = { kind: TypeKind.Bool };
+export const Bool: SingletonKindedFactory<Bool> = singletonFactoryOf(
+  TypeKind.Bool,
+);
+
+export type Nil = { kind: TypeKind.Nil };
+export const Nil: SingletonKindedFactory<Nil> = singletonFactoryOf(
+  TypeKind.Nil,
+);
 
 export type Arrow = {
-  kind: 'Arrow';
+  kind: TypeKind.Arrow;
   domain: TypeEff;
   codomain: TypeEff;
 };
-export const Arrow: KindedFactory<Arrow> = factoryOf<Arrow>('Arrow');
+export const Arrow: KindedFactory<Arrow> = factoryOf<Arrow>(TypeKind.Arrow);
 
 export type ForallT = {
-  kind: 'ForallT';
+  kind: TypeKind.ForallT;
   sensVars: Identifier[];
   codomain: TypeEff;
 };
-export const ForallT: KindedFactory<ForallT> = factoryOf<ForallT>('ForallT');
+export const ForallT: KindedFactory<ForallT> = factoryOf<ForallT>(
+  TypeKind.ForallT,
+);
 
 export type MProduct = {
-  kind: 'MProduct';
+  kind: TypeKind.MProduct;
   first: TypeEff;
   second: TypeEff;
 };
-export const MProduct: KindedFactory<MProduct> =
-  factoryOf<MProduct>('MProduct');
+export const MProduct: KindedFactory<MProduct> = factoryOf<MProduct>(
+  TypeKind.MProduct,
+);
 
-export type Type = Real | Bool | Nil | Arrow | ForallT | MProduct;
+export type AProduct = {
+  kind: TypeKind.AProduct;
+  first: TypeEff;
+  second: TypeEff;
+};
+export const AProduct: KindedFactory<AProduct> = factoryOf<AProduct>(
+  TypeKind.AProduct,
+);
+
+export type Type = Real | Bool | Nil | Arrow | ForallT | MProduct | AProduct;
 
 // U T I L S
 
-export const subst = (ty: Type, name: Identifier, senv: Senv): Type => {
+export const map = (ty: Type, typeEffFn: (teff: TypeEff) => TypeEff): Type => {
   switch (ty.kind) {
-    case 'Real':
-    case 'Nil':
-    case 'Bool':
+    case TypeKind.Real:
+    case TypeKind.Nil:
+    case TypeKind.Bool:
       return ty;
-    case 'Arrow':
+    case TypeKind.Arrow:
       return Arrow({
-        domain: TypeEffUtils.subst(ty.domain, name, senv),
-        codomain: TypeEffUtils.subst(ty.codomain, name, senv),
+        domain: typeEffFn(ty.domain),
+        codomain: typeEffFn(ty.codomain),
       });
-    case 'ForallT':
+    case TypeKind.ForallT:
       return ForallT({
         sensVars: ty.sensVars,
-        codomain: TypeEffUtils.subst(ty.codomain, name, senv),
+        codomain: typeEffFn(ty.codomain),
       });
-    case 'MProduct':
+    case TypeKind.MProduct:
       return MProduct({
-        first: TypeEffUtils.subst(ty.first, name, senv),
-        second: TypeEffUtils.subst(ty.second, name, senv),
+        first: typeEffFn(ty.first),
+        second: typeEffFn(ty.second),
+      });
+
+    case TypeKind.AProduct:
+      return AProduct({
+        first: typeEffFn(ty.first),
+        second: typeEffFn(ty.second),
       });
   }
+};
+
+export const subst = (ty: Type, name: Identifier, senv: Senv): Type => {
+  return map(ty, (teff: TypeEff) => TypeEffUtils.subst(teff, name, senv));
+};
+
+export const substTup = (
+  ty: Type,
+  names: [Identifier, Identifier],
+  latents: [Senv, Senv],
+  effect: Senv,
+): Type => {
+  return map(ty, (teff: TypeEff) =>
+    TypeEffUtils.substTup(teff, names, latents, effect),
+  );
 };
 
 export const format = (ty: Type): string => {
   switch (ty.kind) {
-    case 'Real':
+    case TypeKind.Real:
       return chalk.yellow('Number');
-    case 'Bool':
-    case 'Nil':
+    case TypeKind.Bool:
+    case TypeKind.Nil:
       return chalk.yellow(ty.kind);
-    case 'Arrow':
+    case TypeKind.Arrow:
       return chalk`${TypeEffUtils.format(ty.domain)} -> ${TypeEffUtils.format(
         ty.codomain,
       )}`;
-    case 'ForallT':
+    case TypeKind.ForallT:
       return chalk`forall {green ${ty.sensVars.join(
         ' ',
       )}} . ${TypeEffUtils.format(ty.codomain)}`;
-    case 'MProduct':
+    case TypeKind.MProduct:
       return chalk`${TypeEffUtils.format(ty.first)} ⊗ ${TypeEffUtils.format(
         ty.second,
       )}`;
+    case TypeKind.AProduct:
+      return chalk`${TypeEffUtils.format(ty.first)} & ${TypeEffUtils.format(
+        ty.second,
+      )}`;
   }
+};
+
+export const typeIsKinded = <K extends Type['kind']>(
+  teff: TypeEff,
+  kind: K,
+): teff is TypeEff<Type & { kind: K }, Senv> => {
+  return isKinded(teff.type, kind);
 };

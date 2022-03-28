@@ -9,7 +9,15 @@ import {
   TypeEff,
   TypeEffUtils,
 } from '@gsens-lang/core/utils';
-import { Arrow, ForallT, Nil } from '@gsens-lang/core/utils/Type';
+import {
+  AProduct,
+  Arrow,
+  ForallT,
+  MProduct,
+  Nil,
+  typeIsKinded,
+  TypeKind,
+} from '@gsens-lang/core/utils/Type';
 
 import {
   Ascription,
@@ -18,15 +26,21 @@ import {
   BoolLiteral,
   Call,
   Expression,
+  ExpressionUtils,
   ExprStmt,
   Forall,
   Fun,
   NilLiteral,
   NonLinearBinary,
+  Pair,
   Print,
+  ProjFst,
+  ProjSnd,
   RealLiteral,
   SCall,
   Statement,
+  Tuple,
+  Untup,
   Variable,
   VarStmt,
 } from './ast';
@@ -285,9 +299,9 @@ const app = (
 
   const { result: callee } = calleeElaboration;
 
-  const calleeType = callee.typeEff.type;
+  const calleeTypeEff = callee.typeEff;
 
-  if (calleeType.kind !== 'Arrow') {
+  if (!typeIsKinded(calleeTypeEff, TypeKind.Arrow)) {
     return Err(
       ElaborationTypeError({
         reason: 'Expression called is not a function',
@@ -304,7 +318,7 @@ const app = (
 
   const { result: arg } = argElaboration;
 
-  const calleeArgType = calleeType.domain;
+  const calleeArgType = TypeEffUtils.ArrowsUtils.domain(calleeTypeEff);
 
   const evidence = interior(arg.typeEff, calleeArgType);
 
@@ -320,8 +334,6 @@ const app = (
     );
   }
 
-  const returnEffect = SenvUtils.add(callee.typeEff.effect, arg.typeEff.effect);
-
   return Ok(
     Call({
       callee,
@@ -331,7 +343,7 @@ const app = (
         expression: arg,
       }),
       paren: expr.paren,
-      typeEff: TypeEff(calleeType.codomain.type, returnEffect),
+      typeEff: TypeEffUtils.ArrowsUtils.codomain(calleeTypeEff),
     }),
   );
 };
@@ -348,9 +360,9 @@ const sapp = (
 
   const { result: callee } = calleeElaboration;
 
-  const calleeType = callee.typeEff.type;
+  const calleeTypeEff = callee.typeEff;
 
-  if (calleeType.kind !== 'ForallT') {
+  if (!typeIsKinded(calleeTypeEff, TypeKind.ForallT)) {
     return Err(
       ElaborationTypeError({
         reason: 'Expression called is not a sensitivity quantification',
@@ -359,28 +371,12 @@ const sapp = (
     );
   }
 
-  const {
-    sensVars: [svar, ...sensVars],
-    codomain,
-  } = calleeType;
-
-  const typeEff =
-    sensVars.length === 0
-      ? TypeEffUtils.subst(codomain, svar, expr.arg)
-      : TypeEff(
-          ForallT({
-            sensVars,
-            codomain: TypeEffUtils.subst(codomain, svar, expr.arg),
-          }),
-          callee.typeEff.effect,
-        );
-
   return Ok(
     SCall({
       callee,
       arg: expr.arg,
       bracket: expr.bracket,
-      typeEff,
+      typeEff: TypeEffUtils.ForallsUtils.instance(calleeTypeEff, expr.arg),
     }),
   );
 };
@@ -472,6 +468,208 @@ const block = (
   );
 };
 
+const tuple = (
+  expr: past.Tuple,
+  tenv: TypeEnv,
+): Result<Ascription, ElaborationError> => {
+  const firstElaboration = expression(expr.first, tenv);
+
+  if (!firstElaboration.success) {
+    return firstElaboration;
+  }
+
+  const secondElaboration = expression(expr.second, tenv);
+
+  if (!secondElaboration.success) {
+    return secondElaboration;
+  }
+
+  const typeEff = TypeEff(
+    MProduct({
+      first: firstElaboration.result.typeEff,
+      second: secondElaboration.result.typeEff,
+    }),
+    Senv(),
+  );
+
+  const evidence = initialEvidence(typeEff);
+
+  return Ok(
+    Ascription({
+      evidence,
+      expression: Tuple({
+        first: firstElaboration.result,
+        second: secondElaboration.result,
+        typeEff,
+      }),
+      typeEff,
+    }),
+  );
+};
+
+const untup = (
+  expr: past.Untup,
+  tenv: TypeEnv,
+): Result<Untup, ElaborationError> => {
+  const tuplElaboration = expression(expr.tuple, tenv);
+
+  if (!tuplElaboration.success) {
+    return tuplElaboration;
+  }
+
+  const [x1, x2] = expr.identifiers;
+
+  const bodyElaboration = expression(
+    expr.body,
+    TypeEnvUtils.extend(
+      TypeEnvUtils.extend(
+        tenv,
+        x1.lexeme,
+        TypeEff(
+          tuplElaboration.result.typeEff.type,
+          Senv({ [x1.lexeme]: Sens(1) }),
+        ),
+      ),
+      x2.lexeme,
+      TypeEff(
+        tuplElaboration.result.typeEff.type,
+        Senv({ [x2.lexeme]: Sens(1) }),
+      ),
+    ),
+  );
+
+  if (!bodyElaboration.success) {
+    return bodyElaboration;
+  }
+
+  const tuplType = tuplElaboration.result.typeEff.type;
+
+  if (tuplType.kind !== 'MProduct') {
+    return Err(
+      ElaborationTypeError({
+        reason: 'The expression being unstructured is not a tuple',
+        operator: expr.untupToken,
+      }),
+    );
+  }
+
+  const body = ExpressionUtils.substTup(
+    bodyElaboration.result,
+    [x1.lexeme, x2.lexeme],
+    [tuplType.first.effect, tuplType.second.effect],
+    tuplElaboration.result.typeEff.effect,
+  );
+
+  return Ok(
+    Untup({
+      body,
+      tuple: tuplElaboration.result,
+      typeEff: body.typeEff,
+      identifiers: expr.identifiers,
+      untupToken: expr.untupToken,
+    }),
+  );
+};
+
+const pair = (
+  expr: past.Pair,
+  tenv: TypeEnv,
+): Result<Ascription, ElaborationError> => {
+  const firstElaboration = expression(expr.first, tenv);
+
+  if (!firstElaboration.success) {
+    return firstElaboration;
+  }
+
+  const secondElaboration = expression(expr.second, tenv);
+
+  if (!secondElaboration.success) {
+    return secondElaboration;
+  }
+
+  const typeEff = TypeEff(
+    AProduct({
+      first: firstElaboration.result.typeEff,
+      second: secondElaboration.result.typeEff,
+    }),
+    Senv(),
+  );
+
+  const evidence = initialEvidence(typeEff);
+
+  return Ok(
+    Ascription({
+      evidence,
+      expression: Pair({
+        first: firstElaboration.result,
+        second: secondElaboration.result,
+        typeEff,
+      }),
+      typeEff,
+    }),
+  );
+};
+
+const projFst = (
+  expr: past.ProjFst,
+  tenv: TypeEnv,
+): Result<ProjFst, ElaborationError> => {
+  const pairElaboration = expression(expr.pair, tenv);
+
+  if (!pairElaboration.success) {
+    return pairElaboration;
+  }
+
+  const pairTypeEff = pairElaboration.result.typeEff;
+
+  if (!typeIsKinded(pairTypeEff, TypeKind.AProduct)) {
+    return Err(
+      ElaborationTypeError({
+        reason: 'The expression being projected must be a pair',
+        operator: expr.projToken,
+      }),
+    );
+  }
+
+  return Ok(
+    ProjFst({
+      pair: pairElaboration.result,
+      projToken: expr.projToken,
+      typeEff: TypeEffUtils.AdditiveProductsUtils.firstProjection(pairTypeEff),
+    }),
+  );
+};
+
+const projSnd = (
+  expr: past.ProjSnd,
+  tenv: TypeEnv,
+): Result<ProjSnd, ElaborationError> => {
+  const pairElaboration = expression(expr.pair, tenv);
+
+  if (!pairElaboration.success) {
+    return pairElaboration;
+  }
+
+  const pairTypeEff = pairElaboration.result.typeEff;
+
+  if (!typeIsKinded(pairTypeEff, TypeKind.AProduct)) {
+    return Err(
+      ElaborationTypeError({
+        reason: 'The expression being projected must be a pair',
+        operator: expr.projToken,
+      }),
+    );
+  }
+
+  return Ok(
+    ProjSnd({
+      pair: pairElaboration.result,
+      projToken: expr.projToken,
+      typeEff: TypeEffUtils.AdditiveProductsUtils.secondProjection(pairTypeEff),
+    }),
+  );
+};
+
 export const expression = (
   expr: past.Expression,
   tenv: TypeEnv = {},
@@ -513,6 +711,16 @@ export const expression = (
       return printExpr(expr, tenv);
     case past.ExprKind.Block:
       return block(expr, tenv);
+    case past.ExprKind.Tuple:
+      return tuple(expr, tenv);
+    case past.ExprKind.Untup:
+      return untup(expr, tenv);
+    case past.ExprKind.Pair:
+      return pair(expr, tenv);
+    case past.ExprKind.ProjFst:
+      return projFst(expr, tenv);
+    case past.ExprKind.ProjSnd:
+      return projSnd(expr, tenv);
   }
 };
 

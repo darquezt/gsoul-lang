@@ -21,6 +21,10 @@ import {
   Forall,
   SCall,
   Tuple,
+  Untup,
+  Pair,
+  ProjFst,
+  ProjSnd,
 } from './ast';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
@@ -423,6 +427,107 @@ export function parse(tokens: Token[]): Result<Statement[]> {
         first,
         second,
         constructorToken,
+      });
+    } else if (match(TokenType.UNTUP)) {
+      const untupToken = previous();
+      const x1 = consume(
+        TokenType.IDENTIFIER,
+        errorMessage({
+          expected: 'variable identifier',
+          after: '`untup` elimination',
+        }),
+      );
+      consume(
+        TokenType.COMMA,
+        errorMessage({
+          expected: 'comma (",")',
+          after: 'first tuple component identifier',
+        }),
+      );
+      const x2 = consume(
+        TokenType.IDENTIFIER,
+        errorMessage({
+          expected: 'a second variable identifier',
+          after: '`untup` elimination',
+        }),
+      );
+      consume(
+        TokenType.EQUAL,
+        errorMessage({
+          expected: 'equality sign ("=")',
+          after: 'variable identifiers',
+        }),
+      );
+      const tupl = expression();
+      consume(
+        TokenType.IN,
+        errorMessage({
+          expected: '`in` keyword',
+          before: 'tuple destructuring body',
+        }),
+      );
+      const body = expression();
+
+      return Untup({
+        untupToken,
+        identifiers: [x1, x2],
+        tuple: tupl,
+        body,
+      });
+    } else if (match(TokenType.PAIR)) {
+      const constructorToken = previous();
+      consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: 'pair constructor',
+        }),
+      );
+      const first = expression();
+      consume(
+        TokenType.COMMA,
+        errorMessage({
+          expected: ',',
+          after: 'pair component',
+        }),
+      );
+      const second = expression();
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: 'pair components',
+        }),
+      );
+
+      return Pair({
+        first,
+        second,
+        constructorToken,
+      });
+    } else if (match(TokenType.FST, TokenType.SND)) {
+      const projToken = previous();
+      consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: `${projToken.lexeme} projector`,
+        }),
+      );
+      const pair = expression();
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: 'pair expression',
+        }),
+      );
+
+      const constructor = projToken.type === TokenType.FST ? ProjFst : ProjSnd;
+
+      return constructor({
+        projToken,
+        pair,
       });
     } else if (match(TokenType.NUMBERLIT)) {
       return Literal({

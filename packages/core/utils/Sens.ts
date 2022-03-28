@@ -35,6 +35,14 @@ const addBounds = (a: number, b: number): number => {
   return a + b;
 };
 
+const maxBounds = (a: number, b: number): number => {
+  if (a === MAX_SENS || b === MAX_SENS) {
+    return MAX_SENS;
+  }
+
+  return Math.max(a, b);
+};
+
 export const add = (a: Sens, b: Sens): Sens => {
   return [addBounds(a[0], b[0]), addBounds(a[1], b[1])];
 };
@@ -53,6 +61,10 @@ const multiplyBounds = (a: number, b: number) => {
 
 export const mult = (a: Sens, b: Sens): Sens => {
   return [multiplyBounds(a[0], b[0]), multiplyBounds(a[1], b[1])];
+};
+
+export const join = (a: Sens, b: Sens): Sens => {
+  return [maxBounds(a[0], b[0]), maxBounds(a[1], b[1])];
 };
 
 export const scale = (sens: Sens, factor: number): Sens => [

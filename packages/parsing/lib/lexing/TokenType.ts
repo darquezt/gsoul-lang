@@ -68,7 +68,15 @@ enum TokenType {
   SLET = 'SLET',
   // WHILE = 'WHILE',
 
-  TUPLE = 'TUPLE', // Multiplicative pairs
+  // Multiplicative pairs
+  TUPLE = 'TUPLE',
+  UNTUP = 'UNTUP',
+  IN = 'IN',
+
+  // Additive pairs
+  PAIR = 'PAIR',
+  FST = 'FST',
+  SND = 'SND',
 
   INVALID = 'INVALID',
 

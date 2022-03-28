@@ -10,11 +10,15 @@ import {
   Fun,
   Literal,
   NonLinearBinary,
+  Pair,
   Print,
+  ProjFst,
+  ProjSnd,
   SCall,
   Statement,
   StmtKind,
   Tuple,
+  Untup,
   Variable,
   VarStmt,
 } from '@gsens-lang/parsing/lib/ast';
@@ -28,12 +32,15 @@ import {
   TypeEffUtils,
 } from '@gsens-lang/core/utils';
 import {
+  AProduct,
   Arrow,
   Bool,
   ForallT,
   MProduct,
   Nil,
   Real,
+  typeIsKinded,
+  TypeKind,
 } from '@gsens-lang/core/utils/Type';
 import { isKinded } from '@gsens-lang/core/utils/ADT';
 
@@ -133,7 +140,7 @@ const binary = (expr: Binary, tenv: TypeEnv): PureResult => {
 
   if (!lTC.success) {
     return lTC;
-  } else if (!isKinded(lTC.typeEff.type, 'Real')) {
+  } else if (!isKinded(lTC.typeEff.type, TypeKind.Real)) {
     return Failure(
       expr.operator,
       'Expected real expression on the left-hand side of + operation',
@@ -144,7 +151,7 @@ const binary = (expr: Binary, tenv: TypeEnv): PureResult => {
 
   if (!rTC.success) {
     return rTC;
-  } else if (!isKinded(rTC.typeEff.type, 'Real')) {
+  } else if (!isKinded(rTC.typeEff.type, TypeKind.Real)) {
     return Failure(
       expr.operator,
       'Expected real expression on the right-hand side of + operation',
@@ -162,7 +169,7 @@ const nonLinearBinary = (expr: NonLinearBinary, tenv: TypeEnv): PureResult => {
 
   if (!lTC.success) {
     return lTC;
-  } else if (!isKinded(lTC.typeEff.type, 'Real')) {
+  } else if (!isKinded(lTC.typeEff.type, TypeKind.Real)) {
     return Failure(
       expr.operator,
       'Expected real expression on the left-hand side of + operation',
@@ -173,7 +180,7 @@ const nonLinearBinary = (expr: NonLinearBinary, tenv: TypeEnv): PureResult => {
 
   if (!rTC.success) {
     return rTC;
-  } else if (!isKinded(rTC.typeEff.type, 'Real')) {
+  } else if (!isKinded(rTC.typeEff.type, TypeKind.Real)) {
     return Failure(
       expr.operator,
       'Expected real expression on the right-hand side of + operation',
@@ -242,9 +249,9 @@ const app = (expr: Call, tenv: TypeEnv): PureResult => {
     return calleeTC;
   }
 
-  const calleeType = calleeTC.typeEff.type;
+  const calleeTypeEff = calleeTC.typeEff;
 
-  if (calleeType.kind !== 'Arrow') {
+  if (!typeIsKinded(calleeTypeEff, TypeKind.Arrow)) {
     return Failure(expr.paren, 'Expression called is not a function');
   }
 
@@ -254,24 +261,17 @@ const app = (expr: Call, tenv: TypeEnv): PureResult => {
     return argTC;
   }
 
-  const calleeArgType = calleeType.domain;
-
   const argType = argTC.typeEff;
 
-  if (!isSubTypeEff(argType, calleeArgType)) {
+  if (!isSubTypeEff(argType, TypeEffUtils.ArrowsUtils.domain(calleeTypeEff))) {
     return Failure(
       expr.paren,
       'Argument type is not subtype of the expected type in the function',
     );
   }
 
-  const returnEffect = SenvUtils.add(
-    calleeTC.typeEff.effect,
-    argTC.typeEff.effect,
-  );
-
   return PureSuccess(
-    TypeEff(calleeType.codomain.type, returnEffect),
+    TypeEffUtils.ArrowsUtils.codomain(calleeTypeEff),
     calleeTC.typings.concat(argTC.typings),
   );
 };
@@ -283,32 +283,19 @@ const sapp = (expr: SCall, tenv: TypeEnv): PureResult => {
     return calleeTC;
   }
 
-  const calleeType = calleeTC.typeEff.type;
+  const calleeTypeEff = calleeTC.typeEff;
 
-  if (calleeType.kind !== 'ForallT') {
+  if (!typeIsKinded(calleeTypeEff, TypeKind.ForallT)) {
     return Failure(
       expr.bracket,
       'Expression called is not a sensitive quantification',
     );
   }
 
-  const {
-    sensVars: [svar, ...sensVars],
-    codomain,
-  } = calleeType;
-
-  const returnTypeEff =
-    sensVars.length === 0
-      ? TypeEffUtils.subst(codomain, svar, expr.arg)
-      : TypeEff(
-          ForallT({
-            sensVars,
-            codomain: TypeEffUtils.subst(codomain, svar, expr.arg),
-          }),
-          calleeTC.typeEff.effect,
-        );
-
-  return PureSuccess(returnTypeEff, calleeTC.typings);
+  return PureSuccess(
+    TypeEffUtils.ForallsUtils.instance(calleeTypeEff, expr.arg),
+    calleeTC.typings,
+  );
 };
 
 const ascription = (expr: Ascription, tenv: TypeEnv): PureResult => {
@@ -387,6 +374,115 @@ const tuple = (expr: Tuple, tenv: TypeEnv): PureResult => {
   );
 };
 
+export const untup = (expr: Untup, tenv: TypeEnv): PureResult => {
+  const tuplTC = expression(expr.tuple, tenv);
+
+  if (!tuplTC.success) {
+    return tuplTC;
+  }
+
+  const [x1, x2] = expr.identifiers;
+
+  const bodyTC = expression(
+    expr.body,
+    TypeEnvUtils.extend(
+      TypeEnvUtils.extend(
+        tenv,
+        x1.lexeme,
+        TypeEff(tuplTC.typeEff.type, Senv({ [x1.lexeme]: Sens(1) })),
+      ),
+      x2.lexeme,
+      TypeEff(tuplTC.typeEff.type, Senv({ [x2.lexeme]: Sens(1) })),
+    ),
+  );
+
+  if (!bodyTC.success) {
+    return bodyTC;
+  }
+
+  const tuplType = tuplTC.typeEff.type;
+
+  if (!isKinded(tuplType, TypeKind.MProduct)) {
+    return Failure(
+      expr.untupToken,
+      'The expression being destructured is not a tuple',
+    );
+  }
+
+  return PureSuccess(
+    TypeEffUtils.substTup(
+      bodyTC.typeEff,
+      [x1.lexeme, x2.lexeme],
+      [tuplType.first.effect, tuplType.second.effect],
+      tuplTC.typeEff.effect,
+    ),
+    tuplTC.typings.concat(bodyTC.typings),
+  );
+};
+
+const pair = (expr: Pair, tenv: TypeEnv): PureResult => {
+  const fstTC = expression(expr.first, tenv);
+
+  if (!fstTC.success) {
+    return fstTC;
+  }
+
+  const sndTC = expression(expr.second, tenv);
+
+  if (!sndTC.success) {
+    return sndTC;
+  }
+
+  return PureSuccess(
+    TypeEff(
+      AProduct({
+        first: fstTC.typeEff,
+        second: sndTC.typeEff,
+      }),
+      Senv(),
+    ),
+    fstTC.typings.concat(sndTC.typings),
+  );
+};
+
+export const projFst = (expr: ProjFst, tenv: TypeEnv): PureResult => {
+  const pairTC = expression(expr.pair, tenv);
+
+  if (!pairTC.success) {
+    return pairTC;
+  }
+
+  const pairTypeEff = pairTC.typeEff;
+
+  if (!typeIsKinded(pairTypeEff, TypeKind.AProduct)) {
+    return Failure(expr.projToken, 'Expression being projected must be a pair');
+  }
+
+  return PureSuccess(
+    TypeEffUtils.AdditiveProductsUtils.firstProjection(pairTypeEff),
+    pairTC.typings,
+  );
+};
+
+export const projSnd = (expr: ProjSnd, tenv: TypeEnv): PureResult => {
+  const pairTC = expression(expr.pair, tenv);
+
+  if (!pairTC.success) {
+    return pairTC;
+  }
+
+  const pairTypeEff = pairTC.typeEff;
+
+  if (!typeIsKinded(pairTypeEff, TypeKind.AProduct)) {
+    return Failure(expr.projToken, 'Expression being projected must be a pair');
+  }
+
+  return PureSuccess(
+    TypeEffUtils.AdditiveProductsUtils.secondProjection(pairTypeEff),
+    pairTC.typings,
+  );
+};
+
 export const expression = (
   expr: Expression,
   tenv: TypeEnv = {},
@@ -425,6 +521,14 @@ export const expression = (
       return block(expr, tenv);
     case ExprKind.Tuple:
       return tuple(expr, tenv);
+    case ExprKind.Untup:
+      return untup(expr, tenv);
+    case ExprKind.Pair:
+      return pair(expr, tenv);
+    case ExprKind.ProjFst:
+      return projFst(expr, tenv);
+    case ExprKind.ProjSnd:
+      return projSnd(expr, tenv);
   }
 };
 

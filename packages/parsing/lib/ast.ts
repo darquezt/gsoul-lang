@@ -20,6 +20,10 @@ export enum ExprKind {
   Fun = 'Fun',
   Forall = 'Forall',
   Tuple = 'Tuple',
+  Untup = 'Untup',
+  Pair = 'Pair',
+  ProjFst = 'ProjFst',
+  ProjSnd = 'ProjSnd',
   Ascription = 'Ascription',
   Print = 'Print',
   Block = 'Block',
@@ -94,6 +98,37 @@ export type Tuple = {
 };
 export const Tuple = factoryOf<Tuple>(ExprKind.Tuple);
 
+export type Untup = {
+  kind: ExprKind.Untup;
+  identifiers: [Token, Token];
+  tuple: Expression;
+  body: Expression;
+  untupToken: Token;
+};
+export const Untup = factoryOf<Untup>(ExprKind.Untup);
+
+export type Pair = {
+  kind: ExprKind.Pair;
+  first: Expression;
+  second: Expression;
+  constructorToken: Token;
+};
+export const Pair = factoryOf<Pair>(ExprKind.Pair);
+
+export type ProjFst = {
+  kind: ExprKind.ProjFst;
+  pair: Expression;
+  projToken: Token;
+};
+export const ProjFst = factoryOf<ProjFst>(ExprKind.ProjFst);
+
+export type ProjSnd = {
+  kind: ExprKind.ProjSnd;
+  pair: Expression;
+  projToken: Token;
+};
+export const ProjSnd = factoryOf<ProjSnd>(ExprKind.ProjSnd);
+
 export type Ascription = {
   kind: ExprKind.Ascription;
   expression: Expression;
@@ -124,6 +159,10 @@ export type Expression =
   | Fun
   | Forall
   | Tuple
+  | Untup
+  | Pair
+  | ProjFst
+  | ProjSnd
   | Block
   | Print
   | Ascription;

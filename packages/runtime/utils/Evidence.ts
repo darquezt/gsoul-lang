@@ -6,7 +6,15 @@ import {
   TypeEff,
   TypeEffUtils,
 } from '@gsens-lang/core/utils';
-import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
+import {
+  AProduct,
+  Arrow,
+  Bool,
+  Nil,
+  Real,
+  typeIsKinded,
+  TypeKind,
+} from '@gsens-lang/core/utils/Type';
 import { factoryOf, isKinded } from '@gsens-lang/core/utils/ADT';
 import { Result } from './Result';
 import { Err, Ok } from '../utils/Result';
@@ -97,7 +105,7 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
   if (t1.kind === t2.kind && baseTypes.includes(t1.kind)) {
     return Ok([t1, t2]);
   }
-  if (isKinded(t1, 'Arrow') && isKinded(t2, 'Arrow')) {
+  if (isKinded(t1, TypeKind.Arrow) && isKinded(t2, TypeKind.Arrow)) {
     const evit11Res = interior(t2.domain, t1.domain);
 
     if (!evit11Res.success) {
@@ -231,10 +239,10 @@ const transType = (
   }
 
   if (
-    isKinded(t1, 'Arrow') &&
-    isKinded(t2, 'Arrow') &&
-    isKinded(t3, 'Arrow') &&
-    isKinded(t4, 'Arrow')
+    isKinded(t1, TypeKind.Arrow) &&
+    isKinded(t2, TypeKind.Arrow) &&
+    isKinded(t3, TypeKind.Arrow) &&
+    isKinded(t4, TypeKind.Arrow)
   ) {
     const evit11Res = trans([t4.domain, t3.domain], [t2.domain, t1.domain]);
 
@@ -266,6 +274,43 @@ const transType = (
       Arrow({
         domain: t21p,
         codomain: T22p,
+      }),
+    ]);
+  }
+
+  if (
+    isKinded(t1, TypeKind.AProduct) &&
+    isKinded(t2, TypeKind.AProduct) &&
+    isKinded(t3, TypeKind.AProduct) &&
+    isKinded(t4, TypeKind.AProduct)
+  ) {
+    const evit11Res = trans([t1.first, t2.first], [t3.first, t4.first]);
+
+    if (!evit11Res.success) {
+      return evit11Res;
+    }
+
+    const eviT12Res = trans([t1.second, t2.second], [t3.second, t4.second]);
+
+    if (!eviT12Res.success) {
+      return eviT12Res;
+    }
+
+    const {
+      result: [t21p, t11p],
+    } = evit11Res;
+    const {
+      result: [T12p, T22p],
+    } = eviT12Res;
+
+    return Ok([
+      AProduct({
+        first: t11p,
+        second: T12p,
+      }),
+      AProduct({
+        first: t21p,
+        second: T22p,
       }),
     ]);
   }
@@ -304,7 +349,12 @@ export const trans = (
 // INVERSION
 
 export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
-  if (!isKinded(ev[0].type, 'Arrow') || !isKinded(ev[1].type, 'Arrow')) {
+  const [left, right] = ev;
+
+  if (
+    !typeIsKinded(left, TypeKind.Arrow) ||
+    !typeIsKinded(right, TypeKind.Arrow)
+  ) {
     return Err(
       EvidenceTypeError({
         reason: 'Operator icod is not defined for types other than functions',
@@ -313,55 +363,18 @@ export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   }
 
   return Ok([
-    TypeEff(
-      ev[0].type.codomain.type,
-      SenvUtils.add(ev[0].effect, ev[0].type.codomain.effect),
-    ),
-    TypeEff(
-      ev[1].type.codomain.type,
-      SenvUtils.add(ev[1].effect, ev[1].type.codomain.effect),
-    ),
-  ]);
-};
-
-export const iscod = (
-  ev: Evidence,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _name: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _effect: Senv,
-): Result<Evidence, EvidenceError> => {
-  console.log('ISCOD', format(ev));
-  if (!isKinded(ev[0].type, 'ForallT') || !isKinded(ev[1].type, 'ForallT')) {
-    return Err(
-      EvidenceTypeError({
-        reason: 'Operator iscod is not defined for types other than foralls',
-      }),
-    );
-  }
-
-  return Ok([
-    TypeEff(
-      ev[0].type.codomain.type,
-      SenvUtils.add(ev[0].effect, ev[0].type.codomain.effect),
-    ),
-    // TypeEffUtils.subst(
-    //   name,
-    //   effect,
-    // ),
-    TypeEff(
-      ev[1].type.codomain.type,
-      SenvUtils.add(ev[1].effect, ev[1].type.codomain.effect),
-    ),
-    // TypeEffUtils.subst(
-    //   name,
-    //   effect,
-    // ),
+    TypeEffUtils.ArrowsUtils.codomain(left),
+    TypeEffUtils.ArrowsUtils.codomain(right),
   ]);
 };
 
 export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
-  if (!isKinded(ev[0].type, 'Arrow') || !isKinded(ev[1].type, 'Arrow')) {
+  const [left, right] = ev;
+
+  if (
+    !typeIsKinded(left, TypeKind.Arrow) ||
+    !typeIsKinded(right, TypeKind.Arrow)
+  ) {
     return Err(
       EvidenceTypeError({
         reason: 'Operator idom is not defined for types other than functions',
@@ -369,7 +382,73 @@ export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
     );
   }
 
-  return Ok([ev[1].type.domain, ev[0].type.domain]);
+  return Ok([
+    TypeEffUtils.ArrowsUtils.domain(left),
+    TypeEffUtils.ArrowsUtils.domain(right),
+  ]);
+};
+
+export const iscod = (
+  ev: Evidence,
+  effect?: Senv,
+): Result<Evidence, EvidenceError> => {
+  const [left, right] = ev;
+
+  if (
+    !typeIsKinded(left, TypeKind.ForallT) ||
+    !typeIsKinded(right, TypeKind.ForallT)
+  ) {
+    return Err(
+      EvidenceTypeError({
+        reason: 'Operator icod is not defined for types other than functions',
+      }),
+    );
+  }
+
+  return Ok([
+    TypeEffUtils.ForallsUtils.instance(left, effect),
+    TypeEffUtils.ForallsUtils.instance(right, effect),
+  ]);
+};
+
+export const ifirst = (ev: Evidence): Result<Evidence, EvidenceError> => {
+  const [left, right] = ev;
+
+  if (
+    !typeIsKinded(left, TypeKind.AProduct) ||
+    !typeIsKinded(right, TypeKind.AProduct)
+  ) {
+    return Err(
+      EvidenceTypeError({
+        reason: 'Operator icod is not defined for types other than functions',
+      }),
+    );
+  }
+
+  return Ok([
+    TypeEffUtils.AdditiveProductsUtils.firstProjection(left),
+    TypeEffUtils.AdditiveProductsUtils.firstProjection(right),
+  ]);
+};
+
+export const isecond = (ev: Evidence): Result<Evidence, EvidenceError> => {
+  const [left, right] = ev;
+
+  if (
+    !typeIsKinded(left, TypeKind.AProduct) ||
+    !typeIsKinded(right, TypeKind.AProduct)
+  ) {
+    return Err(
+      EvidenceTypeError({
+        reason: 'Operator icod is not defined for types other than functions',
+      }),
+    );
+  }
+
+  return Ok([
+    TypeEffUtils.AdditiveProductsUtils.secondProjection(left),
+    TypeEffUtils.AdditiveProductsUtils.secondProjection(right),
+  ]);
 };
 
 // UTILS
@@ -417,6 +496,18 @@ export const subst = (ev: Evidence, name: string, senv: Senv): Evidence => {
   return [
     TypeEffUtils.subst(ev[0], name, senv),
     TypeEffUtils.subst(ev[1], name, senv),
+  ];
+};
+
+export const substTup = (
+  ev: Evidence,
+  names: [string, string],
+  latents: [Senv, Senv],
+  senv: Senv,
+): Evidence => {
+  return [
+    TypeEffUtils.substTup(ev[0], names, latents, senv),
+    TypeEffUtils.substTup(ev[1], names, latents, senv),
   ];
 };
 

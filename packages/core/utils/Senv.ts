@@ -64,6 +64,25 @@ export const subst = (senv: Senv, name: Identifier, effect: Senv): Senv => {
   return add(withoutX, scaledEffect);
 };
 
+export const substTup = (
+  senv: Senv,
+  names: [Identifier, Identifier],
+  latents: [Senv, Senv],
+  effect: Senv,
+): Senv => {
+  const x1Sens = access(senv, names[0]);
+  const x2Sens = access(senv, names[1]);
+  const withoutX1X2 = omit(names, senv);
+  const scaledEffect11 = scaleBySens(latents[0], x1Sens);
+  const scaledEffect12 = scaleBySens(latents[1], x2Sens);
+  const scaledEffect1 = scaleBySens(effect, SensUtils.join(x1Sens, x2Sens));
+
+  return add(
+    withoutX1X2,
+    add(scaledEffect11, add(scaledEffect12, scaledEffect1)),
+  );
+};
+
 export const isEmpty = (senv: Senv): boolean => Object.keys(senv).length === 0;
 
 export const format = (senv: Senv): string => {

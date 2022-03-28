@@ -35,6 +35,7 @@ primary ::= "true" | "false"
           | "fun" "(" parameters ")" block
           | "forall" IDENTIFIER "." expression
           | "tuple" "(" expression, expression ")"
+          | "untup" IDENTIFIER, IDENTIFIER "=" expression "in" expression
           | NUMBER
           | IDENTIFIER
           | "(" expression ")";
