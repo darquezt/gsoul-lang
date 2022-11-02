@@ -1,6 +1,6 @@
 {
   "name": "@gsoul-lang/cli",
-  "version": "0.0.1-alpha.0",
+  "version": "0.0.1",
   "description": "CLI module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "index.ts",
