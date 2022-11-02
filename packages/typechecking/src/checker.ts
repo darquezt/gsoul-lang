@@ -47,7 +47,7 @@ import {
 import { isKinded } from '@gsoul-lang/core/utils/ADT';
 
 import { isSubTypeEff } from './subtyping';
-import { Token } from '@gsoul-lang/parsing/lib/lexing';
+import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import { TypeAssoc, TypeAssocs, TypingSeeker } from './utils/typingSeeker';
 import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 
@@ -167,6 +167,13 @@ const binary = (expr: Binary, tenv: TypeEnv): PureResult => {
   );
 };
 
+const nonLinearOperatorsBool = [
+  TokenType.GREATER,
+  TokenType.GREATER_EQUAL,
+  TokenType.LESS,
+  TokenType.LESS_EQUAL,
+  TokenType.EQUAL_EQUAL,
+];
 const nonLinearBinary = (expr: NonLinearBinary, tenv: TypeEnv): PureResult => {
   const lTC = expression(expr.left, tenv);
 
@@ -190,10 +197,13 @@ const nonLinearBinary = (expr: NonLinearBinary, tenv: TypeEnv): PureResult => {
     );
   }
 
+  const type = nonLinearOperatorsBool.includes(expr.operator.type)
+    ? Bool()
+    : Real();
   const addedEffect = SenvUtils.add(lTC.typeEff.effect, rTC.typeEff.effect);
 
   return PureSuccess(
-    TypeEff(Real(), SenvUtils.scaleInf(addedEffect)),
+    TypeEff(type, SenvUtils.scaleInf(addedEffect)),
     lTC.typings.concat(rTC.typings),
   );
 };

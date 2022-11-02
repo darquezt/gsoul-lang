@@ -773,6 +773,51 @@ export const sum = (
   ]);
 };
 
+export const realComparison = (
+  ev1: Evidence,
+  ev2: Evidence,
+): Result<Evidence, EvidenceError> => {
+  const [teff11, teff12] = ev1;
+  const [teff21, teff22] = ev2;
+
+  if (
+    isKinded(teff11, TypeEffectKind.RecursiveVar) ||
+    isKinded(teff21, TypeEffectKind.RecursiveVar) ||
+    isKinded(teff12, TypeEffectKind.RecursiveVar) ||
+    isKinded(teff22, TypeEffectKind.RecursiveVar)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute comparison of a recusive type-and-effect',
+      ),
+    );
+  }
+
+  /**
+   * Types must be the same
+   */
+  if (
+    teff11.type.kind !== teff12.type.kind ||
+    teff11.type.kind !== teff21.type.kind ||
+    teff11.type.kind !== teff22.type.kind
+  ) {
+    return Result.err(
+      new EvidenceTypeError('All types in evidence should be of the same kind'),
+    );
+  }
+
+  return Result.ok([
+    TypeEff(
+      Bool(),
+      SenvUtils.scaleInf(SenvUtils.add(teff11.effect, teff21.effect)),
+    ),
+    TypeEff(
+      Bool(),
+      SenvUtils.scaleInf(SenvUtils.add(teff12.effect, teff22.effect)),
+    ),
+  ]);
+};
+
 export const scale = (ev: Evidence, factor: number): Evidence => {
   const [left, right] = ev;
 

@@ -1,10 +1,11 @@
 import { SenvUtils, TypeEff } from '@gsoul-lang/core/utils';
 import { factoryOf, isKinded, KindedFactory } from '@gsoul-lang/core/utils/ADT';
-import { Real } from '@gsoul-lang/core/utils/Type';
+import { Bool, Real } from '@gsoul-lang/core/utils/Type';
 import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import {
   AscribedValue,
   Binary,
+  BoolLiteral,
   Expression,
   ExprKind,
   NonLinearBinary,
@@ -101,7 +102,7 @@ export const reduceBinaryOperation = (
   kont: LeftOpKont,
 ): Result<StepState, InterpreterError> => {
   const inner = term.expression;
-  if (kont.op.type === TokenType.PLUS) {
+  if (kont.op.type === TokenType.PLUS || kont.op.type === TokenType.MINUS) {
     if (!isKinded(inner, ExprKind.RealLiteral)) {
       return Result.err(
         new InterpreterTypeError({
@@ -122,7 +123,11 @@ export const reduceBinaryOperation = (
       );
     }
 
-    const innerSum = left.expression.value + inner.value;
+    const innerSum =
+      kont.op.lexeme === TokenType.PLUS
+        ? left.expression.value + inner.value
+        : left.expression.value - inner.value;
+
     const sumEvidenceRes = EvidenceUtils.sum(left.evidence, term.evidence);
 
     if (!sumEvidenceRes.isOk) {
@@ -233,6 +238,75 @@ export const reduceNLBinaryOperation = (
       evidence: EvidenceUtils.scaleInf(sumEvidenceRes.value),
       typeEff: TypeEff(
         Real(),
+        SenvUtils.scaleInf(
+          SenvUtils.add(left.typeEff.effect, term.typeEff.effect),
+        ),
+      ),
+    });
+
+    return OkState({ term: sum }, store, kont.state.kont);
+  } else if (
+    [
+      TokenType.GREATER,
+      TokenType.GREATER_EQUAL,
+      TokenType.LESS,
+      TokenType.LESS_EQUAL,
+      TokenType.EQUAL_EQUAL,
+    ].includes(kont.op.type)
+  ) {
+    if (!isKinded(inner, ExprKind.RealLiteral)) {
+      return Result.err(
+        new InterpreterTypeError({
+          reason: `Left operand of ${kont.op.lexeme} must be a number`,
+          operator: kont.op,
+        }),
+      );
+    }
+
+    const left = kont.state.value;
+
+    if (!simpleValueIsKinded(left, ExprKind.RealLiteral)) {
+      return Result.err(
+        new InterpreterTypeError({
+          reason: `Right operand of ${kont.op.lexeme} must be a number`,
+          operator: kont.op,
+        }),
+      );
+    }
+
+    let innerResult: boolean;
+
+    if (kont.op.type === TokenType.EQUAL_EQUAL) {
+      innerResult = left.expression.value === inner.value;
+    } else if (kont.op.type === TokenType.LESS_EQUAL) {
+      innerResult = left.expression.value <= inner.value;
+    } else if (kont.op.type === TokenType.GREATER) {
+      innerResult = left.expression.value > inner.value;
+    } else if (kont.op.type === TokenType.GREATER_EQUAL) {
+      innerResult = left.expression.value >= inner.value;
+    } else {
+      // LESS
+      innerResult = left.expression.value < inner.value;
+    }
+
+    const sumEvidenceRes = EvidenceUtils.sum(left.evidence, term.evidence);
+
+    if (!sumEvidenceRes.isOk) {
+      return Result.err(
+        new InterpreterTypeError({
+          reason: sumEvidenceRes.error.message,
+          operator: kont.op,
+        }),
+      );
+    }
+
+    const sum = AscribedValue({
+      expression: BoolLiteral({
+        value: innerResult,
+      }),
+      evidence: sumEvidenceRes.value,
+      typeEff: TypeEff(
+        Bool(),
         SenvUtils.scaleInf(
           SenvUtils.add(left.typeEff.effect, term.typeEff.effect),
         ),

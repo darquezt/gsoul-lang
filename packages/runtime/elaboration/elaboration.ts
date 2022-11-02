@@ -12,9 +12,11 @@ import {
 import {
   AProduct,
   Arrow,
+  Bool,
   ForallT,
   Nil,
   Product,
+  Real,
   RecType,
   typeIsKinded,
   TypeKind,
@@ -57,7 +59,7 @@ import {
   ElaborationUnsupportedExpressionError,
 } from './errors';
 import { prop } from 'ramda';
-import { Token } from '@gsoul-lang/parsing/lib/lexing';
+import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import { isKinded } from '@gsoul-lang/core/utils/ADT';
 
 export type Stateful<T> = {
@@ -165,6 +167,13 @@ const binary = (
   );
 };
 
+const nonLinearOperatorsBool = [
+  TokenType.GREATER,
+  TokenType.GREATER_EQUAL,
+  TokenType.LESS,
+  TokenType.LESS_EQUAL,
+  TokenType.EQUAL_EQUAL,
+];
 const nonLinearBinary = (
   expr: past.NonLinearBinary,
   tenv: TypeEnv,
@@ -184,13 +193,17 @@ const nonLinearBinary = (
         );
       }
 
+      const type = nonLinearOperatorsBool.includes(expr.operator.type)
+        ? Bool()
+        : Real();
+
       return Result.ok(
         NonLinearBinary({
           operator: expr.operator,
           left,
           right,
           typeEff: TypeEff(
-            left.typeEff.type,
+            type,
             SenvUtils.scaleInf(
               SenvUtils.add(left.typeEff.effect, right.typeEff.effect),
             ),

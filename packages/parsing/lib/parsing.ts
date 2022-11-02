@@ -246,6 +246,7 @@ export function parse(tokens: Token[]): Result<Statement[]> {
         TokenType.GREATER_EQUAL,
         TokenType.LESS,
         TokenType.LESS_EQUAL,
+        TokenType.EQUAL_EQUAL,
       )
     ) {
       const operator = previous();
