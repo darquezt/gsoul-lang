@@ -13,7 +13,7 @@ import {
   Value,
 } from '../../elaboration/ast';
 import { EvidenceUtils, Store } from '../../utils';
-import { Err, Result } from '../../utils/Result';
+import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import {
   InterpreterError,
@@ -103,8 +103,8 @@ export const reduceBinaryOperation = (
   const inner = term.expression;
   if (kont.op.type === TokenType.PLUS) {
     if (!isKinded(inner, ExprKind.RealLiteral)) {
-      return Err(
-        InterpreterTypeError({
+      return Result.err(
+        new InterpreterTypeError({
           reason: `Left operand of ${kont.op.lexeme} must be a number`,
           operator: kont.op,
         }),
@@ -114,8 +114,8 @@ export const reduceBinaryOperation = (
     const left = kont.state.value;
 
     if (!simpleValueIsKinded(left, ExprKind.RealLiteral)) {
-      return Err(
-        InterpreterTypeError({
+      return Result.err(
+        new InterpreterTypeError({
           reason: `Right operand of ${kont.op.lexeme} must be a number`,
           operator: kont.op,
         }),
@@ -125,10 +125,10 @@ export const reduceBinaryOperation = (
     const innerSum = left.expression.value + inner.value;
     const sumEvidenceRes = EvidenceUtils.sum(left.evidence, term.evidence);
 
-    if (!sumEvidenceRes.success) {
-      return Err(
-        InterpreterEvidenceError({
-          reason: sumEvidenceRes.error.reason,
+    if (!sumEvidenceRes.isOk) {
+      return Result.err(
+        new InterpreterEvidenceError({
+          reason: sumEvidenceRes.error.message,
         }),
       );
     }
@@ -137,7 +137,7 @@ export const reduceBinaryOperation = (
       expression: RealLiteral({
         value: innerSum,
       }),
-      evidence: sumEvidenceRes.result,
+      evidence: sumEvidenceRes.value,
       typeEff: TypeEff(
         Real(),
         SenvUtils.add(left.typeEff.effect, term.typeEff.effect),
@@ -147,8 +147,8 @@ export const reduceBinaryOperation = (
     return OkState({ term: sum }, store, kont.state.kont);
   }
 
-  return Err(
-    InterpreterUnsupportedOperator({
+  return Result.err(
+    new InterpreterUnsupportedOperator({
       reason: `We're sorry. GSens does not support the ${kont.op.lexeme} operator yet`,
       operator: kont.op,
     }),
@@ -194,8 +194,8 @@ export const reduceNLBinaryOperation = (
 
   if (kont.op.type === TokenType.STAR) {
     if (!isKinded(inner, ExprKind.RealLiteral)) {
-      return Err(
-        InterpreterTypeError({
+      return Result.err(
+        new InterpreterTypeError({
           reason: `Left operand of ${kont.op.lexeme} must be a number`,
           operator: kont.op,
         }),
@@ -205,8 +205,8 @@ export const reduceNLBinaryOperation = (
     const left = kont.state.value;
 
     if (!simpleValueIsKinded(left, ExprKind.RealLiteral)) {
-      return Err(
-        InterpreterTypeError({
+      return Result.err(
+        new InterpreterTypeError({
           reason: `Right operand of ${kont.op.lexeme} must be a number`,
           operator: kont.op,
         }),
@@ -217,10 +217,10 @@ export const reduceNLBinaryOperation = (
 
     const sumEvidenceRes = EvidenceUtils.sum(left.evidence, term.evidence);
 
-    if (!sumEvidenceRes.success) {
-      return Err(
-        InterpreterTypeError({
-          reason: sumEvidenceRes.error.reason,
+    if (!sumEvidenceRes.isOk) {
+      return Result.err(
+        new InterpreterTypeError({
+          reason: sumEvidenceRes.error.message,
           operator: kont.op,
         }),
       );
@@ -230,7 +230,7 @@ export const reduceNLBinaryOperation = (
       expression: RealLiteral({
         value: innerProduct,
       }),
-      evidence: EvidenceUtils.scaleInf(sumEvidenceRes.result),
+      evidence: EvidenceUtils.scaleInf(sumEvidenceRes.value),
       typeEff: TypeEff(
         Real(),
         SenvUtils.scaleInf(
@@ -242,8 +242,8 @@ export const reduceNLBinaryOperation = (
     return OkState({ term: sum }, store, kont.state.kont);
   }
 
-  return Err(
-    InterpreterUnsupportedOperator({
+  return Result.err(
+    new InterpreterUnsupportedOperator({
       reason: `We're sorry. GSens does not support the ${kont.op.lexeme} operator yet`,
       operator: kont.op,
     }),

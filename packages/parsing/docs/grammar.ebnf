@@ -28,7 +28,7 @@ comparison ::= additive ("<=" additive)*;
 additive ::= factor ("+" factor)*; (* Minus op should be added here *)
 multiplicative ::= unary ("*" unary)*; (* Division should be added here *)
 unary ::= call; (* Unary operators may be added before `call` in the future *)
-call ::= primary ("(" arguments ")")* | primary senv*;
+call ::= primary ("(" arguments ")")* | primary ("<" senv ">")* | primary ("[" NUMBER "]")*;
 
 primary ::= "true" | "false"
           | "nil"
@@ -40,7 +40,7 @@ primary ::= "true" | "false"
           | IDENTIFIER
           | "(" expression ")";
 
-(* Types *)
+(* Types )*
 
 typeEff ::= type "!" senv; (* Should the @[] be in the def of senv? *)
 type ::= "Number" | "Bool" | "Nil"
@@ -52,7 +52,20 @@ baseTypeEff ::= baseType "!" senv;
 type ::= baseType | typeEff "->" typeEff;
 baseType = ;
 
-senv ::= "[" ( sensitivity IDENTIFIER ("+" sensitivity IDENTIFIER)* )? "]";
+typeEff ::= finiteType "!" senv | type | "(" type ")" "!" senv | "(" type "!" senv ")" | IDENTIFIER;
+type ::= finiteType | typeEff "->" typeEff;
+finiteType ::= "Number" | "Bool" | "Nil" | "forall" IDENTIFIER* "." typeEff | "rec" IDENTIFIER "." typeEff;
+
+typeEff ::=  atomTypeEff ("->" atomTypeEff)*;
+atomTypeEff ::= "Number" ["!" senv]
+           | "Bool" ["!" senv]
+           | "Nil" ["!" senv]
+           | "forall" IDENTIFIER* "." typeEff ["!" senv]
+           | "rec" IDENTIFIER "." typeEff ["!" senv]
+           | IDENTIFIER
+           | "(" typeEff ")" ["!" senv];
+
+senv ::= ( sensitivity IDENTIFIER ("+" sensitivity IDENTIFIER)* )?;
 sensitivity ::= NUMBER | "?";
 
 (* Utility *)

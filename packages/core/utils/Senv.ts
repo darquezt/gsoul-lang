@@ -2,6 +2,8 @@ import * as chalk from 'chalk';
 import { map, mergeWith, omit } from 'ramda';
 import { Sens } from './Sens';
 import * as SensUtils from './Sens';
+import { UndefinedMeetError } from './Sens';
+import { Result } from '@badrap/result';
 
 export type Identifier = string;
 
@@ -30,11 +32,27 @@ export const access = (senv: Senv, name: Identifier): Sens => {
 };
 
 export const add = (a: Senv, b: Senv): Senv => {
-  return mergeWith(
-    (asens: Sens, bsens: Sens) => SensUtils.add(asens, bsens),
-    a,
-    b,
-  );
+  return mergeWith((asens: Sens, bsens: Sens) => asens.plus(bsens), a, b);
+};
+
+export const meet = (a: Senv, b: Senv): Result<Senv, UndefinedMeetError> => {
+  const senv1Keys = Object.keys(a);
+  const senv2Keys = Object.keys(b);
+  const keys = [...senv1Keys, ...senv2Keys];
+
+  let result = Senv();
+
+  for (const x of keys) {
+    const sensMeetRes = SensUtils.meet(access(a, x), access(b, x));
+
+    if (!sensMeetRes.isOk) {
+      return Result.err(new UndefinedMeetError());
+    }
+
+    result = extend(result, x, sensMeetRes.value);
+  }
+
+  return Result.ok(result);
 };
 
 export const scale = (senv: Senv, factor: number): Senv => {
@@ -75,7 +93,7 @@ export const substTup = (
   const withoutX1X2 = omit(names, senv);
   const scaledEffect11 = scaleBySens(latents[0], x1Sens);
   const scaledEffect12 = scaleBySens(latents[1], x2Sens);
-  const scaledEffect1 = scaleBySens(effect, SensUtils.join(x1Sens, x2Sens));
+  const scaledEffect1 = scaleBySens(effect, SensUtils.sjoin(x1Sens, x2Sens));
 
   return add(
     withoutX1X2,

@@ -2,6 +2,7 @@ import Token from './lexing/Token';
 import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
 import { factoryOf } from '@gsens-lang/core/utils/ADT';
 import { Senv } from '@gsens-lang/core/utils';
+import { RecType } from '@gsens-lang/core/utils/Type';
 
 // ===================
 // EXPRESSIONS
@@ -20,13 +21,16 @@ export enum ExprKind {
   Fun = 'Fun',
   Forall = 'Forall',
   Tuple = 'Tuple',
-  Untup = 'Untup',
+  Projection = 'Projection',
+  // Untup = 'Untup',
   Pair = 'Pair',
   ProjFst = 'ProjFst',
   ProjSnd = 'ProjSnd',
   Ascription = 'Ascription',
   Print = 'Print',
   Block = 'Block',
+  Fold = 'Fold',
+  Unfold = 'Unfold',
 }
 
 export type Literal = {
@@ -92,20 +96,27 @@ export const Forall = factoryOf<Forall>(ExprKind.Forall);
 
 export type Tuple = {
   kind: ExprKind.Tuple;
-  first: Expression;
-  second: Expression;
+  expressions: Expression[];
   constructorToken: Token;
 };
 export const Tuple = factoryOf<Tuple>(ExprKind.Tuple);
 
-export type Untup = {
-  kind: ExprKind.Untup;
-  identifiers: [Token, Token];
+export type Projection = {
+  kind: ExprKind.Projection;
+  index: number;
   tuple: Expression;
-  body: Expression;
-  untupToken: Token;
+  projectToken: Token;
 };
-export const Untup = factoryOf<Untup>(ExprKind.Untup);
+export const Projection = factoryOf<Projection>(ExprKind.Projection);
+
+// export type Untup = {
+//   kind: ExprKind.Untup;
+//   identifiers: [Token, Token];
+//   tuple: Expression;
+//   body: Expression;
+//   untupToken: Token;
+// };
+// export const Untup = factoryOf<Untup>(ExprKind.Untup);
 
 export type Pair = {
   kind: ExprKind.Pair;
@@ -145,6 +156,21 @@ export type Print = {
 };
 export const Print = factoryOf<Print>(ExprKind.Print);
 
+export type Fold = {
+  kind: ExprKind.Fold;
+  expression: Expression;
+  recType: RecType;
+  foldToken: Token;
+};
+export const Fold = factoryOf<Fold>(ExprKind.Fold);
+
+export type Unfold = {
+  kind: ExprKind.Unfold;
+  expression: Expression;
+  unfoldToken: Token;
+};
+export const Unfold = factoryOf<Unfold>(ExprKind.Unfold);
+
 export type Block = { kind: ExprKind.Block; statements: Statement[] };
 export const Block = factoryOf<Block>(ExprKind.Block);
 
@@ -159,13 +185,16 @@ export type Expression =
   | Fun
   | Forall
   | Tuple
-  | Untup
+  | Projection
+  // | Untup
   | Pair
   | ProjFst
   | ProjSnd
   | Block
   | Print
-  | Ascription;
+  | Ascription
+  | Fold
+  | Unfold;
 
 // ===================
 // STATEMENTS

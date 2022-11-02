@@ -4,18 +4,18 @@ import { elaborate } from './elaboration/elaboration';
 import { ElaborationError } from './elaboration/errors';
 import { evaluate } from './interpreter/cek';
 import { InterpreterError } from './interpreter/errors';
-import { Result } from './utils/Result';
+import { Result } from '@badrap/result';
 
 export const run = (
   program: Program,
 ): Result<Value, InterpreterError | ElaborationError> => {
   const elaboration = elaborate(program);
 
-  if (!elaboration.success) {
-    return elaboration;
+  if (!elaboration.isOk) {
+    return Result.err(elaboration.error);
   }
 
-  const value = evaluate(elaboration.result);
+  const value = evaluate(elaboration.value);
 
   return value;
 };

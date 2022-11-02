@@ -16,7 +16,6 @@ import {
   Print,
   SCall,
   Statement,
-  Tuple,
   Variable,
   VarStmt,
 } from './ast';
@@ -25,7 +24,6 @@ import { scanTokens } from './lexing/lexing';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
 import { Failure, parse, Result } from './parsing';
-import { MaxSenv } from '@gsens-lang/core/utils/Senv';
 
 const lexAndParse = (source: string) => parse(scanTokens(source));
 
@@ -615,8 +613,8 @@ describe('Parsing', () => {
                 domain: TypeEff(Real(), Senv({ x: Sens(2) })),
                 codomain: TypeEff(
                   Arrow({
-                    domain: TypeEff(Real(), MaxSenv()),
-                    codomain: TypeEff(Bool(), MaxSenv()),
+                    domain: TypeEff(Real(), Senv()),
+                    codomain: TypeEff(Bool(), Senv()),
                   }),
                   Senv({ y: Sens(4) }),
                 ),
@@ -629,25 +627,25 @@ describe('Parsing', () => {
     });
   });
 
-  describe('tuples', () => {
-    test('a simple tuple', () => {
-      expect(lexAndParse('tuple(2, 3);')).toStrictEqual<Result<Statement[]>>(
-        exprStmt(
-          Tuple({
-            first: Literal({
-              value: 2,
-              token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 7),
-            }),
-            second: Literal({
-              value: 3,
-              token: new Token(TokenType.NUMBERLIT, '3', 3, 1, 10),
-            }),
-            constructorToken: new Token(TokenType.TUPLE, 'tuple', null, 1, 1),
-          }),
-        ),
-      );
-    });
-  });
+  // describe('tuples', () => {
+  //   test('a simple tuple', () => {
+  //     expect(lexAndParse('tuple(2, 3);')).toStrictEqual<Result<Statement[]>>(
+  //       exprStmt(
+  //         Tuple({
+  //           first: Literal({
+  //             value: 2,
+  //             token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 7),
+  //           }),
+  //           second: Literal({
+  //             value: 3,
+  //             token: new Token(TokenType.NUMBERLIT, '3', 3, 1, 10),
+  //           }),
+  //           constructorToken: new Token(TokenType.TUPLE, 'tuple', null, 1, 1),
+  //         }),
+  //       ),
+  //     );
+  //   });
+  // });
 
   describe('block statements', () => {
     test('An empty block', () => {

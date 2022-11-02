@@ -1,8 +1,8 @@
 import { TypeEff } from '@gsens-lang/core/utils';
 import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
-import { Ascription, Value } from '../../elaboration/ast';
+import { Ascription, SimpleValue, Value } from '../../elaboration/ast';
 import { Evidence, EvidenceUtils, Store } from '../../utils';
-import { Err, Result } from '../../utils/Result';
+import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterEvidenceError } from '../errors';
 
@@ -39,6 +39,24 @@ export const reduceAscrInnerExpression = (
   );
 };
 
+export const reconstructValueAscription = (
+  term: SimpleValue,
+  _store: Store,
+  kont: AscrKont,
+): Result<StepState, InterpreterError> => {
+  return OkState(
+    {
+      term: Ascription({
+        evidence: kont.state.evidence,
+        expression: term,
+        typeEff: kont.state.typeEff,
+      }),
+    },
+    kont.state.store,
+    kont.state.kont,
+  );
+};
+
 export const reduceDoubleAscription = (
   term: Value,
   _store: Store,
@@ -46,10 +64,10 @@ export const reduceDoubleAscription = (
 ): Result<StepState, InterpreterError> => {
   const evidenceRes = EvidenceUtils.trans(term.evidence, kont.state.evidence);
 
-  if (!evidenceRes.success) {
-    return Err(
-      InterpreterEvidenceError({
-        reason: evidenceRes.error.reason,
+  if (!evidenceRes.isOk) {
+    return Result.err(
+      new InterpreterEvidenceError({
+        reason: evidenceRes.error.message,
       }),
     );
   }
@@ -57,7 +75,7 @@ export const reduceDoubleAscription = (
   return OkState(
     {
       term: Ascription({
-        evidence: evidenceRes.result,
+        evidence: evidenceRes.value,
         expression: term.expression,
         typeEff: kont.state.typeEff,
       }),

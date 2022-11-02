@@ -15,7 +15,7 @@ import {
   Value,
 } from '../../elaboration/ast';
 import { EvidenceUtils, Store, StoreUtils } from '../../utils';
-import { Err, Result } from '../../utils/Result';
+import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterTypeError } from '../errors';
 
@@ -59,8 +59,8 @@ export const reduceFunArg = (
   kont: ArgKont,
 ): Result<StepState, InterpreterError> => {
   if (!simpleValueIsKinded(term, ExprKind.Closure)) {
-    return Err(
-      InterpreterTypeError({
+    return Result.err(
+      new InterpreterTypeError({
         reason: 'Callee must be a function',
         operator: kont.paren,
       }),
@@ -87,21 +87,21 @@ export const reduceFunCall = (
 
   const idomRes = EvidenceUtils.idom(ascrFun.evidence);
 
-  if (!idomRes.success) {
-    return Err(
-      InterpreterTypeError({
-        reason: idomRes.error.reason,
+  if (!idomRes.isOk) {
+    return Result.err(
+      new InterpreterTypeError({
+        reason: idomRes.error.message,
         operator: kont.paren,
       }),
     );
   }
 
-  const argEviRes = EvidenceUtils.trans(term.evidence, idomRes.result);
+  const argEviRes = EvidenceUtils.trans(term.evidence, idomRes.value);
 
-  if (!argEviRes.success) {
-    return Err(
-      InterpreterTypeError({
-        reason: argEviRes.error.reason,
+  if (!argEviRes.isOk) {
+    return Result.err(
+      new InterpreterTypeError({
+        reason: argEviRes.error.message,
         operator: kont.paren,
       }),
     );
@@ -109,27 +109,27 @@ export const reduceFunCall = (
 
   const arg = AscribedValue({
     typeEff: closure.fun.binder.type,
-    evidence: argEviRes.result,
+    evidence: argEviRes.value,
     expression: term.expression,
   });
 
   const bodyEviRes = EvidenceUtils.icod(ascrFun.evidence);
 
-  if (!bodyEviRes.success) {
-    return Err(
-      InterpreterTypeError({
-        reason: bodyEviRes.error.reason,
+  if (!bodyEviRes.isOk) {
+    return Result.err(
+      new InterpreterTypeError({
+        reason: bodyEviRes.error.message,
         operator: kont.paren,
       }),
     );
   }
 
-  const codomain = (ascrFun.typeEff.type as Arrow).codomain;
+  const codomain = (ascrFun.typeEff.type as Arrow).codomain as TypeEff;
   const bodyEffect = SenvUtils.add(ascrFun.typeEff.effect, codomain.effect);
 
   const body = Ascription({
     expression: closure.fun.body,
-    evidence: bodyEviRes.result,
+    evidence: bodyEviRes.value,
     typeEff: TypeEff(codomain.type, bodyEffect),
   });
 

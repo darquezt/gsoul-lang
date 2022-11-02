@@ -41,6 +41,107 @@ A well-typed GSens expression has a type-and-effect which corresponds to a type 
 
 - The expression `fun (x : Number) { x + x }`, as literals, is not sensitive because functions are considered to be pure values. However, its _latent effect_ is 2-sensitive in `x`. This is the sensitivity effect of executing or reducing the body of the function. The type of this expression is written as `(x:Number -> Number@[2x])`. First, we need to annotate the name of the argument (`x`) in the arrow type because it can appear in the codomain of the type. This type represents a function, denoted as `(_ -> _)`, that takes an argument `x` of type `Number` and returns a type-and-effect `Number@[2x]`. Finally, since that functions are pure values, the resulting type-and-effect is `(x:Number -> Number@[2x])@[]`. Notice that parenthesis are used to dissamiguate whether an effect `@[_]` corresponds to the return type-and-effect of the arrow type or to the funtion type-and-effect.
 
+### Examples
+
+```
+declare resources: x y;
+
+let x = 2; // type: Number![x] because the name matches with a scoped resource
+let y = 3; // type: Number![y]
+let z = 4; // type: Number![] or simply Number
+
+let sum = forall a, b. fun (a: Number!a, b: Number!b): Number![a + b] {
+  a + b
+};
+
+// or
+
+let sum = fun (a! : Number, b! : Number): Number![a + b] {
+  a + b
+};
+
+// or
+
+let sum = fun<a, b>(a: Number![a], b: Number![b]): Number![a + b] {
+  a + b
+};
+
+// or
+
+def sum(a: Number!, b: Number!): Number![a + b] {
+  a + b
+};
+
+// or
+
+def sum<a, b>(a: Number![a], b: Number![b]): Number![a + b] {
+  a + b
+};
+
+sum<x, y>(x, y);
+
+sum(x, y); // a and b get inferred
+
+let p = Pair(x, y);
+
+let t = Tuple(3, 4, 5) // Tuples have arbitrary arities
+
+type Nat = rec S. Either<S, Nil>;
+type Nat = Succ Nat | Zero;
+
+// A list of numbers parametric on the sensitivity effect of its elements
+type NList<e> = rec R. Either<Nil, Tuple<Number![e], R>>;
+type NList<e> = Null | Cons Number![e] NList<e>;
+
+// ADT constructors must be strict, i.e. they pay for the recursive structures
+// For instance, cons(2, l) where l is a resource has type NList<[]>![l]
+// pushing out the sensitivity cost of the value l
+
+// Cons<e> : forall l. Nat!e -> NList<e>![l] -> NList<e>![l]
+
+let l = Cons(1, Cons(2, Null));
+
+def foldl<F, A, E, L>(
+  f: (Number!<A + (F + E)?> -> Number<E> -> Number<A + (F + E)?>)!<F>,
+  acc: Number!A + (F + E)?,
+  l: NList<E>!L,
+): Number!(L + A + (F + E)?) {
+  case (l) of {
+    _ => acc;
+    cons => foldl<F, A, E, []>(f, f(acc, cons[0]), cons[1])
+    // ideally:
+    // Cons(n, rest) => foldl<F, A, E, []>(f, f(acc, n), rest)
+  }
+};
+
+def foldl<f, a, e, l>(
+  f: (Nat![a + ?f + ?e] -> Nat![e] -> Nat![a + ?f + ?e])![f],
+  acc: Nat![a + ?f + ?e],
+  l: NList<e>![l],
+): Nat![l + a + ?f + ?e] {
+  case (l) of {
+    _ => acc;
+    cons => foldl<f, a, e, []>(f, f(acc, cons[0]), cons[1])
+    // ideally:
+    // Cons(n, rest) => foldl<F, A, E, []>(f, f(acc, n), rest)
+  }
+};
+
+def add(a! : Nat, b! : Nat): Nat![a + b] {
+  case (a) of {
+    _   => b;
+    pre => add(pre, Succ(b));
+  }
+};
+
+def times(n: Nat!, v: Nat!): Nat![n + ?v] {
+  case (n) of {
+    _ => Zero;
+    Succ(pred) => add(v, times(pred, v));
+  }
+};
+```
+
 ### Var vs Resources
 
 Gsens provides two ways of declaring a variable:

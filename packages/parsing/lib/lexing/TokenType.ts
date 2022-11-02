@@ -78,6 +78,11 @@ enum TokenType {
   FST = 'FST',
   SND = 'SND',
 
+  // Recursive types
+  FOLD = 'FOLD',
+  UNFOLD = 'UNFOLD',
+  RECTYPE = 'RECTYPE',
+
   INVALID = 'INVALID',
 
   EOF = 'EOF',

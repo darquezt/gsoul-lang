@@ -10,10 +10,12 @@ import {
   ExprKind,
   StmtKind,
   ascrExpressionIsKinded,
+  isSimpleValue,
+  SimpleValue,
 } from '../elaboration/ast';
 import { Store } from '../utils';
 import { InterpreterError, InterpreterUnsupportedExpression } from './errors';
-import { Err, Ok, Result } from '../utils/Result';
+import { Result } from '@badrap/result';
 import {
   BinaryKontKind,
   LeftOpKont,
@@ -49,6 +51,7 @@ import {
 import {
   AscrKont,
   AscrKontKind,
+  reconstructValueAscription,
   reduceAscrInnerExpression,
   reduceDoubleAscription,
 } from './interpretations/ascriptions';
@@ -84,6 +87,24 @@ import {
   reducePairAndSecondProj,
   reduceSecondPairComponent,
 } from './interpretations/pairs';
+import {
+  FoldKont,
+  RecursiveKontKind,
+  reduceFold,
+  reduceFoldedExpression,
+  reduceUnfold,
+  reduceUnfoldedExpression,
+  UnfoldKont,
+} from './interpretations/recursive';
+import {
+  projectTuple,
+  reduceNextTupleComponent,
+  reduceProjectionTuple,
+  reduceTuple,
+  TupleKontKind,
+  TupleNextComponentsKont,
+  TupleProjKont,
+} from './interpretations/tuples';
 
 enum KontKind {
   EmptyKont = 'EmptyKont',
@@ -113,7 +134,11 @@ export type Kont =
   | PairSecondKont
   | PairFirstKont
   | PairFirstProjKont
-  | PairSecondProjKont;
+  | PairSecondProjKont
+  | TupleNextComponentsKont
+  | TupleProjKont
+  | UnfoldKont
+  | FoldKont;
 
 export type State<T> = T & {
   store: Store;
@@ -125,8 +150,12 @@ export const State = <T>(t: T, store: Store, kont: Kont): State<T> => ({
   kont,
 });
 
-export const OkState = <T>(t: T, store: Store, kont: Kont): Ok<State<T>> =>
-  Ok({
+export const OkState = <T, E extends Error>(
+  t: T,
+  store: Store,
+  kont: Kont,
+): Result<State<T>, E> =>
+  Result.ok({
     ...t,
     store,
     kont,
@@ -149,6 +178,97 @@ const step = ({
   store,
   kont,
 }: StepState): Result<StepState, InterpreterError> => {
+  if (
+    isSimpleValue(term as Expression) &&
+    kont.kind === AscrKontKind.AscrKont
+  ) {
+    return reconstructValueAscription(term as SimpleValue, store, kont);
+  }
+
+  if (term.kind === ExprKind.Ascription && isValue(term)) {
+    switch (kont.kind) {
+      case BinaryKontKind.RightOpKont: {
+        return reduceRightOperand(term, store, kont);
+      }
+
+      case BinaryKontKind.NLRightOpKont: {
+        return reduceNLRightOperand(term, store, kont);
+      }
+
+      case BinaryKontKind.LeftOpKont: {
+        return reduceBinaryOperation(term, store, kont);
+      }
+
+      case BinaryKontKind.NLLeftOpKont: {
+        return reduceNLBinaryOperation(term, store, kont);
+      }
+
+      case FunKontKind.ArgKont: {
+        return reduceFunArg(term, store, kont);
+      }
+
+      case FunKontKind.FnKont: {
+        return reduceFunCall(term, store, kont);
+      }
+
+      case PolyKontKind.ForallKont: {
+        return reduceForallBody(term, store, kont);
+      }
+
+      case PolyKontKind.ForallSubstKont: {
+        return reduceForallSubstitutedBody(term, store, kont);
+      }
+
+      case AscrKontKind.AscrKont: {
+        return reduceDoubleAscription(term, store, kont);
+      }
+
+      case BlockKontKind.BlockKont: {
+        return reduceNextBlockStatement(term, store, kont);
+      }
+
+      case PrintKontKind.PrintKont: {
+        return printValueAndContinue(term, store, kont);
+      }
+
+      case PairKontKind.PairSecondKont: {
+        return reduceSecondPairComponent(term, store, kont);
+      }
+
+      case PairKontKind.PairFirstKont: {
+        return producePairValue(term, store, kont);
+      }
+
+      case PairKontKind.PairFirstProjKont: {
+        return projectFirstPairComponent(term, store, kont);
+      }
+
+      case PairKontKind.PairSecondProjKont: {
+        return projectSecondPairComponent(term, store, kont);
+      }
+
+      case TupleKontKind.TupleNextComponentsKont: {
+        return reduceNextTupleComponent(term, store, kont);
+      }
+
+      case TupleKontKind.TupleProjKont: {
+        return projectTuple(term, store, kont);
+      }
+
+      case DeclKontKind.VarDeclKont: {
+        return extendStoreAndContinue(term, store, kont);
+      }
+
+      case RecursiveKontKind.FoldKont: {
+        return reduceFold(term, store, kont);
+      }
+
+      case RecursiveKontKind.UnfoldKont: {
+        return reduceUnfold(term, store, kont);
+      }
+    }
+  }
+
   switch (term.kind) {
     case ExprKind.Binary: {
       return reduceLeftOperand(term, store, kont);
@@ -182,6 +302,14 @@ const step = ({
       return reducePairAndSecondProj(term, store, kont);
     }
 
+    case ExprKind.Tuple: {
+      return reduceTuple(term, store, kont);
+    }
+
+    case ExprKind.Projection: {
+      return reduceProjectionTuple(term, store, kont);
+    }
+
     case ExprKind.Block: {
       return reduceFirstBlockStatement(term, store, kont);
     }
@@ -194,79 +322,19 @@ const step = ({
       return reducePrintInnerExpression(term, store, kont);
     }
 
+    case ExprKind.Fold: {
+      return reduceFoldedExpression(term, store, kont);
+    }
+
+    case ExprKind.Unfold: {
+      return reduceUnfoldedExpression(term, store, kont);
+    }
+
     case StmtKind.VarStmt: {
       return reduceVarDeclInnerExpression(term, store, kont);
     }
 
     case ExprKind.Ascription: {
-      if (isValue(term)) {
-        switch (kont.kind) {
-          case BinaryKontKind.RightOpKont: {
-            return reduceRightOperand(term, store, kont);
-          }
-
-          case BinaryKontKind.NLRightOpKont: {
-            return reduceNLRightOperand(term, store, kont);
-          }
-
-          case BinaryKontKind.LeftOpKont: {
-            return reduceBinaryOperation(term, store, kont);
-          }
-
-          case BinaryKontKind.NLLeftOpKont: {
-            return reduceNLBinaryOperation(term, store, kont);
-          }
-
-          case FunKontKind.ArgKont: {
-            return reduceFunArg(term, store, kont);
-          }
-
-          case FunKontKind.FnKont: {
-            return reduceFunCall(term, store, kont);
-          }
-
-          case PolyKontKind.ForallKont: {
-            return reduceForallBody(term, store, kont);
-          }
-
-          case PolyKontKind.ForallSubstKont: {
-            return reduceForallSubstitutedBody(term, store, kont);
-          }
-
-          case AscrKontKind.AscrKont: {
-            return reduceDoubleAscription(term, store, kont);
-          }
-
-          case BlockKontKind.BlockKont: {
-            return reduceNextBlockStatement(term, store, kont);
-          }
-
-          case PrintKontKind.PrintKont: {
-            return printValueAndContinue(term, store, kont);
-          }
-
-          case PairKontKind.PairSecondKont: {
-            return reduceSecondPairComponent(term, store, kont);
-          }
-
-          case PairKontKind.PairFirstKont: {
-            return producePairValue(term, store, kont);
-          }
-
-          case PairKontKind.PairFirstProjKont: {
-            return projectFirstPairComponent(term, store, kont);
-          }
-
-          case PairKontKind.PairSecondProjKont: {
-            return projectSecondPairComponent(term, store, kont);
-          }
-
-          case DeclKontKind.VarDeclKont: {
-            return extendStoreAndContinue(term, store, kont);
-          }
-        }
-      }
-
       if (ascrExpressionIsKinded(term, ExprKind.Fun)) {
         return funClosureCreation(term, store, kont);
       }
@@ -279,8 +347,8 @@ const step = ({
     }
 
     default:
-      return Err(
-        InterpreterUnsupportedExpression({
+      return Result.err(
+        new InterpreterUnsupportedExpression({
           reason: `We're sorry. GSens does not support this kinds of expressions yet (${term.kind})`,
         }),
       );
@@ -298,12 +366,12 @@ export const evaluate = (
   ) {
     const result = step(state);
 
-    if (!result.success) {
-      return result;
+    if (!result.isOk) {
+      return Result.err(result.error);
     }
 
-    state = result.result;
+    state = result.value;
   }
 
-  return Ok(state.term as Value); // TODO: Improve this
+  return Result.ok(state.term as Value); // TODO: Improve this
 };

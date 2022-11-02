@@ -6,19 +6,21 @@ import {
   Expression,
   ExprKind,
   ExprStmt,
+  Fold,
   Forall,
   Fun,
   Literal,
   NonLinearBinary,
   Pair,
   Print,
+  Projection,
   ProjFst,
   ProjSnd,
   SCall,
   Statement,
   StmtKind,
   Tuple,
-  Untup,
+  Unfold,
   Variable,
   VarStmt,
 } from '@gsens-lang/parsing/lib/ast';
@@ -36,8 +38,8 @@ import {
   Arrow,
   Bool,
   ForallT,
-  MProduct,
   Nil,
+  Product,
   Real,
   typeIsKinded,
   TypeKind,
@@ -47,6 +49,7 @@ import { isKinded } from '@gsens-lang/core/utils/ADT';
 import { isSubTypeEff } from './subtyping';
 import { Token } from '@gsens-lang/parsing/lib/lexing';
 import { TypeAssoc, TypeAssocs, TypingSeeker } from './utils/typingSeeker';
+import { TypeEffect } from '@gsens-lang/core/utils/TypeEff';
 
 export type PureSuccess = {
   success: true;
@@ -202,7 +205,7 @@ const fun = (expr: Fun, tenv: TypeEnv): PureResult => {
 
   const bodyTC = expression(
     body,
-    TypeEnvUtils.extend(tenv, varName, binder.type),
+    TypeEnvUtils.extend(tenv, varName, binder.type as TypeEff),
   );
 
   if (!bodyTC.success) {
@@ -312,7 +315,7 @@ const ascription = (expr: Ascription, tenv: TypeEnv): PureResult => {
     );
   }
 
-  return PureSuccess(expr.typeEff, innerTC.typings);
+  return PureSuccess(expr.typeEff as TypeEff, innerTC.typings);
 };
 
 const printExpr = (expr: Print, tenv: TypeEnv): PureResult => {
@@ -350,75 +353,118 @@ const block = (expr: Block, tenv: TypeEnv): PureResult => {
 };
 
 const tuple = (expr: Tuple, tenv: TypeEnv): PureResult => {
-  const firstTC = expression(expr.first, tenv);
+  const typeEffects: TypeEffect[] = [];
+  const typings: TypeAssocs = [];
 
-  if (!firstTC.success) {
-    return firstTC;
-  }
+  for (const e of expr.expressions) {
+    const eTC = expression(e, tenv);
 
-  const secondTC = expression(expr.second, tenv);
+    if (!eTC.success) {
+      return eTC;
+    }
 
-  if (!secondTC.success) {
-    return secondTC;
+    typeEffects.push(eTC.typeEff);
+    typings.concat(eTC.typings);
   }
 
   return PureSuccess(
     TypeEff(
-      MProduct({
-        first: firstTC.typeEff,
-        second: secondTC.typeEff,
+      Product({
+        typeEffects,
       }),
       Senv(),
     ),
-    firstTC.typings.concat(secondTC.typings),
+    typings,
   );
 };
 
-export const untup = (expr: Untup, tenv: TypeEnv): PureResult => {
-  const tuplTC = expression(expr.tuple, tenv);
+export const projection = (expr: Projection, tenv: TypeEnv): PureResult => {
+  const tupleTC = expression(expr.tuple, tenv);
 
-  if (!tuplTC.success) {
-    return tuplTC;
+  if (!tupleTC.success) {
+    return tupleTC;
   }
 
-  const [x1, x2] = expr.identifiers;
+  const tupleTypeEff = tupleTC.typeEff;
 
-  const bodyTC = expression(
-    expr.body,
-    TypeEnvUtils.extend(
-      TypeEnvUtils.extend(
-        tenv,
-        x1.lexeme,
-        TypeEff(tuplTC.typeEff.type, Senv({ [x1.lexeme]: Sens(1) })),
-      ),
-      x2.lexeme,
-      TypeEff(tuplTC.typeEff.type, Senv({ [x2.lexeme]: Sens(1) })),
-    ),
-  );
-
-  if (!bodyTC.success) {
-    return bodyTC;
-  }
-
-  const tuplType = tuplTC.typeEff.type;
-
-  if (!isKinded(tuplType, TypeKind.MProduct)) {
+  if (!typeIsKinded(tupleTypeEff, TypeKind.Product)) {
     return Failure(
-      expr.untupToken,
-      'The expression being destructured is not a tuple',
+      expr.projectToken,
+      'Expression being projected must be a tuple',
     );
   }
 
+  if (expr.index >= tupleTypeEff.type.typeEffects.length) {
+    return Failure(expr.projectToken, `Tuple has no ${expr.index} element`);
+  }
+
   return PureSuccess(
-    TypeEffUtils.substTup(
-      bodyTC.typeEff,
-      [x1.lexeme, x2.lexeme],
-      [tuplType.first.effect, tuplType.second.effect],
-      tuplTC.typeEff.effect,
-    ),
-    tuplTC.typings.concat(bodyTC.typings),
+    TypeEffUtils.ProductUtils.projection(expr.index, tupleTypeEff),
+    tupleTC.typings,
   );
 };
+
+// const untup = (expr: Untup, tenv: TypeEnv): PureResult => {
+//   const tuplTC = expression(expr.tuple, tenv);
+
+//   if (!tuplTC.success) {
+//     return tuplTC;
+//   }
+
+//   const [x1, x2] = expr.identifiers;
+
+//   const bodyTC = expression(
+//     expr.body,
+//     TypeEnvUtils.extend(
+//       TypeEnvUtils.extend(
+//         tenv,
+//         x1.lexeme,
+//         TypeEff(tuplTC.typeEff.type, Senv({ [x1.lexeme]: Sens(1) })),
+//       ),
+//       x2.lexeme,
+//       TypeEff(tuplTC.typeEff.type, Senv({ [x2.lexeme]: Sens(1) })),
+//     ),
+//   );
+
+//   if (!bodyTC.success) {
+//     return bodyTC;
+//   }
+
+//   const tuplType = tuplTC.typeEff.type;
+
+//   if (!isKinded(tuplType, TypeKind.MProduct)) {
+//     return Failure(
+//       expr.untupToken,
+//       'The expression being destructured is not a tuple',
+//     );
+//   }
+
+//   const tuplSenv = tuplTC.typeEff.effect;
+
+//   const firstEffect = (tuplType.first as TypeEff).effect;
+//   const secondEffect = (tuplType.second as TypeEff).effect;
+
+//   return PureSuccess(
+//     TypeEff(
+//       TypeUtils.subst(
+//         TypeUtils.subst(
+//           bodyTC.typeEff.type,
+//           x1.lexeme,
+//           SenvUtils.add(tuplSenv, firstEffect),
+//         ),
+//         x2.lexeme,
+//         SenvUtils.add(tuplSenv, secondEffect),
+//       ),
+//       SenvUtils.substTup(
+//         bodyTC.typeEff.effect,
+//         [x1.lexeme, x2.lexeme],
+//         [firstEffect, secondEffect],
+//         tuplSenv,
+//       ),
+//     ),
+//     tuplTC.typings.concat(bodyTC.typings),
+//   );
+// };
 
 const pair = (expr: Pair, tenv: TypeEnv): PureResult => {
   const fstTC = expression(expr.first, tenv);
@@ -483,6 +529,49 @@ export const projSnd = (expr: ProjSnd, tenv: TypeEnv): PureResult => {
   );
 };
 
+export const fold = (expr: Fold, tenv: TypeEnv): PureResult => {
+  const bodyTC = expression(expr.expression, tenv);
+
+  if (!bodyTC.success) {
+    return bodyTC;
+  }
+
+  const typeEff = TypeEff(expr.recType, Senv());
+
+  const unfolded = TypeEffUtils.RecursiveUtils.unfold(typeEff);
+
+  if (!isSubTypeEff(bodyTC.typeEff, unfolded)) {
+    return Failure(
+      expr.foldToken,
+      'Expression type-and-effect is not a subtype of the unfolded type-and-effect',
+    );
+  }
+
+  return PureSuccess(typeEff, bodyTC.typings);
+};
+
+export const unfold = (expr: Unfold, tenv: TypeEnv): PureResult => {
+  const bodyTC = expression(expr.expression, tenv);
+
+  if (!bodyTC.success) {
+    return bodyTC;
+  }
+
+  const bodyTeff = bodyTC.typeEff;
+
+  if (!typeIsKinded(bodyTeff, TypeKind.RecType)) {
+    return Failure(
+      expr.unfoldToken,
+      'Expression being unfolded must be a fold',
+    );
+  }
+
+  return PureSuccess(
+    TypeEffUtils.RecursiveUtils.unfold(bodyTeff),
+    bodyTC.typings,
+  );
+};
+
 export const expression = (
   expr: Expression,
   tenv: TypeEnv = {},
@@ -521,14 +610,20 @@ export const expression = (
       return block(expr, tenv);
     case ExprKind.Tuple:
       return tuple(expr, tenv);
-    case ExprKind.Untup:
-      return untup(expr, tenv);
+    case ExprKind.Projection:
+      return projection(expr, tenv);
+    // case ExprKind.Untup:
+    //   return untup(expr, tenv);
     case ExprKind.Pair:
       return pair(expr, tenv);
     case ExprKind.ProjFst:
       return projFst(expr, tenv);
     case ExprKind.ProjSnd:
       return projSnd(expr, tenv);
+    case ExprKind.Fold:
+      return fold(expr, tenv);
+    case ExprKind.Unfold:
+      return unfold(expr, tenv);
   }
 };
 

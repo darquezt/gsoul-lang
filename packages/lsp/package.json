@@ -24,9 +24,9 @@
     "test": "echo \"Error: run tests from root\" && exit 1"
   },
   "dependencies": {
-    "@gsens-lang/core": "file:../core",
-    "@gsens-lang/parsing": "file:../parsing",
-    "@gsens-lang/typechecking": "file:../typechecking",
+    "@gsens-lang/core": "^0.0.4-alpha.0",
+    "@gsens-lang/parsing": "^0.0.4-alpha.0",
+    "@gsens-lang/typechecking": "^0.0.4-alpha.1",
     "vscode-languageserver": "^7.0.0",
     "vscode-languageserver-textdocument": "^1.0.2"
   },

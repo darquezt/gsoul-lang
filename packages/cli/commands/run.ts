@@ -31,11 +31,11 @@ const runHandler = (file: string) => {
     } else {
       const result = runCommand(statements);
 
-      if (!result.success) {
+      if (!result.isOk) {
         const lines = contents.split('\n');
         console.log(runtimeError(result.error, { file, lines }));
       } else {
-        console.log(formatValue(result.result.expression));
+        console.log(formatValue(result.value.expression));
       }
     }
   } catch (e) {

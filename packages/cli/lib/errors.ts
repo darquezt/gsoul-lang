@@ -1,5 +1,11 @@
-import { ElaborationError } from '@gsens-lang/runtime/elaboration/errors';
-import { InterpreterError } from '@gsens-lang/runtime/interpreter/errors';
+import {
+  ElaborationError,
+  ElaborationErrorKind,
+} from '@gsens-lang/runtime/elaboration/errors';
+import {
+  InterpreterError,
+  InterpreterErrorKind,
+} from '@gsens-lang/runtime/interpreter/errors';
 import * as chalk from 'chalk';
 
 const formatFileName = (name: string, line?: number, col?: number) =>
@@ -34,55 +40,59 @@ export const runtimeError = (
   error: ElaborationError | InterpreterError,
   { lines, file }: ErrorMeta,
 ): string => {
-  switch (error.kind) {
-    case 'InterpreterReferenceError':
+  switch (error.name) {
+    case InterpreterErrorKind.InterpreterReferenceError:
       return chalk`
 ${lines[error.variable.line - 1]}
 ${arrows(error.variable.col - 1, error.variable.lexeme.length)}
-${formatError('Reference error', error.reason)}
+${formatError('Reference error', error.message)}
   ${formatFileName(file, error.variable.line, error.variable.col)}`;
 
-    case 'InterpreterTypeError':
+    case InterpreterErrorKind.InterpreterTypeError:
       return chalk`
 ${lines[error.operator.line - 1]}
 ${arrows(error.operator.col - 1, error.operator.lexeme.length)}
-${formatError('Type error', error.reason)}
+${formatError('Type error', error.message)}
   ${formatFileName(file, error.operator.line, error.operator.col)}`;
 
-    case 'InterpreterEvidenceError':
-      return chalk`${formatError('Type error', error.reason)}`;
+    case InterpreterErrorKind.InterpreterEvidenceError:
+      return chalk`${formatError('Type error', error.message)}`;
 
-    case 'ElaborationReferenceError':
+    case ElaborationErrorKind.ElaborationReferenceError:
       return chalk`
 ${lines[error.variable.line - 1]}
 ${arrows(error.variable.col - 1, error.variable.lexeme.length)}
-${formatError('Reference error', error.reason)}
+${formatError('Reference error', error.message)}
   ${formatFileName(file, error.variable.line, error.variable.col)}`;
 
-    case 'ElaborationTypeError':
+    case ElaborationErrorKind.ElaborationTypeError:
       return chalk`
 ${lines[error.operator.line - 1]}
 ${arrows(error.operator.col - 1, error.operator.lexeme.length)}
-${formatError('Type error', error.reason)}
+${formatError('Type error', error.message)}
 ${formatFileName(file, error.operator.line, error.operator.col)}`;
 
-    case 'ElaborationDependencyError':
+    case ElaborationErrorKind.ElaborationDependencyError:
       return chalk`
 ${lines[error.variable.line - 1]}
 ${arrows(error.variable.col - 1, error.variable.lexeme.length)}
-${formatError('Resource dependency error', error.reason)}
+${formatError('Resource dependency error', error.message)}
   ${formatFileName(file, error.variable.line, error.variable.col)}`;
 
-    case 'ElaborationSubtypingError':
+    case ElaborationErrorKind.ElaborationSubtypingError:
+      console.log(
+        JSON.stringify(error.type, null, 2),
+        JSON.stringify(error.superType, null, 2),
+      );
       return chalk`
 ${lines[error.operator.line - 1]}
 ${arrows(error.operator.col - 1, error.operator.lexeme.length)}
-${formatError('Subtyping error', error.reason)}
+${formatError('Subtyping error', error.message)}
   ${formatFileName(file, error.operator.line, error.operator.col)}`;
 
     default:
       return chalk`
-{bgRed *${error.kind}*}: ${error.reason}
+{bgRed *${error.name}*}: ${error.message}
   ${formatFileName(file)}`;
   }
 };

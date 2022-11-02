@@ -1,7 +1,18 @@
 import { Sens, Senv, SenvUtils, TypeEff } from '@gsens-lang/core/utils';
 import { UnknownSens } from '@gsens-lang/core/utils/Sens';
-import { MaxSenv } from '@gsens-lang/core/utils/Senv';
-import { Arrow, Bool, Nil, Real } from '@gsens-lang/core/utils/Type';
+import {
+  Arrow,
+  Bool,
+  ForallT,
+  Nil,
+  Real,
+  RecType,
+} from '@gsens-lang/core/utils/Type';
+import {
+  RecursiveVar,
+  TypeEffect,
+  TypeEffectKind,
+} from '@gsens-lang/core/utils/TypeEff';
 
 import {
   Expression,
@@ -20,11 +31,13 @@ import {
   NonLinearBinary,
   Forall,
   SCall,
-  Tuple,
-  Untup,
   Pair,
   ProjFst,
   ProjSnd,
+  Fold,
+  Unfold,
+  Tuple,
+  Projection,
 } from './ast';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
@@ -46,6 +59,13 @@ export const Result = <T>(result: T, failures: Failure[]): Result<T> => ({
   result,
   failures,
 });
+
+enum EffectSource {
+  INFERRED = 'INFERRED',
+  EXPLICIT = 'EXPLICIT',
+}
+
+type WithEffectInfo<T> = [EffectSource, T];
 
 class ParseError extends Error {
   constructor(public token: Token, public reason?: string) {
@@ -181,6 +201,16 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     while (match(TokenType.COLON_COLON)) {
       const doubleColon = previous();
       const ascrTE = typeEff();
+
+      if (ascrTE.kind === TypeEffectKind.RecursiveVar) {
+        throw error(
+          previous(),
+          errorMessage({
+            beginning: 'ascription type. Ascription types cannot be recursive',
+          }),
+        );
+      }
+
       expr = Ascription({
         expression: expr,
         typeEff: ascrTE,
@@ -303,6 +333,44 @@ export function parse(tokens: Token[]): Result<Statement[]> {
           arg,
           paren,
         });
+      } else if (match(TokenType.LESS)) {
+        const arg = senv();
+
+        const bracket = consume(
+          TokenType.GREATER,
+          errorMessage({
+            expected: '>',
+            end: 'a sensitivity effect call',
+          }),
+        );
+
+        callee = SCall({
+          callee,
+          arg,
+          bracket,
+        });
+      } else if (match(TokenType.LEFT_BRACKET)) {
+        const index = consume(
+          TokenType.NUMBERLIT,
+          errorMessage({
+            expected: 'an index',
+            after: 'tuple projection',
+          }),
+        );
+
+        const projectToken = consume(
+          TokenType.RIGHT_BRACKET,
+          errorMessage({
+            expected: ']',
+            end: 'a tuple projection',
+          }),
+        );
+
+        callee = Projection({
+          tuple: callee,
+          index: index.literal as number,
+          projectToken,
+        });
       }
 
       if (check(TokenType.LEFT_BRACKET)) {
@@ -350,6 +418,16 @@ export function parse(tokens: Token[]): Result<Statement[]> {
         }),
       );
       const type = typeEff();
+
+      if (type.kind === TypeEffectKind.RecursiveVar) {
+        throw error(
+          previous(),
+          errorMessage({
+            beginning: 'argument type. Argument types cannot be recursive vars',
+          }),
+        );
+      }
+
       consume(
         TokenType.RIGHT_PAREN,
         errorMessage({
@@ -396,83 +474,6 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       return Forall({
         sensVars,
         expr,
-      });
-    } else if (match(TokenType.TUPLE)) {
-      const constructorToken = previous();
-      consume(
-        TokenType.LEFT_PAREN,
-        errorMessage({
-          expected: '(',
-          after: 'tuple constructor',
-        }),
-      );
-      const first = expression();
-      consume(
-        TokenType.COMMA,
-        errorMessage({
-          expected: ',',
-          after: 'tuple component',
-        }),
-      );
-      const second = expression();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          after: 'tuple components',
-        }),
-      );
-
-      return Tuple({
-        first,
-        second,
-        constructorToken,
-      });
-    } else if (match(TokenType.UNTUP)) {
-      const untupToken = previous();
-      const x1 = consume(
-        TokenType.IDENTIFIER,
-        errorMessage({
-          expected: 'variable identifier',
-          after: '`untup` elimination',
-        }),
-      );
-      consume(
-        TokenType.COMMA,
-        errorMessage({
-          expected: 'comma (",")',
-          after: 'first tuple component identifier',
-        }),
-      );
-      const x2 = consume(
-        TokenType.IDENTIFIER,
-        errorMessage({
-          expected: 'a second variable identifier',
-          after: '`untup` elimination',
-        }),
-      );
-      consume(
-        TokenType.EQUAL,
-        errorMessage({
-          expected: 'equality sign ("=")',
-          after: 'variable identifiers',
-        }),
-      );
-      const tupl = expression();
-      consume(
-        TokenType.IN,
-        errorMessage({
-          expected: '`in` keyword',
-          before: 'tuple destructuring body',
-        }),
-      );
-      const body = expression();
-
-      return Untup({
-        untupToken,
-        identifiers: [x1, x2],
-        tuple: tupl,
-        body,
       });
     } else if (match(TokenType.PAIR)) {
       const constructorToken = previous();
@@ -529,6 +530,101 @@ export function parse(tokens: Token[]): Result<Statement[]> {
         projToken,
         pair,
       });
+    } else if (match(TokenType.FOLD)) {
+      const foldToken = previous();
+
+      consume(
+        TokenType.LESS,
+        errorMessage({
+          expected: '<',
+          after: `${foldToken.lexeme} constructor`,
+        }),
+      );
+      const teff = typeEff();
+      consume(
+        TokenType.GREATER,
+        errorMessage({
+          expected: '>',
+          after: `${foldToken.lexeme} fold type instantiation`,
+        }),
+      );
+
+      consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: `${foldToken.lexeme}`,
+        }),
+      );
+      const expr = expression();
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: `${foldToken.lexeme} expression`,
+        }),
+      );
+
+      return Fold({
+        foldToken,
+        expression: expr,
+        recType: (teff as TypeEff<RecType, Senv>).type,
+      });
+    } else if (match(TokenType.TUPLE)) {
+      const constructorToken = previous();
+
+      consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: 'tuple constructor',
+        }),
+      );
+      const first = expression();
+
+      const expressions = [first];
+
+      while (match(TokenType.COMMA)) {
+        const another = expression();
+
+        expressions.push(another);
+      }
+
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: 'tuple components',
+        }),
+      );
+
+      return Tuple({
+        expressions,
+        constructorToken,
+      });
+    } else if (match(TokenType.UNFOLD)) {
+      const unfoldToken = previous();
+
+      consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: `${unfoldToken.lexeme}`,
+        }),
+      );
+      const expr = expression();
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: `${unfoldToken.lexeme} expression`,
+        }),
+      );
+
+      return Unfold({
+        unfoldToken,
+        expression: expr,
+      });
     } else if (match(TokenType.NUMBERLIT)) {
       return Literal({
         value: previous().literal as number,
@@ -573,14 +669,6 @@ export function parse(tokens: Token[]): Result<Statement[]> {
   }
 
   function senv(): Senv {
-    consume(
-      TokenType.LEFT_BRACKET,
-      errorMessage({
-        expected: '[',
-        beginning: 'a sensitivity environment',
-      }),
-    );
-
     let s = Senv();
 
     if (!check(TokenType.RIGHT_BRACKET)) {
@@ -616,86 +704,284 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       }
     }
 
-    consume(
-      TokenType.RIGHT_BRACKET,
-      errorMessage({
-        expected: ']',
-        end: 'a sensitivity environment',
-      }),
-    );
+    // consume(
+    //   TokenType.RIGHT_BRACKET,
+    //   errorMessage({
+    //     expected: ']',
+    //     end: 'a sensitivity environment',
+    //   }),
+    // );
 
     return Senv(s);
   }
 
-  function typeEff(): TypeEff {
-    let t: TypeEff | null = null;
+  function optionalSenv(): WithEffectInfo<Senv> {
+    if (match(TokenType.BANG)) {
+      consume(
+        TokenType.LEFT_BRACKET,
+        errorMessage({
+          expected: '[',
+          beginning: 'a sensitivity environment',
+        }),
+      );
 
-    if (match(TokenType.NUMBER, TokenType.BOOL, TokenType.NIL)) {
-      const typeToken = previous();
+      const eff = senv();
 
-      const effect = match(TokenType.BANG) ? senv() : MaxSenv();
+      consume(
+        TokenType.RIGHT_BRACKET,
+        errorMessage({
+          expected: ']',
+          end: 'a sensitivity environment',
+        }),
+      );
 
-      switch (typeToken.type) {
-        case TokenType.NUMBER: {
-          t = TypeEff(Real(), effect);
-          break;
-        }
-        case TokenType.BOOL: {
-          t = TypeEff(Bool(), effect);
-          break;
-        }
-        case TokenType.NIL: {
-          t = TypeEff(Nil(), effect);
-          break;
-        }
+      return [EffectSource.EXPLICIT, eff];
+    }
+
+    return [EffectSource.INFERRED, Senv()];
+  }
+
+  function atomTypeEff(): WithEffectInfo<TypeEffect> {
+    let currentType = null;
+
+    if (match(TokenType.NUMBER)) {
+      currentType = Real();
+    } else if (match(TokenType.BOOL)) {
+      currentType = Bool();
+    } else if (match(TokenType.NIL)) {
+      currentType = Nil();
+    } else if (match(TokenType.FORALLT)) {
+      const forallKeyword = previous();
+
+      const firstSensVar = consume(
+        TokenType.IDENTIFIER,
+        errorMessage({
+          expected: 'at least one sensitive variable name',
+          after: `${forallKeyword.lexeme} keyword`,
+        }),
+      );
+      const sensVars = [firstSensVar.lexeme];
+
+      while (match(TokenType.IDENTIFIER)) {
+        sensVars.push(previous().lexeme);
       }
+
+      consume(
+        TokenType.DOT,
+        errorMessage({
+          expected: 'a dot (.)',
+          after: 'sensitive variables',
+        }),
+      );
+
+      const codomain = typeEff();
+
+      currentType = ForallT({
+        sensVars,
+        codomain,
+      });
+    } else if (match(TokenType.RECTYPE)) {
+      const rectypeKeyword = previous();
+
+      const variable = consume(
+        TokenType.IDENTIFIER,
+        errorMessage({
+          expected: 'a type variable name',
+          after: `${rectypeKeyword.lexeme} keyword`,
+        }),
+      ).lexeme;
+
+      consume(
+        TokenType.DOT,
+        errorMessage({
+          expected: 'a dot (.)',
+          after: 'the recursive type variable',
+        }),
+      );
+
+      const body = typeEff();
+
+      currentType = RecType({
+        variable,
+        body,
+      });
+    }
+
+    if (currentType) {
+      const [source, effect] = optionalSenv();
+
+      return [source, TypeEff(currentType, effect)];
     }
 
     if (match(TokenType.LEFT_PAREN)) {
-      t = typeEff();
+      const [senvSource, teff] = internalTypeEff();
 
       consume(
         TokenType.RIGHT_PAREN,
         errorMessage({
-          expected: 'aclosing paranthesis )',
-          end: 'this type-and-effect',
+          expected: 'a right parenthesis )',
+          after: 'declaring a pure type',
         }),
       );
 
       if (match(TokenType.BANG)) {
+        if (senvSource === EffectSource.EXPLICIT) {
+          throw error(
+            peek(),
+            errorMessage({
+              after: 'type-and-effect',
+            }),
+          );
+        }
+
+        consume(
+          TokenType.LEFT_BRACKET,
+          errorMessage({
+            expected: '[',
+            beginning: 'a sensitivity environment',
+          }),
+        );
+
         const effect = senv();
 
-        t = TypeEff(t.type, SenvUtils.add(t.effect, effect));
+        consume(
+          TokenType.RIGHT_BRACKET,
+          errorMessage({
+            expected: ']',
+            end: 'a sensitivity environment',
+          }),
+        );
+
+        return [EffectSource.EXPLICIT, TypeEff((teff as TypeEff).type, effect)];
       }
+
+      return [senvSource, teff];
     }
 
-    if (!t) {
-      throw error(
-        peek(),
-        errorMessage({ expected: 'a type or a type-and-effect' }),
-      );
+    if (match(TokenType.IDENTIFIER)) {
+      const identifier = previous();
+
+      return [
+        EffectSource.EXPLICIT,
+        RecursiveVar({
+          name: identifier.lexeme,
+        }),
+      ];
     }
+
+    throw error(
+      peek(),
+      errorMessage({
+        expected: 'a type',
+      }),
+    );
+  }
+
+  function internalTypeEff(): WithEffectInfo<TypeEffect> {
+    const ty = atomTypeEff();
+
+    const arrows = [];
 
     while (match(TokenType.ARROW)) {
-      switch (previous().type) {
-        case TokenType.ARROW: {
-          const codomain = typeEff();
+      const [, codomain] = atomTypeEff();
 
-          t = TypeEff(
-            Arrow({
-              domain: t,
-              codomain,
-            }),
-            Senv(),
-          );
-
-          break;
-        }
-      }
+      arrows.push(codomain);
     }
 
-    return t;
+    if (arrows.length === 0) {
+      return ty;
+    }
+
+    const arrow = arrows.reduceRight(
+      (domain, codomain) =>
+        TypeEff(
+          Arrow({
+            domain,
+            codomain,
+          }),
+          Senv(),
+        ),
+      ty[1],
+    );
+
+    return [EffectSource.INFERRED, arrow];
   }
+
+  function typeEff(): TypeEffect {
+    const [, teff] = internalTypeEff();
+
+    return teff;
+  }
+
+  // function typeEff(): TypeEff {
+  //   let t: TypeEff | null = null;
+
+  //   if (match(TokenType.NUMBER, TokenType.BOOL, TokenType.NIL)) {
+  //     const typeToken = previous();
+
+  //     const effect = match(TokenType.BANG) ? senv() : MaxSenv();
+
+  //     switch (typeToken.type) {
+  //       case TokenType.NUMBER: {
+  //         t = TypeEff(Real(), effect);
+  //         break;
+  //       }
+  //       case TokenType.BOOL: {
+  //         t = TypeEff(Bool(), effect);
+  //         break;
+  //       }
+  //       case TokenType.NIL: {
+  //         t = TypeEff(Nil(), effect);
+  //         break;
+  //       }
+  //     }
+  //   }
+
+  //   if (match(TokenType.LEFT_PAREN)) {
+  //     t = typeEff();
+
+  //     consume(
+  //       TokenType.RIGHT_PAREN,
+  //       errorMessage({
+  //         expected: 'aclosing paranthesis )',
+  //         end: 'this type-and-effect',
+  //       }),
+  //     );
+
+  //     if (match(TokenType.BANG)) {
+  //       const effect = senv();
+
+  //       t = TypeEff(t.type, SenvUtils.add(t.effect, effect));
+  //     }
+  //   }
+
+  //   if (!t) {
+  //     throw error(
+  //       peek(),
+  //       errorMessage({ expected: 'a type or a type-and-effect' }),
+  //     );
+  //   }
+
+  //   while (match(TokenType.ARROW)) {
+  //     switch (previous().type) {
+  //       case TokenType.ARROW: {
+  //         const codomain = typeEff();
+
+  //         t = TypeEff(
+  //           Arrow({
+  //             domain: t,
+  //             codomain,
+  //           }),
+  //           Senv(),
+  //         );
+
+  //         break;
+  //       }
+  //     }
+  //   }
+
+  //   return t;
+  // }
 
   function consume(type: TokenType, message: string): Token {
     if (check(type)) {

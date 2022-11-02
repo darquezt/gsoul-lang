@@ -18,12 +18,14 @@ const keywords: Record<string, TokenType> = {
   fun: TokenType.FUN,
   forall: TokenType.FORALL,
   Forall: TokenType.FORALLT,
-  // tuple: TokenType.TUPLE,
-  // untup: TokenType.UNTUP,
-  // in: TokenType.IN,
-  pair: TokenType.PAIR,
+  Tuple: TokenType.TUPLE,
+  in: TokenType.IN,
+  Pair: TokenType.PAIR,
   fst: TokenType.FST,
   snd: TokenType.SND,
+  fold: TokenType.FOLD,
+  unfold: TokenType.UNFOLD,
+  rec: TokenType.RECTYPE,
 };
 
 /**

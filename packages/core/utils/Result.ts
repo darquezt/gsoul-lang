@@ -7,7 +7,7 @@ export const Ok = <T>(result: T): Ok<T> => ({
   result,
 });
 
-type BaseErr = { reason: string };
+export type BaseErr = { reason: string };
 export type Err<E extends BaseErr> = {
   success: false;
   error: E;

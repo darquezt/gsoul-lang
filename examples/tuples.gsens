@@ -1,0 +1,3 @@
+let tup = Tuple(2 + 3, nil, true);
+
+print tup[0];

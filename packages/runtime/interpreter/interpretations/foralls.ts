@@ -14,7 +14,7 @@ import {
   Value,
 } from '../../elaboration/ast';
 import { EvidenceUtils, Store } from '../../utils';
-import { Err, Result } from '../../utils/Result';
+import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterTypeError } from '../errors';
 
@@ -61,8 +61,8 @@ export const reduceForallBody = (
   kont: ForallKont,
 ): Result<StepState, InterpreterError> => {
   if (!simpleValueIsKinded(term, ExprKind.SClosure)) {
-    return Err(
-      InterpreterTypeError({
+    return Result.err(
+      new InterpreterTypeError({
         reason:
           'Only polymorphic quantifications can be instantiated with sensitivity environments',
         operator: kont.bracket,
@@ -76,16 +76,16 @@ export const reduceForallBody = (
 
   const evidenceRes = EvidenceUtils.iscod(term.evidence);
 
-  if (!evidenceRes.success) {
-    return Err(
-      InterpreterTypeError({
-        reason: evidenceRes.error.reason,
+  if (!evidenceRes.isOk) {
+    return Result.err(
+      new InterpreterTypeError({
+        reason: evidenceRes.error.message,
         operator: kont.bracket,
       }),
     );
   }
 
-  const evidence = evidenceRes.result;
+  const evidence = evidenceRes.value;
 
   const newTypeEff = TypeEffUtils.ForallsUtils.instance(
     term.expression.forall.typeEff,

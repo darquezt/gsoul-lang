@@ -16,7 +16,8 @@ import {
 } from '../elaboration/ast';
 import { initialEvidence } from '../utils/Evidence';
 import { evaluate } from './cek';
-import { Ok } from '../utils/Result';
+import { Result } from '@badrap/result';
+import { TypeEffectKind } from '@gsens-lang/core/utils/TypeEff';
 
 const RealEmptySenv = TypeEff(Real(), Senv());
 
@@ -60,6 +61,7 @@ describe('CEK', () => {
         },
         body,
         typeEff: {
+          kind: TypeEffectKind.TypeEff,
           type: Arrow({
             domain: RealEmptySenv,
             codomain: RealEmptySenv,
@@ -100,13 +102,17 @@ describe('CEK', () => {
 
     const val = evaluate(app);
 
-    const result = Ok(
+    const result = Result.ok(
       Ascription({
         expression: RealLiteral({
           value: 4,
         }),
-        typeEff: { type: Real(), effect: Senv() },
-        evidence: initialEvidence({ type: Real(), effect: Senv() }),
+        typeEff: { kind: TypeEffectKind.TypeEff, type: Real(), effect: Senv() },
+        evidence: initialEvidence({
+          kind: TypeEffectKind.TypeEff,
+          type: Real(),
+          effect: Senv(),
+        }),
       }),
     );
 
@@ -142,7 +148,7 @@ describe('CEK', () => {
 
     const val = evaluate(sum);
 
-    const result = Ok(
+    const result = Result.ok(
       Ascription({
         expression: RealLiteral({
           value: leftInner + rightInner,
@@ -187,7 +193,7 @@ describe('CEK', () => {
 
     const val = evaluate(sum);
 
-    const result = Ok(
+    const result = Result.ok(
       Ascription({
         expression: RealLiteral({
           value: leftInner * rightInner,

@@ -3,7 +3,7 @@ import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
 import { Print, Value } from '../../elaboration/ast';
 import { EvidenceUtils, Store } from '../../utils';
 import { formatValue } from '../../utils/format';
-import { Result } from '../../utils/Result';
+import { Result } from '@badrap/result';
 import { Kont, OkState, StepState } from '../cek';
 import { InterpreterError } from '../errors';
 

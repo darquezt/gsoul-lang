@@ -14,7 +14,7 @@ import {
 } from '../../elaboration/ast';
 import { EvidenceUtils } from '../../utils';
 import { initialEvidence } from '../../utils/Evidence';
-import { Err } from '../../utils/Result';
+import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepReducer } from '../cek';
 import { InterpreterEvidenceError, InterpreterTypeError } from '../errors';
 
@@ -149,8 +149,8 @@ export const projectFirstPairComponent: StepReducer<
   PairFirstProjKont
 > = (term, _store, kont) => {
   if (!simpleValueIsKinded(term, ExprKind.Pair)) {
-    return Err(
-      InterpreterTypeError({
+    return Result.err(
+      new InterpreterTypeError({
         reason: 'Callee must be a function',
         operator: kont.state.projToken,
       }),
@@ -159,15 +159,15 @@ export const projectFirstPairComponent: StepReducer<
 
   const evidenceResult = EvidenceUtils.ifirst(term.evidence);
 
-  if (!evidenceResult.success) {
-    return Err(
-      InterpreterEvidenceError({
-        reason: evidenceResult.error.reason,
+  if (!evidenceResult.isOk) {
+    return Result.err(
+      new InterpreterEvidenceError({
+        reason: evidenceResult.error.message,
       }),
     );
   }
 
-  const evidence = evidenceResult.result;
+  const evidence = evidenceResult.value;
 
   const typeEff = TypeEffUtils.AdditiveProductsUtils.firstProjection(
     term.typeEff as TypeEff<AProduct, Senv>,
@@ -191,8 +191,8 @@ export const projectSecondPairComponent: StepReducer<
   PairSecondProjKont
 > = (term, _store, kont) => {
   if (!simpleValueIsKinded(term, ExprKind.Pair)) {
-    return Err(
-      InterpreterTypeError({
+    return Result.err(
+      new InterpreterTypeError({
         reason: 'Callee must be a function',
         operator: kont.state.projToken,
       }),
@@ -201,15 +201,15 @@ export const projectSecondPairComponent: StepReducer<
 
   const evidenceResult = EvidenceUtils.isecond(term.evidence);
 
-  if (!evidenceResult.success) {
-    return Err(
-      InterpreterEvidenceError({
-        reason: evidenceResult.error.reason,
+  if (!evidenceResult.isOk) {
+    return Result.err(
+      new InterpreterEvidenceError({
+        reason: evidenceResult.error.message,
       }),
     );
   }
 
-  const evidence = evidenceResult.result;
+  const evidence = evidenceResult.value;
 
   const typeEff = TypeEffUtils.AdditiveProductsUtils.secondProjection(
     term.typeEff as TypeEff<AProduct, Senv>,

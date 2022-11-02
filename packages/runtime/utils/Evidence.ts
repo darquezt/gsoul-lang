@@ -1,50 +1,62 @@
 import {
   Sens,
+  SensUtils,
   Senv,
   SenvUtils,
   Type,
   TypeEff,
   TypeEffUtils,
+  TypeUtils,
 } from '@gsens-lang/core/utils';
 import {
-  AProduct,
   Arrow,
   Bool,
   Nil,
+  Product,
   Real,
+  RecType,
   typeIsKinded,
   TypeKind,
 } from '@gsens-lang/core/utils/Type';
-import { factoryOf, isKinded } from '@gsens-lang/core/utils/ADT';
-import { Result } from './Result';
-import { Err, Ok } from '../utils/Result';
+import { isKinded } from '@gsens-lang/core/utils/ADT';
+import { TypeEffect, TypeEffectKind } from '@gsens-lang/core/utils/TypeEff';
+import { Result } from '@badrap/result';
+import { zip } from 'ramda';
+import RecursivePolarityCheck, {
+  RecursivePolarityMode,
+} from '@gsens-lang/core/utils/lib/RecursivePolarityCheck';
+import Meet from '@gsens-lang/core/utils/lib/Meet';
 
 type Evi<T> = Readonly<[T, T]>;
 
-export type Evidence = Evi<TypeEff>;
+export type Evidence = Evi<TypeEffect>;
 
-export type EvidenceInteriorError = {
-  kind: 'EvidenceInteriorError';
-  reason: string;
-};
-export const EvidenceInteriorError = factoryOf<EvidenceInteriorError>(
-  'EvidenceInteriorError',
-);
+// export type EvidenceInteriorError = {
+//   kind: 'EvidenceInteriorError';
+//   string;
+// };
+// export const EvidenceInteriorError = factoryOf<EvidenceInteriorError>(
+//   'EvidenceInteriorError',
+// );
 
-export type EvidenceTransitivityError = {
-  kind: 'EvidenceTransitivityError';
-  reason: string;
-};
-export const EvidenceTransitivityError = factoryOf<EvidenceTransitivityError>(
-  'EvidenceTransitivityError',
-);
+// export type EvidenceTransitivityError = {
+//   kind: 'EvidenceTransitivityError';
+//   string;
+// };
+// export const EvidenceTransitivityError = factoryOf<EvidenceTransitivityError>(
+//   'EvidenceTransitivityError',
+// );
 
-export type EvidenceTypeError = {
-  kind: 'EvidenceTypeError';
-  reason: string;
-};
-export const EvidenceTypeError =
-  factoryOf<EvidenceTypeError>('EvidenceTypeError');
+// export type EvidenceTypeError = {
+//   kind: 'EvidenceTypeError';
+//   string;
+// };
+// export const EvidenceTypeError =
+//   factoryOf<EvidenceTypeError>('EvidenceTypeError');
+
+export class EvidenceInteriorError extends Error {}
+export class EvidenceTransitivityError extends Error {}
+export class EvidenceTypeError extends Error {}
 
 export type EvidenceError =
   | EvidenceInteriorError
@@ -59,14 +71,10 @@ const interiorSens = (
   const s13 = Math.max(s1, s3);
 
   if (s1 <= s24 && s13 <= s4) {
-    return Ok([Sens(s1, s24), Sens(s13, s4)]);
+    return Result.ok([Sens(s1, s24), Sens(s13, s4)]);
   }
 
-  return Err(
-    EvidenceInteriorError({
-      reason: 'Interior is not defined',
-    }),
-  );
+  return Result.err(new EvidenceInteriorError('Interior is not defined'));
 };
 
 const interiorSenv = (
@@ -86,80 +94,145 @@ const interiorSenv = (
       SenvUtils.access(senv2, x),
     );
 
-    if (!eviSensRes.success) {
-      return eviSensRes;
+    if (!eviSensRes.isOk) {
+      return Result.err(eviSensRes.error);
     }
 
-    const { result: eviSens } = eviSensRes;
+    const { value: eviSens } = eviSensRes;
 
     eviSenv1 = SenvUtils.extend(eviSenv1, x, eviSens[0]);
     eviSenv2 = SenvUtils.extend(eviSenv2, x, eviSens[1]);
   }
 
-  return Ok([eviSenv1, eviSenv2]);
+  return Result.ok([eviSenv1, eviSenv2]);
 };
 
 const baseTypes: string[] = [Real().kind, Bool().kind, Nil().kind];
 
 const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
   if (t1.kind === t2.kind && baseTypes.includes(t1.kind)) {
-    return Ok([t1, t2]);
+    return Result.ok([t1, t2]);
   }
-  if (isKinded(t1, TypeKind.Arrow) && isKinded(t2, TypeKind.Arrow)) {
-    const evit11Res = interior(t2.domain, t1.domain);
 
-    if (!evit11Res.success) {
-      return evit11Res;
-    }
+  if (isKinded(t1, TypeKind.Arrow) && isKinded(t2, TypeKind.Arrow)) {
+    const eviT11Res = interior(t2.domain, t1.domain);
 
     const eviT12Res = interior(t1.codomain, t2.codomain);
 
-    if (!eviT12Res.success) {
-      return eviT12Res;
-    }
-
-    const {
-      result: [t21p, t11p],
-    } = evit11Res;
-    const {
-      result: [T12p, T22p],
-    } = eviT12Res;
-
-    return Ok([
+    return Result.all([eviT11Res, eviT12Res]).map(([eviT11, eviT12]) => [
       Arrow({
-        domain: t11p,
-        codomain: T12p,
+        domain: eviT11[1],
+        codomain: eviT12[0],
       }),
       Arrow({
-        domain: t21p,
-        codomain: T22p,
+        domain: eviT11[0],
+        codomain: eviT12[1],
       }),
     ]);
   }
 
-  return Err(EvidenceInteriorError({ reason: 'Unsopported type' }));
+  if (isKinded(t1, TypeKind.Product) && isKinded(t2, TypeKind.Product)) {
+    if (t1.typeEffects.length !== t2.typeEffects.length) {
+      return Result.err(
+        new EvidenceInteriorError('Wrong number of product components'),
+      );
+    }
+
+    const componentInteriors = zip(t1.typeEffects, t2.typeEffects).map(
+      ([teff1, teff2]) => interior(teff1, teff2),
+    );
+
+    Result.all(componentInteriors).map((interiors) => {
+      const leftInteriors = interiors.map((evi) => evi[0]);
+      const rightInteriors = interiors.map((evi) => evi[1]);
+
+      return [
+        Product({ typeEffects: leftInteriors }),
+        Product({ typeEffects: rightInteriors }),
+      ];
+    });
+  }
+
+  if (isKinded(t1, TypeKind.RecType) && isKinded(t2, TypeKind.RecType)) {
+    if (t1.variable !== t2.variable) {
+      return Result.err(
+        new EvidenceInteriorError(
+          'Bound variables of recursive types are incompatible',
+        ),
+      );
+    }
+
+    const positivePolarity = RecursivePolarityCheck.Type(
+      t1.variable,
+      RecursivePolarityMode.POSITIVE,
+      t1,
+      t2,
+    );
+
+    const bodyInterior = interior(t1.body, t2.body);
+
+    if (positivePolarity) {
+      return bodyInterior.map(([leftBody, rightBody]) => [
+        RecType({
+          variable: t1.variable,
+          body: leftBody,
+        }),
+        RecType({
+          variable: t2.variable,
+          body: rightBody,
+        }),
+      ]);
+    }
+
+    const bodyMeet = Meet.TypeEffect(t1.body, t2.body);
+
+    if (bodyMeet.isOk) {
+      return Result.ok([
+        RecType({
+          variable: t1.variable,
+          body: bodyMeet.value,
+        }),
+        RecType({
+          variable: t2.variable,
+          body: bodyMeet.value,
+        }),
+      ]);
+    }
+  }
+
+  return Result.err(new EvidenceInteriorError('Unsopported type'));
 };
 
 export const interior = (
-  te1: TypeEff,
-  te2: TypeEff,
+  te1: TypeEffect,
+  te2: TypeEffect,
 ): Result<Evidence, EvidenceError> => {
-  const eviTypeRes = interiorType(te1.type, te2.type);
+  if (
+    isKinded(te1, TypeEffectKind.RecursiveVar) &&
+    isKinded(te2, TypeEffectKind.RecursiveVar)
+  ) {
+    if (te1.name === te1.name) {
+      return Result.ok([te1, te2]);
+    }
 
-  if (!eviTypeRes.success) {
-    return eviTypeRes;
+    return Result.err(new EvidenceInteriorError('Interior is not defined'));
   }
 
-  const eviSenvRes = interiorSenv(te1.effect, te2.effect);
+  if (
+    isKinded(te1, TypeEffectKind.TypeEff) &&
+    isKinded(te2, TypeEffectKind.TypeEff)
+  ) {
+    const eviTypeRes = interiorType(te1.type, te2.type);
 
-  if (!eviSenvRes.success) {
-    return eviSenvRes;
+    const eviSenvRes = interiorSenv(te1.effect, te2.effect);
+
+    return Result.all([eviTypeRes, eviSenvRes]).map(([eviType, eviSenv]) => [
+      TypeEff(eviType[0], eviSenv[0]),
+      TypeEff(eviType[1], eviSenv[1]),
+    ]);
   }
 
-  const { result: eviType } = eviTypeRes;
-  const { result: eviSenv } = eviSenvRes;
-
-  return Ok([TypeEff(eviType[0], eviSenv[0]), TypeEff(eviType[1], eviSenv[1])]);
+  return Result.err(new EvidenceInteriorError('Interior is not defined'));
 };
 
 export const initialEvidence = (te1: TypeEff): Evidence => {
@@ -177,14 +250,12 @@ export const transSens = (
   const s2p = Math.max(s13, s21, s23);
 
   if (!(s11 <= s1p) || !(s2p <= s24)) {
-    return Err(
-      EvidenceTransitivityError({
-        reason: 'Consistent transitivity is not defined',
-      }),
+    return Result.err(
+      new EvidenceTransitivityError('Consistent transitivity is not defined'),
     );
   }
 
-  return Ok([Sens(s11, s1p), Sens(s2p, s24)]);
+  return Result.ok([Sens(s11, s1p), Sens(s2p, s24)]);
 };
 
 export const transSenv = (
@@ -209,141 +280,233 @@ export const transSenv = (
       [SenvUtils.access(senv3, x), SenvUtils.access(senv4, x)],
     );
 
-    if (!eviSensRes.success) {
-      return eviSensRes;
+    if (!eviSensRes.isOk) {
+      return Result.err(eviSensRes.error);
     }
 
-    const { result: eviSens } = eviSensRes;
+    const { value: eviSens } = eviSensRes;
 
     eviSenv1 = SenvUtils.extend(eviSenv1, x, eviSens[0]);
     eviSenv2 = SenvUtils.extend(eviSenv2, x, eviSens[1]);
   }
 
-  return Ok([eviSenv1, eviSenv2]);
+  return Result.ok([eviSenv1, eviSenv2]);
 };
 
 const transType = (
   ev1: Evi<Type>,
   ev2: Evi<Type>,
 ): Result<Evi<Type>, EvidenceError> => {
-  const [t1, t2] = ev1;
-  const [t3, t4] = ev2;
+  const middle = TypeUtils.meet(ev1[1], ev2[0]);
 
-  if (
-    t1.kind === t2.kind &&
-    t1.kind === t3.kind &&
-    t1.kind === t4.kind &&
-    baseTypes.includes(t1.kind)
-  ) {
-    return Ok(ev1);
+  if (!middle.isOk) {
+    return Result.err(new EvidenceTransitivityError('Undefined meet'));
   }
 
-  if (
-    isKinded(t1, TypeKind.Arrow) &&
-    isKinded(t2, TypeKind.Arrow) &&
-    isKinded(t3, TypeKind.Arrow) &&
-    isKinded(t4, TypeKind.Arrow)
-  ) {
-    const evit11Res = trans([t4.domain, t3.domain], [t2.domain, t1.domain]);
+  const leftTrans = interiorType(ev1[0], middle.value);
+  const rightTrans = interiorType(middle.value, ev2[1]);
 
-    if (!evit11Res.success) {
-      return evit11Res;
-    }
-
-    const eviT12Res = trans(
-      [t1.codomain, t2.codomain],
-      [t3.codomain, t4.codomain],
-    );
-
-    if (!eviT12Res.success) {
-      return eviT12Res;
-    }
-
-    const {
-      result: [t21p, t11p],
-    } = evit11Res;
-    const {
-      result: [T12p, T22p],
-    } = eviT12Res;
-
-    return Ok([
-      Arrow({
-        domain: t11p,
-        codomain: T12p,
-      }),
-      Arrow({
-        domain: t21p,
-        codomain: T22p,
-      }),
-    ]);
-  }
-
-  if (
-    isKinded(t1, TypeKind.AProduct) &&
-    isKinded(t2, TypeKind.AProduct) &&
-    isKinded(t3, TypeKind.AProduct) &&
-    isKinded(t4, TypeKind.AProduct)
-  ) {
-    const evit11Res = trans([t1.first, t2.first], [t3.first, t4.first]);
-
-    if (!evit11Res.success) {
-      return evit11Res;
-    }
-
-    const eviT12Res = trans([t1.second, t2.second], [t3.second, t4.second]);
-
-    if (!eviT12Res.success) {
-      return eviT12Res;
-    }
-
-    const {
-      result: [t21p, t11p],
-    } = evit11Res;
-    const {
-      result: [T12p, T22p],
-    } = eviT12Res;
-
-    return Ok([
-      AProduct({
-        first: t11p,
-        second: T12p,
-      }),
-      AProduct({
-        first: t21p,
-        second: T22p,
-      }),
-    ]);
-  }
-
-  return Err(EvidenceTransitivityError({ reason: 'Unsupported type' }));
+  return Result.all([leftTrans, rightTrans]).map(([left, right]) => [
+    left[0],
+    right[1],
+  ]);
 };
 
+// const transType = (
+//   ev1: Evi<Type>,
+//   ev2: Evi<Type>,
+// ): Result<Evi<Type>, EvidenceError> => {
+//   const [t1, t2] = ev1;
+//   const [t3, t4] = ev2;
+
+//   if (
+//     t1.kind === t2.kind &&
+//     t1.kind === t3.kind &&
+//     t1.kind === t4.kind &&
+//     baseTypes.includes(t1.kind)
+//   ) {
+//     return Result.ok(ev1);
+//   }
+
+//   if (
+//     isKinded(t1, TypeKind.Arrow) &&
+//     isKinded(t2, TypeKind.Arrow) &&
+//     isKinded(t3, TypeKind.Arrow) &&
+//     isKinded(t4, TypeKind.Arrow)
+//   ) {
+//     const evit11Res = trans(
+//       [t4.domain as TypeEff, t3.domain as TypeEff],
+//       [t2.domain as TypeEff, t1.domain as TypeEff],
+//     );
+
+//     if (!evit11Res.success) {
+//       return evit11Res;
+//     }
+
+//     const eviT12Res = trans(
+//       [t1.codomain as TypeEff, t2.codomain as TypeEff],
+//       [t3.codomain as TypeEff, t4.codomain as TypeEff],
+//     );
+
+//     if (!eviT12Res.success) {
+//       return eviT12Res;
+//     }
+
+//     const {
+//       result: [t21p, t11p],
+//     } = evit11Res;
+//     const {
+//       result: [T12p, T22p],
+//     } = eviT12Res;
+
+//     return Result.ok([
+//       Arrow({
+//         domain: t11p,
+//         codomain: T12p,
+//       }),
+//       Arrow({
+//         domain: t21p,
+//         codomain: T22p,
+//       }),
+//     ]);
+//   }
+
+//   if (
+//     isKinded(t1, TypeKind.RecType) &&
+//     isKinded(t2, TypeKind.RecType) &&
+//     isKinded(t3, TypeKind.RecType) &&
+//     isKinded(t4, TypeKind.RecType)
+//   ) {
+//     const evit11Res = trans(
+//       [t4.domain as TypeEff, t3.domain as TypeEff],
+//       [t2.domain as TypeEff, t1.domain as TypeEff],
+//     );
+
+//     if (!evit11Res.success) {
+//       return evit11Res;
+//     }
+
+//     const eviT12Res = trans(
+//       [t1.codomain as TypeEff, t2.codomain as TypeEff],
+//       [t3.codomain as TypeEff, t4.codomain as TypeEff],
+//     );
+
+//     if (!eviT12Res.success) {
+//       return eviT12Res;
+//     }
+
+//     const {
+//       result: [t21p, t11p],
+//     } = evit11Res;
+//     const {
+//       result: [T12p, T22p],
+//     } = eviT12Res;
+
+//     return Result.ok([
+//       Arrow({
+//         domain: t11p,
+//         codomain: T12p,
+//       }),
+//       Arrow({
+//         domain: t21p,
+//         codomain: T22p,
+//       }),
+//     ]);
+//   }
+
+//   if (
+//     isKinded(t1, TypeKind.AProduct) &&
+//     isKinded(t2, TypeKind.AProduct) &&
+//     isKinded(t3, TypeKind.AProduct) &&
+//     isKinded(t4, TypeKind.AProduct)
+//   ) {
+//     const evit11Res = trans(
+//       [t1.first as TypeEff, t2.first as TypeEff],
+//       [t3.first as TypeEff, t4.first as TypeEff],
+//     );
+
+//     if (!evit11Res.success) {
+//       return evit11Res;
+//     }
+
+//     const eviT12Res = trans(
+//       [t1.second as TypeEff, t2.second as TypeEff],
+//       [t3.second as TypeEff, t4.second as TypeEff],
+//     );
+
+//     if (!eviT12Res.success) {
+//       return eviT12Res;
+//     }
+
+//     const {
+//       result: [t21p, t11p],
+//     } = evit11Res;
+//     const {
+//       result: [T12p, T22p],
+//     } = eviT12Res;
+
+//     return Result.ok([
+//       AProduct({
+//         first: t11p,
+//         second: T12p,
+//       }),
+//       AProduct({
+//         first: t21p,
+//         second: T22p,
+//       }),
+//     ]);
+//   }
+
+//   return Result.err(EvidenceTransitivityError({ 'Unsupported type' }));
+// };
+
 export const trans = (
-  ev1: Evidence,
-  ev2: Evidence,
+  [teff11, teff12]: Evidence,
+  [teff21, teff22]: Evidence,
 ): Result<Evidence, EvidenceError> => {
-  const eviTypeRes = transType(
-    [ev1[0].type, ev1[1].type],
-    [ev2[0].type, ev2[1].type],
-  );
+  if (
+    isKinded(teff11, TypeEffectKind.RecursiveVar) &&
+    isKinded(teff12, TypeEffectKind.RecursiveVar) &&
+    isKinded(teff21, TypeEffectKind.RecursiveVar) &&
+    isKinded(teff22, TypeEffectKind.RecursiveVar)
+  ) {
+    if (
+      teff11.name === teff12.name &&
+      teff11.name === teff21.name &&
+      teff11.name === teff22.name
+    ) {
+      return Result.ok([teff11, teff22]);
+    }
 
-  if (!eviTypeRes.success) {
-    return eviTypeRes;
+    return Result.err(
+      new EvidenceTransitivityError('Consistent transitivity is not defined'),
+    );
   }
 
-  const eviSenvRes = transSenv(
-    [ev1[0].effect, ev1[1].effect],
-    [ev2[0].effect, ev2[1].effect],
-  );
+  if (
+    isKinded(teff11, TypeEffectKind.TypeEff) &&
+    isKinded(teff12, TypeEffectKind.TypeEff) &&
+    isKinded(teff21, TypeEffectKind.TypeEff) &&
+    isKinded(teff22, TypeEffectKind.TypeEff)
+  ) {
+    const eviTypeRes = transType(
+      [teff11.type, teff12.type],
+      [teff12.type, teff22.type],
+    );
+    const eviSenvRes = transSenv(
+      [teff11.effect, teff12.effect],
+      [teff12.effect, teff22.effect],
+    );
 
-  if (!eviSenvRes.success) {
-    return eviSenvRes;
+    return Result.all([eviTypeRes, eviSenvRes]).map(([eviType, eviSenv]) => [
+      TypeEff(eviType[0], eviSenv[0]),
+      TypeEff(eviType[1], eviSenv[1]),
+    ]);
   }
 
-  const { result: eviType } = eviTypeRes;
-  const { result: eviSenv } = eviSenvRes;
-
-  return Ok([TypeEff(eviType[0], eviSenv[0]), TypeEff(eviType[1], eviSenv[1])]);
+  return Result.err(
+    new EvidenceTransitivityError('Consistent transitivity is not defined'),
+  );
 };
 
 // INVERSION
@@ -352,17 +515,28 @@ export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    !typeIsKinded(left, TypeKind.Arrow) ||
-    !typeIsKinded(right, TypeKind.Arrow)
+    isKinded(left, TypeEffectKind.RecursiveVar) ||
+    isKinded(right, TypeEffectKind.RecursiveVar)
   ) {
-    return Err(
-      EvidenceTypeError({
-        reason: 'Operator icod is not defined for types other than functions',
-      }),
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive type-and-effect',
+      ),
     );
   }
 
-  return Ok([
+  if (
+    !typeIsKinded(left, TypeKind.Arrow) ||
+    !typeIsKinded(right, TypeKind.Arrow)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator icod is not defined for types other than functions',
+      ),
+    );
+  }
+
+  return Result.ok([
     TypeEffUtils.ArrowsUtils.codomain(left),
     TypeEffUtils.ArrowsUtils.codomain(right),
   ]);
@@ -372,17 +546,28 @@ export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    !typeIsKinded(left, TypeKind.Arrow) ||
-    !typeIsKinded(right, TypeKind.Arrow)
+    isKinded(left, TypeEffectKind.RecursiveVar) ||
+    isKinded(right, TypeEffectKind.RecursiveVar)
   ) {
-    return Err(
-      EvidenceTypeError({
-        reason: 'Operator idom is not defined for types other than functions',
-      }),
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive type-and-effect',
+      ),
     );
   }
 
-  return Ok([
+  if (
+    !typeIsKinded(left, TypeKind.Arrow) ||
+    !typeIsKinded(right, TypeKind.Arrow)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator idom is not defined for types other than functions',
+      ),
+    );
+  }
+
+  return Result.ok([
     TypeEffUtils.ArrowsUtils.domain(left),
     TypeEffUtils.ArrowsUtils.domain(right),
   ]);
@@ -395,17 +580,28 @@ export const iscod = (
   const [left, right] = ev;
 
   if (
-    !typeIsKinded(left, TypeKind.ForallT) ||
-    !typeIsKinded(right, TypeKind.ForallT)
+    isKinded(left, TypeEffectKind.RecursiveVar) ||
+    isKinded(right, TypeEffectKind.RecursiveVar)
   ) {
-    return Err(
-      EvidenceTypeError({
-        reason: 'Operator icod is not defined for types other than functions',
-      }),
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive type-and-effect',
+      ),
     );
   }
 
-  return Ok([
+  if (
+    !typeIsKinded(left, TypeKind.ForallT) ||
+    !typeIsKinded(right, TypeKind.ForallT)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator iscod is not defined for types other than functions',
+      ),
+    );
+  }
+
+  return Result.ok([
     TypeEffUtils.ForallsUtils.instance(left, effect),
     TypeEffUtils.ForallsUtils.instance(right, effect),
   ]);
@@ -415,17 +611,28 @@ export const ifirst = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    !typeIsKinded(left, TypeKind.AProduct) ||
-    !typeIsKinded(right, TypeKind.AProduct)
+    isKinded(left, TypeEffectKind.RecursiveVar) ||
+    isKinded(right, TypeEffectKind.RecursiveVar)
   ) {
-    return Err(
-      EvidenceTypeError({
-        reason: 'Operator icod is not defined for types other than functions',
-      }),
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive type-and-effect',
+      ),
     );
   }
 
-  return Ok([
+  if (
+    !typeIsKinded(left, TypeKind.AProduct) ||
+    !typeIsKinded(right, TypeKind.AProduct)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator ifirst is not defined for types other than products',
+      ),
+    );
+  }
+
+  return Result.ok([
     TypeEffUtils.AdditiveProductsUtils.firstProjection(left),
     TypeEffUtils.AdditiveProductsUtils.firstProjection(right),
   ]);
@@ -435,19 +642,95 @@ export const isecond = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    !typeIsKinded(left, TypeKind.AProduct) ||
-    !typeIsKinded(right, TypeKind.AProduct)
+    isKinded(left, TypeEffectKind.RecursiveVar) ||
+    isKinded(right, TypeEffectKind.RecursiveVar)
   ) {
-    return Err(
-      EvidenceTypeError({
-        reason: 'Operator icod is not defined for types other than functions',
-      }),
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive type-and-effect',
+      ),
     );
   }
 
-  return Ok([
+  if (
+    !typeIsKinded(left, TypeKind.AProduct) ||
+    !typeIsKinded(right, TypeKind.AProduct)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator isecond is not defined for types other than products',
+      ),
+    );
+  }
+
+  return Result.ok([
     TypeEffUtils.AdditiveProductsUtils.secondProjection(left),
     TypeEffUtils.AdditiveProductsUtils.secondProjection(right),
+  ]);
+};
+
+export const iproj = (
+  index: number,
+  ev: Evidence,
+): Result<Evidence, EvidenceError> => {
+  const [left, right] = ev;
+
+  if (
+    isKinded(left, TypeEffectKind.RecursiveVar) ||
+    isKinded(right, TypeEffectKind.RecursiveVar)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive type-and-effect',
+      ),
+    );
+  }
+
+  if (
+    !typeIsKinded(left, TypeKind.Product) ||
+    !typeIsKinded(right, TypeKind.Product)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator iproj is not defined for types other than products',
+      ),
+    );
+  }
+
+  return Result.ok([
+    TypeEffUtils.ProductUtils.projection(index, left),
+    TypeEffUtils.ProductUtils.projection(index, right),
+  ]);
+};
+
+export const iunfold = (ev: Evidence): Result<Evidence, EvidenceError> => {
+  const [left, right] = ev;
+
+  if (
+    isKinded(left, TypeEffectKind.RecursiveVar) ||
+    isKinded(right, TypeEffectKind.RecursiveVar)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive type-and-effect',
+      ),
+    );
+  }
+
+  if (
+    !typeIsKinded(left, TypeKind.RecType) ||
+    !typeIsKinded(right, TypeKind.RecType)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator iunfold is not defined for types other than functions',
+      ),
+    );
+  }
+
+  return Result.ok([
+    TypeEffUtils.RecursiveUtils.unfold(left),
+    TypeEffUtils.RecursiveUtils.unfold(right),
   ]);
 };
 
@@ -457,39 +740,54 @@ export const sum = (
   ev1: Evidence,
   ev2: Evidence,
 ): Result<Evidence, EvidenceError> => {
+  const [teff11, teff12] = ev1;
+  const [teff21, teff22] = ev2;
+
+  if (
+    isKinded(teff11, TypeEffectKind.RecursiveVar) ||
+    isKinded(teff21, TypeEffectKind.RecursiveVar) ||
+    isKinded(teff12, TypeEffectKind.RecursiveVar) ||
+    isKinded(teff22, TypeEffectKind.RecursiveVar)
+  ) {
+    return Result.err(
+      new EvidenceTypeError('Cannot compute sum of a recusive type-and-effect'),
+    );
+  }
+
   /**
    * Types must be the same
    */
   if (
-    ev1[0].type.kind !== ev1[1].type.kind ||
-    ev1[0].type.kind !== ev2[0].type.kind ||
-    ev1[0].type.kind !== ev2[1].type.kind
+    teff11.type.kind !== teff12.type.kind ||
+    teff11.type.kind !== teff21.type.kind ||
+    teff11.type.kind !== teff22.type.kind
   ) {
-    return Err(
-      EvidenceTypeError({
-        reason: 'All types in evidence should be of the same kind',
-      }),
+    return Result.err(
+      new EvidenceTypeError('All types in evidence should be of the same kind'),
     );
   }
 
-  return Ok([
-    TypeEff(ev1[0].type, SenvUtils.add(ev1[0].effect, ev2[0].effect)),
-    TypeEff(ev2[0].type, SenvUtils.add(ev1[1].effect, ev2[1].effect)),
+  return Result.ok([
+    TypeEff(teff11.type, SenvUtils.add(teff11.effect, teff21.effect)),
+    TypeEff(teff21.type, SenvUtils.add(teff12.effect, teff22.effect)),
   ]);
 };
 
 export const scale = (ev: Evidence, factor: number): Evidence => {
+  const [left, right] = ev;
+
   return [
-    TypeEff(ev[0].type, SenvUtils.scale(ev[0].effect, factor)),
-    TypeEff(ev[1].type, SenvUtils.scale(ev[1].effect, factor)),
+    isKinded(left, TypeEffectKind.RecursiveVar)
+      ? left
+      : TypeEff(left.type, SenvUtils.scale(left.effect, factor)),
+    isKinded(right, TypeEffectKind.RecursiveVar)
+      ? right
+      : TypeEff(right.type, SenvUtils.scale(right.effect, factor)),
   ];
 };
 
 export const scaleInf = (ev: Evidence): Evidence => {
-  return [
-    TypeEff(ev[0].type, SenvUtils.scaleInf(ev[0].effect)),
-    TypeEff(ev[1].type, SenvUtils.scaleInf(ev[1].effect)),
-  ];
+  return scale(ev, SensUtils.MAX_SENS);
 };
 
 export const subst = (ev: Evidence, name: string, senv: Senv): Evidence => {
@@ -499,17 +797,17 @@ export const subst = (ev: Evidence, name: string, senv: Senv): Evidence => {
   ];
 };
 
-export const substTup = (
-  ev: Evidence,
-  names: [string, string],
-  latents: [Senv, Senv],
-  senv: Senv,
-): Evidence => {
-  return [
-    TypeEffUtils.substTup(ev[0], names, latents, senv),
-    TypeEffUtils.substTup(ev[1], names, latents, senv),
-  ];
-};
+// export const substTup = (
+//   ev: Evidence,
+//   names: [string, string],
+//   latents: [Senv, Senv],
+//   senv: Senv,
+// ): Evidence => {
+//   return [
+//     TypeEffUtils.substTup(ev[0], names, latents, senv),
+//     TypeEffUtils.substTup(ev[1], names, latents, senv),
+//   ];
+// };
 
 export const format = ([teff1, teff2]: Evidence): string => {
   return `⟨${TypeEffUtils.format(teff1)}, ${TypeEffUtils.format(teff2)}⟩`;

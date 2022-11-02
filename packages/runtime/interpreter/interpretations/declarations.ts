@@ -1,7 +1,7 @@
 import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
 import { Value, VarStmt } from '../../elaboration/ast';
 import { Store, StoreUtils } from '../../utils';
-import { Result } from '../../utils/Result';
+import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError } from '../errors';
 

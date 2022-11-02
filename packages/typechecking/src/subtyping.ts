@@ -1,4 +1,8 @@
-import { Sens, Senv, SenvUtils, Type, TypeEff } from '@gsens-lang/core/utils';
+import { Sens, Senv, SenvUtils, Type } from '@gsens-lang/core/utils';
+import RecursivePolarityCheck, {
+  RecursivePolarityMode,
+} from '@gsens-lang/core/utils/lib/RecursivePolarityCheck';
+import { TypeEffect, TypeEffectKind } from '@gsens-lang/core/utils/TypeEff';
 
 export const isSubSens = (s1: Sens, s2: Sens): boolean => s1[0] <= s2[1];
 
@@ -48,14 +52,40 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
     return firstSubtyping && secondSubtyping;
   }
 
+  if (type1.kind === 'RecType' && type2.kind === 'RecType') {
+    if (
+      RecursivePolarityCheck.TypeEffect(
+        type1.variable,
+        RecursivePolarityMode.POSITIVE,
+        type1.body,
+        type2.body,
+      )
+    ) {
+      return isSubTypeEff(type1.body, type2.body);
+    }
+  }
+
   throw new UnsupportedSubtypingError(
     `We are sorry, gsens does not support subtyping between these types yet (${type1.kind}, ${type2.kind})`,
   );
 };
 
-export const isSubTypeEff = (te1: TypeEff, te2: TypeEff): boolean => {
-  const subtyping = isSubType(te1.type, te2.type);
-  const subsenving = isSubSenv(te1.effect, te2.effect);
+export const isSubTypeEff = (te1: TypeEffect, te2: TypeEffect): boolean => {
+  if (
+    te1.kind === TypeEffectKind.RecursiveVar &&
+    te2.kind === TypeEffectKind.RecursiveVar
+  ) {
+    return te1.name === te2.name;
+  }
+  if (
+    te1.kind === TypeEffectKind.TypeEff &&
+    te2.kind === TypeEffectKind.TypeEff
+  ) {
+    const subtyping = isSubType(te1.type, te2.type);
+    const subsenving = isSubSenv(te1.effect, te2.effect);
 
-  return subtyping && subsenving;
+    return subtyping && subsenving;
+  }
+
+  return false;
 };

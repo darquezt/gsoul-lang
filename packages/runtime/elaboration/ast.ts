@@ -7,10 +7,18 @@ import {
   TypeEffUtils,
   TypeUtils,
 } from '@gsens-lang/core/utils';
-import { Arrow, Bool, ForallT, Nil, Real } from '@gsens-lang/core/utils/Type';
+import {
+  Arrow,
+  Bool,
+  ForallT,
+  Nil,
+  Real,
+  RecType,
+} from '@gsens-lang/core/utils/Type';
 import { factoryOf, isKinded } from '@gsens-lang/core/utils/ADT';
 
 import { Evidence, EvidenceUtils, Store, StoreUtils } from '../utils';
+import { all } from 'ramda';
 
 /**
  * Expressions
@@ -33,6 +41,7 @@ export enum ExprKind {
   Forall = 'Forall',
   SClosure = 'SClosure',
   Tuple = 'Tuple',
+  Projection = 'Projection',
   Untup = 'Untup',
   Pair = 'Pair',
   ProjFst = 'ProjFst',
@@ -40,6 +49,8 @@ export enum ExprKind {
   Ascription = 'Ascription',
   Print = 'Print',
   Block = 'Block',
+  Fold = 'Fold',
+  Unfold = 'Unfold',
 }
 
 export type RealLiteral = Term<
@@ -183,19 +194,26 @@ export const Print = factoryOf<Print>(ExprKind.Print);
 
 export type Tuple = Term<{
   kind: ExprKind.Tuple;
-  first: Expression;
-  second: Expression;
+  expressions: Expression[];
 }>;
 export const Tuple = factoryOf<Tuple>(ExprKind.Tuple);
 
-export type Untup = Term<{
-  kind: ExprKind.Untup;
-  identifiers: [Token, Token];
+export type Projection = Term<{
+  kind: ExprKind.Projection;
+  index: number;
   tuple: Expression;
-  body: Expression;
-  untupToken: Token;
+  projectToken: Token;
 }>;
-export const Untup = factoryOf<Untup>(ExprKind.Untup);
+export const Projection = factoryOf<Projection>(ExprKind.Projection);
+
+// export type Untup = Term<{
+//   kind: ExprKind.Untup;
+//   identifiers: [Token, Token];
+//   tuple: Expression;
+//   body: Expression;
+//   untupToken: Token;
+// }>;
+// export const Untup = factoryOf<Untup>(ExprKind.Untup);
 
 export type Pair = Term<{
   kind: ExprKind.Pair;
@@ -221,21 +239,40 @@ export const ProjSnd = factoryOf<ProjSnd>(ExprKind.ProjSnd);
 export type Block = Term<{ kind: ExprKind.Block; statements: Statement[] }>;
 export const Block = factoryOf<Block>(ExprKind.Block);
 
+export type Fold = Term<{
+  kind: ExprKind.Fold;
+  expression: Expression;
+  recType: RecType;
+  foldToken: Token;
+}>;
+export const Fold = factoryOf<Fold>(ExprKind.Fold);
+
+export type Unfold = Term<{
+  kind: ExprKind.Unfold;
+  expression: Expression;
+  unfoldToken: Token;
+}>;
+export const Unfold = factoryOf<Unfold>(ExprKind.Unfold);
+
 export type SimpleValue =
   | RealLiteral
   | BoolLiteral
   | NilLiteral
   | Closure
   | SClosure
-  | Tuple
-  | Pair;
+  | (Tuple & { expressions: Value[] })
+  | (Pair & { first: Value; second: Value })
+  | (Fold & { expression: Value });
 
 export const isSimpleValue = (expr: Expression): expr is SimpleValue => {
   if (expr.kind === ExprKind.Tuple) {
-    return isValue(expr.first) && isValue(expr.second);
+    return all(isValue, expr.expressions);
   }
   if (expr.kind === ExprKind.Pair) {
     return isValue(expr.first) && isValue(expr.second);
+  }
+  if (expr.kind === ExprKind.Fold) {
+    return isValue(expr.expression);
   }
 
   return [
@@ -295,13 +332,16 @@ export type Expression =
   | Forall
   | SClosure
   | Tuple
-  | Untup
+  | Projection
+  // | Untup
   | Pair
   | ProjFst
   | ProjSnd
   | Print
   | Block
-  | Ascription;
+  | Ascription
+  | Fold
+  | Unfold;
 
 type ExprMapFns = {
   senvFn: (senv: Senv) => Senv;
@@ -312,7 +352,7 @@ type ExprMapFns = {
   stmtFn: (stmt: Statement) => Statement;
 };
 const map = (expr: Expression, fns: ExprMapFns): Expression => {
-  const { senvFn, teffFn, eviFn, storeFn, stmtFn } = fns;
+  const { senvFn, typeFn, teffFn, eviFn, storeFn, stmtFn } = fns;
   const inductiveCall = <E extends Record<K, Expression>, K extends keyof E>(
     key: K,
     e: E,
@@ -407,19 +447,24 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
     case ExprKind.Tuple:
       return Tuple({
         ...expr,
-        ...inductiveCall('first', expr),
-        ...inductiveCall('second', expr),
+        expressions: expr.expressions.map((e) => map(e, fns)),
         typeEff,
       });
-    case ExprKind.Untup:
-      return Untup({
+    case ExprKind.Projection:
+      return Projection({
         ...expr,
         ...inductiveCall('tuple', expr),
-        ...inductiveCall('body', expr),
         typeEff,
       });
+    // case ExprKind.Untup:
+    //   return Untup({
+    //     ...expr,
+    //     ...inductiveCall('tuple', expr),
+    //     ...inductiveCall('body', expr),
+    //     typeEff,
+    //   });
     case ExprKind.Pair:
-      return Tuple({
+      return Pair({
         ...expr,
         ...inductiveCall('first', expr),
         ...inductiveCall('second', expr),
@@ -444,6 +489,19 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
         evidence: eviFn(expr.evidence),
         typeEff,
       });
+    case ExprKind.Fold:
+      return Fold({
+        ...expr,
+        ...inductiveCall('expression', expr),
+        recType: typeFn(expr.recType) as RecType,
+        typeEff,
+      });
+    case ExprKind.Unfold:
+      return Unfold({
+        ...expr,
+        ...inductiveCall('expression', expr),
+        typeEff,
+      });
   }
 };
 
@@ -458,26 +516,8 @@ const subst = (expr: Expression, name: string, senv: Senv): Expression => {
   });
 };
 
-const substTup = (
-  expr: Expression,
-  names: [string, string],
-  latents: [Senv, Senv],
-  senv: Senv,
-): Expression => {
-  return map(expr, {
-    senvFn: (s: Senv) => SenvUtils.substTup(s, names, latents, senv),
-    typeFn: (ty: Type) => TypeUtils.substTup(ty, names, latents, senv),
-    teffFn: (teff: TypeEff) =>
-      TypeEffUtils.substTup(teff, names, latents, senv),
-    eviFn: (evi: Evidence) => EvidenceUtils.substTup(evi, names, latents, senv),
-    storeFn: (store: Store) => StoreUtils.substTup(store, names, latents, senv),
-    stmtFn: (stmt: Statement) => substTupStmt(stmt, names, latents, senv),
-  });
-};
-
 export const ExpressionUtils = {
   subst,
-  substTup,
 };
 
 /**
@@ -518,40 +558,6 @@ const substStmt = (stmt: Statement, name: string, senv: Senv): Statement => {
       return VarStmt({
         ...stmt,
         assignment: ExpressionUtils.subst(stmt.assignment, name, senv),
-        typeEff,
-      });
-  }
-};
-
-const substTupStmt = (
-  stmt: Statement,
-  names: [string, string],
-  latents: [Senv, Senv],
-  senv: Senv,
-): Statement => {
-  const typeEff = TypeEffUtils.substTup(stmt.typeEff, names, latents, senv);
-
-  switch (stmt.kind) {
-    case StmtKind.ExprStmt:
-      return ExprStmt({
-        ...stmt,
-        expression: ExpressionUtils.substTup(
-          stmt.expression,
-          names,
-          latents,
-          senv,
-        ),
-        typeEff,
-      });
-    case StmtKind.VarStmt:
-      return VarStmt({
-        ...stmt,
-        assignment: ExpressionUtils.substTup(
-          stmt.assignment,
-          names,
-          latents,
-          senv,
-        ),
         typeEff,
       });
   }

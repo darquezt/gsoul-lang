@@ -1,58 +1,78 @@
 import { TypeEff } from '@gsens-lang/core/utils';
-import { factoryOf } from '@gsens-lang/core/utils/ADT';
 import { Token } from '@gsens-lang/parsing/lib/lexing';
 
-export type ElaborationReferenceError = {
-  kind: 'ElaborationReferenceError';
-  reason: string;
+export enum ElaborationErrorKind {
+  ElaborationReferenceError = 'ElaborationReferenceError',
+  ElaborationTypeError = 'ElaborationTypeError',
+  ElaborationSubtypingError = 'ElaborationSubtypingError',
+  ElaborationDependencyError = 'ElaborationDependencyError',
+  ElaborationUnsupportedExpressionError = 'ElaborationUnsupportedExpressionError',
+}
+
+export class ElaborationReferenceError extends Error {
   variable: Token;
-};
-export const ElaborationReferenceError = factoryOf<ElaborationReferenceError>(
-  'ElaborationReferenceError',
-);
+  name = ElaborationErrorKind.ElaborationReferenceError as const;
 
-export type ElaborationTypeError = {
-  kind: 'ElaborationTypeError';
-  reason: string;
-  operator: Token;
-};
-export const ElaborationTypeError = factoryOf<ElaborationTypeError>(
-  'ElaborationTypeError',
-);
+  constructor({ reason, variable }: { reason: string; variable: Token }) {
+    super(reason);
+    this.variable = variable;
+  }
+}
 
-export type ElaborationSubtypingError = {
-  kind: 'ElaborationSubtypingError';
-  reason: string;
+export class ElaborationTypeError extends Error {
   operator: Token;
-  superType: TypeEff;
+  name = ElaborationErrorKind.ElaborationTypeError as const;
+
+  constructor({ reason, operator }: { reason: string; operator: Token }) {
+    super(reason);
+    this.operator = operator;
+  }
+}
+
+export class ElaborationSubtypingError extends Error {
+  operator: Token;
   type: TypeEff;
-};
-export const ElaborationSubtypingError = factoryOf<ElaborationSubtypingError>(
-  'ElaborationSubtypingError',
-);
+  superType: TypeEff;
+  name = ElaborationErrorKind.ElaborationSubtypingError as const;
 
-export type ElaborationDependencyError = {
-  kind: 'ElaborationDependencyError';
-  reason: string;
+  constructor({
+    reason,
+    operator,
+    type,
+    superType,
+  }: {
+    reason: string;
+    operator: Token;
+    type: TypeEff;
+    superType: TypeEff;
+  }) {
+    super(reason);
+    this.operator = operator;
+    this.type = type;
+    this.superType = superType;
+  }
+}
+
+export class ElaborationDependencyError extends Error {
   variable: Token;
-};
-export const ElaborationDependencyError = factoryOf<ElaborationDependencyError>(
-  'ElaborationDependencyError',
-);
+  name = ElaborationErrorKind.ElaborationDependencyError as const;
+
+  constructor({ reason, variable }: { reason: string; variable: Token }) {
+    super(reason);
+    this.variable = variable;
+  }
+}
 
 /**
  * @deprecated This should not be used at all but it is a workaround while the language is still in development
  */
-export type ElaborationUnsupportedExpressionError = {
-  kind: 'ElaborationUnsupportedExpressionError';
-  reason: string;
-};
-/**
- * @deprecated This should not be used at all but it is a workaround while the language is still in development
- */
-export const ElaborationUnsupportedExpressionError = factoryOf<ElaborationUnsupportedExpressionError>(
-  'ElaborationUnsupportedExpressionError',
-);
+export class ElaborationUnsupportedExpressionError extends Error {
+  name = ElaborationErrorKind.ElaborationUnsupportedExpressionError as const;
+
+  constructor({ reason }: { reason: string }) {
+    super(reason);
+  }
+}
 
 export type ElaborationError =
   | ElaborationReferenceError
