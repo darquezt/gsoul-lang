@@ -1,7 +1,7 @@
-import { Senv, TypeEff, TypeEffUtils } from '@gsens-lang/core/utils';
-import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
-import { ForallT } from '@gsens-lang/core/utils/Type';
-import { Token } from '@gsens-lang/parsing/lib/lexing';
+import { Senv, TypeEff, TypeEffUtils } from '@gsoul-lang/core/utils';
+import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
+import { ForallT } from '@gsoul-lang/core/utils/Type';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import {
   Ascribed,
   Ascription,

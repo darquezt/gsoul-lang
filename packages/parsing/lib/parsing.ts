@@ -1,5 +1,5 @@
-import { Sens, Senv, SenvUtils, TypeEff } from '@gsens-lang/core/utils';
-import { UnknownSens } from '@gsens-lang/core/utils/Sens';
+import { Sens, Senv, SenvUtils, TypeEff } from '@gsoul-lang/core/utils';
+import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
   Bool,
@@ -7,12 +7,12 @@ import {
   Nil,
   Real,
   RecType,
-} from '@gsens-lang/core/utils/Type';
+} from '@gsoul-lang/core/utils/Type';
 import {
   RecursiveVar,
   TypeEffect,
   TypeEffectKind,
-} from '@gsens-lang/core/utils/TypeEff';
+} from '@gsoul-lang/core/utils/TypeEff';
 
 import {
   Expression,
@@ -222,13 +222,17 @@ export function parse(tokens: Token[]): Result<Statement[]> {
   }
 
   function equality(): Expression {
-    const expr = comparison();
+    let expr = comparison();
 
-    // while (match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
-    //   const operator = previous();
-    //   const right = comparison();
-    //   expr = new Binary(operator, expr, right);
-    // }
+    while (match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
+      const operator = previous();
+      const right = comparison();
+      expr = Binary({
+        operator,
+        left: expr,
+        right,
+      });
+    }
 
     return expr;
   }
@@ -238,9 +242,9 @@ export function parse(tokens: Token[]): Result<Statement[]> {
 
     while (
       match(
-        // TokenType.GREATER,
-        // TokenType.GREATER_EQUAL,
-        // TokenType.LESS,
+        TokenType.GREATER,
+        TokenType.GREATER_EQUAL,
+        TokenType.LESS,
         TokenType.LESS_EQUAL,
       )
     ) {

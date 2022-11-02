@@ -1,11 +1,11 @@
-# @gsens-lang/lsp
+# @gsoul-lang/lsp
 
 A [language server](https://microsoft.github.io/language-server-protocol/) for GSens.
 
 ## Instalation
 
 ```bash
-npm i -g @gsens-lang/lsp
+npm i -g @gsoul-lang/lsp
 ```
 
 ## Module status

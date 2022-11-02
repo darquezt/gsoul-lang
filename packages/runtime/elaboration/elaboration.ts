@@ -1,4 +1,4 @@
-import * as past from '@gsens-lang/parsing/lib/ast';
+import * as past from '@gsoul-lang/parsing/lib/ast';
 import {
   Sens,
   Senv,
@@ -8,7 +8,7 @@ import {
   TypeEnvUtils,
   TypeEff,
   TypeEffUtils,
-} from '@gsens-lang/core/utils';
+} from '@gsoul-lang/core/utils';
 import {
   AProduct,
   Arrow,
@@ -18,7 +18,7 @@ import {
   RecType,
   typeIsKinded,
   TypeKind,
-} from '@gsens-lang/core/utils/Type';
+} from '@gsoul-lang/core/utils/Type';
 
 import {
   Ascription,
@@ -57,8 +57,8 @@ import {
   ElaborationUnsupportedExpressionError,
 } from './errors';
 import { prop } from 'ramda';
-import { Token } from '@gsens-lang/parsing/lib/lexing';
-import { isKinded } from '@gsens-lang/core/utils/ADT';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
+import { isKinded } from '@gsoul-lang/core/utils/ADT';
 
 export type Stateful<T> = {
   term: T;

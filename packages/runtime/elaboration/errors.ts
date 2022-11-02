@@ -1,5 +1,5 @@
-import { TypeEff } from '@gsens-lang/core/utils';
-import { Token } from '@gsens-lang/parsing/lib/lexing';
+import { TypeEff } from '@gsoul-lang/core/utils';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
 
 export enum ElaborationErrorKind {
   ElaborationReferenceError = 'ElaborationReferenceError',

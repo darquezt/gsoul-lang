@@ -1,5 +1,5 @@
-import { TypeEffUtils } from '@gsens-lang/core/utils';
-import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
+import { TypeEffUtils } from '@gsoul-lang/core/utils';
+import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
 import { Print, Value } from '../../elaboration/ast';
 import { EvidenceUtils, Store } from '../../utils';
 import { formatValue } from '../../utils/format';

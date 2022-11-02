@@ -1,11 +1,11 @@
-# @gsens-lang/core
+# @gsoul-lang/core
 
 This package contains the core utility modules.
 
 ## Instalation
 
 ```bash
-npm i -g @gsens-lang/core
+npm i -g @gsoul-lang/core
 ```
 
 _Note: You probably do not need to install this package alone. This package should be automatically installed by installing either the CLI or the LSP module._

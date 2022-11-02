@@ -1,5 +1,5 @@
-import { TypeEff } from '@gsens-lang/core/utils';
-import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
+import { TypeEff } from '@gsoul-lang/core/utils';
+import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
 import { Ascription, SimpleValue, Value } from '../../elaboration/ast';
 import { Evidence, EvidenceUtils, Store } from '../../utils';
 import { Result } from '@badrap/result';

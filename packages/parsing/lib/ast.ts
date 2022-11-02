@@ -1,8 +1,8 @@
 import Token from './lexing/Token';
-import { TypeEff } from '@gsens-lang/core/utils/TypeEff';
-import { factoryOf } from '@gsens-lang/core/utils/ADT';
-import { Senv } from '@gsens-lang/core/utils';
-import { RecType } from '@gsens-lang/core/utils/Type';
+import { TypeEff } from '@gsoul-lang/core/utils/TypeEff';
+import { factoryOf } from '@gsoul-lang/core/utils/ADT';
+import { Senv } from '@gsoul-lang/core/utils';
+import { RecType } from '@gsoul-lang/core/utils/Type';
 
 // ===================
 // EXPRESSIONS

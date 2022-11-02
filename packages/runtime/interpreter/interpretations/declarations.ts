@@ -1,4 +1,4 @@
-import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
+import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
 import { Value, VarStmt } from '../../elaboration/ast';
 import { Store, StoreUtils } from '../../utils';
 import { Result } from '@badrap/result';

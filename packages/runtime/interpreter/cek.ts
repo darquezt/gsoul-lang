@@ -1,7 +1,7 @@
 import {
   singletonFactoryOf,
   SingletonKindedFactory,
-} from '@gsens-lang/core/utils/ADT';
+} from '@gsoul-lang/core/utils/ADT';
 import {
   Expression,
   Statement,

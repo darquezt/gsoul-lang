@@ -1,7 +1,7 @@
-import { Token, TokenType } from '@gsens-lang/parsing/lib/lexing';
-import { parse } from '@gsens-lang/parsing';
-import { Senv, TypeEff } from '@gsens-lang/core/utils';
-import { Bool, Real } from '@gsens-lang/core/utils/Type';
+import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
+import { parse } from '@gsoul-lang/parsing';
+import { Senv, TypeEff } from '@gsoul-lang/core/utils';
+import { Bool, Real } from '@gsoul-lang/core/utils/Type';
 import { TypeCheckingResult, typeCheck, TypeCheckingSuccess } from './checker';
 import { TypingSeeker } from '..';
 

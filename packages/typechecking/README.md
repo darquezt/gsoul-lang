@@ -1,11 +1,11 @@
-# @gsens-lang/typechecking
+# @gsoul-lang/typechecking
 
 This package contains the typechecker tool for GSens.
 
 ## Instalation
 
 ```bash
-npm i -g @gsens-lang/typechecking
+npm i -g @gsoul-lang/typechecking
 ```
 
 _Note: You probably do not need to install this package alone. This package should be automatically installed by installing either the CLI or the LSP module._

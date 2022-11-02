@@ -1,7 +1,7 @@
-import { SenvUtils, TypeEff } from '@gsens-lang/core/utils';
-import { factoryOf, KindedFactory } from '@gsens-lang/core/utils/ADT';
-import { Arrow } from '@gsens-lang/core/utils/Type';
-import { Token } from '@gsens-lang/parsing/lib/lexing';
+import { SenvUtils, TypeEff } from '@gsoul-lang/core/utils';
+import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
+import { Arrow } from '@gsoul-lang/core/utils/Type';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import {
   Ascribed,
   AscribedValue,

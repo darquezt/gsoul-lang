@@ -1,8 +1,8 @@
 import { CommandModule } from 'yargs';
 import { readFileSync } from 'fs';
 
-import { run as runCommand, formatValue } from '@gsens-lang/runtime';
-import { parse } from '@gsens-lang/parsing';
+import { run as runCommand, formatValue } from '@gsoul-lang/runtime';
+import { parse } from '@gsoul-lang/parsing';
 import { runtimeError, syntaxError } from '../lib/errors';
 
 const runHandler = (file: string) => {

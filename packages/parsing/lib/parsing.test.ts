@@ -1,6 +1,6 @@
-import { Sens, Senv, TypeEff } from '@gsens-lang/core/utils';
-import { UnknownSens } from '@gsens-lang/core/utils/Sens';
-import { Nil, Real, Arrow, Bool } from '@gsens-lang/core/utils/Type';
+import { Sens, Senv, TypeEff } from '@gsoul-lang/core/utils';
+import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
+import { Nil, Real, Arrow, Bool } from '@gsoul-lang/core/utils/Type';
 import {
   Ascription,
   Binary,

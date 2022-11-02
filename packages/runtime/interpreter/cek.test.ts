@@ -1,7 +1,7 @@
-import { Token, TokenType } from '@gsens-lang/parsing/lib/lexing';
-import { Sens, Senv, TypeEff } from '@gsens-lang/core/utils';
-import { MaxSens } from '@gsens-lang/core/utils/Sens';
-import { Arrow, Real } from '@gsens-lang/core/utils/Type';
+import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
+import { Sens, Senv, TypeEff } from '@gsoul-lang/core/utils';
+import { MaxSens } from '@gsoul-lang/core/utils/Sens';
+import { Arrow, Real } from '@gsoul-lang/core/utils/Type';
 import {
   Ascription,
   Binary,
@@ -17,7 +17,7 @@ import {
 import { initialEvidence } from '../utils/Evidence';
 import { evaluate } from './cek';
 import { Result } from '@badrap/result';
-import { TypeEffectKind } from '@gsens-lang/core/utils/TypeEff';
+import { TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
 
 const RealEmptySenv = TypeEff(Real(), Senv());
 

@@ -1,6 +1,6 @@
 {
-  "name": "@gsens-lang/cli",
-  "version": "0.0.4-alpha.0",
+  "name": "@gsoul-lang/cli",
+  "version": "0.0.1-alpha.0",
   "description": "CLI module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "index.ts",
@@ -17,8 +17,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@gsens-lang/parsing": "^0.0.4-alpha.0",
-    "@gsens-lang/runtime": "^0.0.4-alpha.0",
+    "@gsoul-lang/parsing": "workspace:^",
+    "@gsoul-lang/runtime": "workspace:^",
     "chalk": "^4.1.2",
     "yargs": "^17.2.1"
   },
@@ -30,5 +30,8 @@
   "bugs": {
     "url": "https://github.com/darquezt/gsens-lang/issues"
   },
-  "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
+  "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8",
+  "devDependencies": {
+    "@types/yargs": "^17.0.13"
+  }
 }

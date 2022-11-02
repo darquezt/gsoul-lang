@@ -1,4 +1,4 @@
-import { Senv } from '@gsens-lang/core/utils';
+import { Senv } from '@gsoul-lang/core/utils';
 import { ExpressionUtils, Value } from '../elaboration/ast';
 
 export type Identifier = string;

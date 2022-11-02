@@ -1,11 +1,11 @@
-# @gsens-lang/cli
+# @gsoul-lang/cli
 
 This package allows you to execute GSens files from the command line
 
 ## Instalation
 
 ```bash
-npm i -g @gsens-lang/cli
+npm i -g @gsoul-lang/cli
 ```
 
 ## Documentation

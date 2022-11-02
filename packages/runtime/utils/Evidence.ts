@@ -7,7 +7,7 @@ import {
   TypeEff,
   TypeEffUtils,
   TypeUtils,
-} from '@gsens-lang/core/utils';
+} from '@gsoul-lang/core/utils';
 import {
   Arrow,
   Bool,
@@ -17,15 +17,15 @@ import {
   RecType,
   typeIsKinded,
   TypeKind,
-} from '@gsens-lang/core/utils/Type';
-import { isKinded } from '@gsens-lang/core/utils/ADT';
-import { TypeEffect, TypeEffectKind } from '@gsens-lang/core/utils/TypeEff';
+} from '@gsoul-lang/core/utils/Type';
+import { isKinded } from '@gsoul-lang/core/utils/ADT';
+import { TypeEffect, TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
 import { Result } from '@badrap/result';
 import { zip } from 'ramda';
 import RecursivePolarityCheck, {
   RecursivePolarityMode,
-} from '@gsens-lang/core/utils/lib/RecursivePolarityCheck';
-import Meet from '@gsens-lang/core/utils/lib/Meet';
+} from '@gsoul-lang/core/utils/lib/RecursivePolarityCheck';
+import Meet from '@gsoul-lang/core/utils/lib/Meet';
 
 type Evi<T> = Readonly<[T, T]>;
 

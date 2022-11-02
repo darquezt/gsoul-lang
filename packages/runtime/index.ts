@@ -1,4 +1,4 @@
-import { Program } from '@gsens-lang/parsing/lib/ast';
+import { Program } from '@gsoul-lang/parsing/lib/ast';
 import { Value } from './elaboration/ast';
 import { elaborate } from './elaboration/elaboration';
 import { ElaborationError } from './elaboration/errors';
@@ -20,4 +20,6 @@ export const run = (
   return value;
 };
 
+export { InterpreterError, InterpreterErrorKind } from './interpreter/errors';
+export { ElaborationError, ElaborationErrorKind } from './elaboration/errors';
 export { formatValue } from './utils/format';

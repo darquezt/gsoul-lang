@@ -1,4 +1,4 @@
-import { Token } from '@gsens-lang/parsing/lib/lexing';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import {
   Senv,
   SenvUtils,
@@ -6,7 +6,7 @@ import {
   TypeEff,
   TypeEffUtils,
   TypeUtils,
-} from '@gsens-lang/core/utils';
+} from '@gsoul-lang/core/utils';
 import {
   Arrow,
   Bool,
@@ -14,8 +14,8 @@ import {
   Nil,
   Real,
   RecType,
-} from '@gsens-lang/core/utils/Type';
-import { factoryOf, isKinded } from '@gsens-lang/core/utils/ADT';
+} from '@gsoul-lang/core/utils/Type';
+import { factoryOf, isKinded } from '@gsoul-lang/core/utils/ADT';
 
 import { Evidence, EvidenceUtils, Store, StoreUtils } from '../utils';
 import { all } from 'ramda';

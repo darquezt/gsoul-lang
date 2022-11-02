@@ -1,5 +1,5 @@
 {
-  "name": "@gsens-lang/parsing",
+  "name": "@gsoul-lang/parsing",
   "version": "0.0.4-alpha.0",
   "description": "Parsing and lexing module",
   "main": "build/index.js",
@@ -24,7 +24,7 @@
     "watch": "tsc -w -p tsconfig.release.json"
   },
   "dependencies": {
-    "@gsens-lang/core": "^0.0.4-alpha.0"
+    "@gsoul-lang/core": "workspace:^"
   },
   "homepage": "https://github.com/darquezt/gsens-lang#readme",
   "repository": {

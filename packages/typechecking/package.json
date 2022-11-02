@@ -1,6 +1,6 @@
 {
-  "name": "@gsens-lang/typechecking",
-  "version": "0.0.4-alpha.1",
+  "name": "@gsoul-lang/typechecking",
+  "version": "0.0.1-alpha.0",
   "description": "Typechecking module",
   "main": "index.ts",
   "license": "MIT",
@@ -13,8 +13,8 @@
   },
   "exports": "./build/index.js",
   "dependencies": {
-    "@gsens-lang/core": "^0.0.4-alpha.0",
-    "@gsens-lang/parsing": "^0.0.4-alpha.0"
+    "@gsoul-lang/core": "workspace:^",
+    "@gsoul-lang/parsing": "workspace:^"
   },
   "homepage": "https://github.com/darquezt/gsens-lang#readme",
   "repository": {

@@ -13,9 +13,9 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { parse } from '@gsens-lang/parsing';
-import { typeCheck, TypingSeeker } from '@gsens-lang/typechecking';
-import { TypeEffUtils } from '@gsens-lang/core/utils';
+import { parse } from '@gsoul-lang/parsing';
+import { typeCheck, TypingSeeker } from '@gsoul-lang/typechecking';
+import { TypeEffUtils } from '@gsoul-lang/core/utils';
 
 const connection = createConnection(ProposedFeatures.all);
 

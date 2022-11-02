@@ -1,8 +1,8 @@
-import { Sens, Senv, SenvUtils, Type } from '@gsens-lang/core/utils';
+import { Sens, Senv, SenvUtils, Type } from '@gsoul-lang/core/utils';
 import RecursivePolarityCheck, {
   RecursivePolarityMode,
-} from '@gsens-lang/core/utils/lib/RecursivePolarityCheck';
-import { TypeEffect, TypeEffectKind } from '@gsens-lang/core/utils/TypeEff';
+} from '@gsoul-lang/core/utils/lib/RecursivePolarityCheck';
+import { TypeEffect, TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
 
 export const isSubSens = (s1: Sens, s2: Sens): boolean => s1[0] <= s2[1];
 

@@ -1,4 +1,4 @@
-import { Token } from '@gsens-lang/parsing/lib/lexing';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
 
 export enum InterpreterErrorKind {
   InterpreterReferenceError = 'InterpreterReferenceError',

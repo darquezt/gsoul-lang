@@ -1,11 +1,9 @@
 import {
   ElaborationError,
   ElaborationErrorKind,
-} from '@gsens-lang/runtime/elaboration/errors';
-import {
   InterpreterError,
   InterpreterErrorKind,
-} from '@gsens-lang/runtime/interpreter/errors';
+} from '@gsoul-lang/runtime';
 import * as chalk from 'chalk';
 
 const formatFileName = (name: string, line?: number, col?: number) =>

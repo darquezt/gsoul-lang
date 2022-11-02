@@ -23,7 +23,7 @@ import {
   Unfold,
   Variable,
   VarStmt,
-} from '@gsens-lang/parsing/lib/ast';
+} from '@gsoul-lang/parsing/lib/ast';
 import {
   Sens,
   Senv,
@@ -32,7 +32,7 @@ import {
   TypeEnvUtils,
   TypeEff,
   TypeEffUtils,
-} from '@gsens-lang/core/utils';
+} from '@gsoul-lang/core/utils';
 import {
   AProduct,
   Arrow,
@@ -43,13 +43,13 @@ import {
   Real,
   typeIsKinded,
   TypeKind,
-} from '@gsens-lang/core/utils/Type';
-import { isKinded } from '@gsens-lang/core/utils/ADT';
+} from '@gsoul-lang/core/utils/Type';
+import { isKinded } from '@gsoul-lang/core/utils/ADT';
 
 import { isSubTypeEff } from './subtyping';
-import { Token } from '@gsens-lang/parsing/lib/lexing';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import { TypeAssoc, TypeAssocs, TypingSeeker } from './utils/typingSeeker';
-import { TypeEffect } from '@gsens-lang/core/utils/TypeEff';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 
 export type PureSuccess = {
   success: true;

@@ -5,7 +5,7 @@ GSens is a functional, expression-based programming languages with gradual sensi
 ## Install
 
 ```bash
-npm i -g @gsens-lang/cli
+npm i -g @gsoul-lang/cli
 ```
 
 ## Usage
