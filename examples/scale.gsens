@@ -1,0 +1,33 @@
+forall x. {
+  let Y = fun (f : (Number -> (Number![1x] -> Number![?x])) -> (Number -> (Number![1x] -> Number![?x]))) {
+    let A = fun (x : rec alpha . (alpha -> (Number -> (Number![1x] -> Number![?x])))) {
+      fun (n1: Number) {
+        fun (a : Number![1x]) {
+          f(unfold(x)(x))(n1)(a);
+        };
+      };
+    };
+
+    let B = fun (y : rec alpha . (alpha -> (Number -> (Number![1x] -> Number![?x])))) {
+      fun (n2: Number) {
+        fun (b : Number![1x]) {
+          f(unfold(y)(y))(n2)(b);
+        };
+      };
+    };
+
+    A(fold<rec alpha . (alpha -> (Number -> (Number![1x] -> Number![?x])))>(B));
+  };
+
+  let scale = fun (scaleFn: Number -> (Number![1x] -> Number![?x])) {
+    fun (n: Number) {
+      fun (x: Number![1x]) {
+        if (n == 0) then 0 else {
+          (scaleFn(n - 1)(x) + x) :: Number![?x];
+        };
+      };
+    };
+  };
+
+  printEv Y(scale)(21)(3);
+} @[];

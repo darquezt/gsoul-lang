@@ -33,6 +33,7 @@ import {
   Fold,
   Forall,
   Fun,
+  If,
   NilLiteral,
   NonLinearBinary,
   Pair,
@@ -61,6 +62,8 @@ import {
 import { prop } from 'ramda';
 import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import { isKinded } from '@gsoul-lang/core/utils/ADT';
+import SJoin from '@gsoul-lang/core/utils/lib/SJoin';
+import { liftSenvOp } from '@gsoul-lang/core/utils/lib/LiftSenvOp';
 
 export type Stateful<T> = {
   term: T;
@@ -723,6 +726,44 @@ export const unfold = (
   );
 };
 
+const ifExpr = (expr: past.If, tenv: TypeEnv): Result<If, ElaborationError> => {
+  const conditionElaboration = expression(expr.condition, tenv);
+  const thenElaboration = expression(expr.then, tenv);
+  const elseElaboration = expression(expr.else, tenv);
+
+  return Result.all([
+    conditionElaboration,
+    thenElaboration,
+    elseElaboration,
+  ]).chain(([condition, then, els]) => {
+    const bodyTypeEff = SJoin.TypeEffect(then.typeEff, els.typeEff);
+
+    if (!bodyTypeEff.isOk) {
+      return Result.err(
+        new ElaborationTypeError({
+          reason: 'Branches of if expression have incompatible types',
+          operator: expr.ifToken,
+        }),
+      );
+    }
+
+    const resultTypeEff = liftSenvOp(SJoin.Senv)(
+      bodyTypeEff.value as TypeEff,
+      condition.typeEff.effect,
+    );
+
+    return Result.ok(
+      If({
+        ifToken: expr.ifToken,
+        condition,
+        then,
+        else: els,
+        typeEff: resultTypeEff,
+      }),
+    );
+  });
+};
+
 export const expression = (
   expr: past.Expression,
   tenv: TypeEnv = {},
@@ -778,6 +819,8 @@ export const expression = (
       return fold(expr, tenv);
     case past.ExprKind.Unfold:
       return unfold(expr, tenv);
+    case past.ExprKind.If:
+      return ifExpr(expr, tenv);
   }
 };
 

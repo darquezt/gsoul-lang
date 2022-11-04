@@ -2,4 +2,4 @@ let f = forall x. fun (x: Number![1x]) {
   x + x :: Number![?x] :: Number![1x];
 };
 
-f [1z] (1);
+f @[] (1);

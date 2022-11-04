@@ -26,6 +26,9 @@ const keywords: Record<string, TokenType> = {
   fold: TokenType.FOLD,
   unfold: TokenType.UNFOLD,
   rec: TokenType.RECTYPE,
+  if: TokenType.IF,
+  then: TokenType.THEN,
+  else: TokenType.ELSE,
 };
 
 /**

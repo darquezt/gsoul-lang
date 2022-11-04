@@ -9,6 +9,7 @@ import {
   Fold,
   Forall,
   Fun,
+  If,
   Literal,
   NonLinearBinary,
   Pair,
@@ -50,6 +51,8 @@ import { isSubTypeEff } from './subtyping';
 import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import { TypeAssoc, TypeAssocs, TypingSeeker } from './utils/typingSeeker';
 import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
+import SJoin from '@gsoul-lang/core/utils/lib/SJoin';
+import { liftSenvOp } from '@gsoul-lang/core/utils/lib/LiftSenvOp';
 
 export type PureSuccess = {
   success: true;
@@ -582,6 +585,49 @@ export const unfold = (expr: Unfold, tenv: TypeEnv): PureResult => {
   );
 };
 
+const ifExpr = (expr: If, tenv: TypeEnv): PureResult => {
+  const conditionTC = expression(expr.condition, tenv);
+
+  if (!conditionTC.success) {
+    return conditionTC;
+  }
+
+  if (isKinded(conditionTC.typeEff.type, TypeKind.Bool)) {
+    return Failure(
+      expr.ifToken,
+      'Condition of if expression must be of type Bool',
+    );
+  }
+
+  const thenTC = expression(expr.then, tenv);
+
+  if (!thenTC.success) {
+    return thenTC;
+  }
+
+  const elseTC = expression(expr.else, tenv);
+
+  if (!elseTC.success) {
+    return elseTC;
+  }
+
+  const bodyType = SJoin.TypeEffect(thenTC.typeEff, elseTC.typeEff);
+
+  if (!bodyType.isOk) {
+    return Failure(expr.ifToken, bodyType.error.message);
+  }
+
+  const resultType = liftSenvOp(SJoin.Senv)(
+    bodyType.value as TypeEff,
+    conditionTC.typeEff.effect,
+  );
+
+  return PureSuccess(
+    resultType,
+    conditionTC.typings.concat(thenTC.typings).concat(elseTC.typings),
+  );
+};
+
 export const expression = (
   expr: Expression,
   tenv: TypeEnv = {},
@@ -634,6 +680,8 @@ export const expression = (
       return fold(expr, tenv);
     case ExprKind.Unfold:
       return unfold(expr, tenv);
+    case ExprKind.If:
+      return ifExpr(expr, tenv);
   }
 };
 

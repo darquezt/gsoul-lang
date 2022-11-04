@@ -1,19 +1,19 @@
 forall x. {
-  let Y = fun (f : (Number![1x] -> Number![?x]) -> (Number![1x] -> Number![?x])) {
-    let A = fun (x : rec alpha . (alpha -> (Number![1x] -> Number![?x]))) {
+  let Y = fun (f : (Number![1x] -> Number![2x]) -> (Number![1x] -> Number![2x])) {
+    let A = fun (x : rec alpha . (alpha -> (Number![1x] -> Number![2x]))) {
       fun (a : Number![1x]) {
         f((unfold(x))(x))(a);
       };
     };
 
-    let B = fun (y : rec alpha . (alpha -> (Number![1x] -> Number![?x]))) {
+    let B = fun (y : rec alpha . (alpha -> (Number![1x] -> Number![2x]))) {
       fun (b : Number![1x]) {
         f(unfold(y)(y))(b);
       };
     };
 
-    A(fold<rec alpha . (alpha -> (Number![1x] -> Number![?x]))>(B));
+    A(fold<rec alpha . (alpha -> (Number![1x] -> Number![2x]))>(B));
   };
 
   printEv Y;
-};
+} @[];

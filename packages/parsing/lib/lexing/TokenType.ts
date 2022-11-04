@@ -48,6 +48,7 @@ enum TokenType {
 
   AND = 'AND',
   CLASS = 'CLASS',
+  THEN = 'THEN',
   ELSE = 'ELSE',
   FALSE = 'FALSE',
   FUN = 'FUN',

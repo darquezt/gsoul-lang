@@ -31,6 +31,7 @@ export enum ExprKind {
   Block = 'Block',
   Fold = 'Fold',
   Unfold = 'Unfold',
+  If = 'If',
 }
 
 export type Literal = {
@@ -171,6 +172,15 @@ export type Unfold = {
 };
 export const Unfold = factoryOf<Unfold>(ExprKind.Unfold);
 
+export type If = {
+  kind: ExprKind.If;
+  condition: Expression;
+  then: Expression;
+  else: Expression;
+  ifToken: Token;
+};
+export const If = factoryOf<If>(ExprKind.If);
+
 export type Block = { kind: ExprKind.Block; statements: Statement[] };
 export const Block = factoryOf<Block>(ExprKind.Block);
 
@@ -194,7 +204,8 @@ export type Expression =
   | Print
   | Ascription
   | Fold
-  | Unfold;
+  | Unfold
+  | If;
 
 // ===================
 // STATEMENTS

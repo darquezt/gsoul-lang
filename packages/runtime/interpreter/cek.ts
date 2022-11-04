@@ -105,6 +105,12 @@ import {
   TupleNextComponentsKont,
   TupleProjKont,
 } from './interpretations/tuples';
+import {
+  IfBranchesKont,
+  IfKontKind,
+  reduceIfBranch,
+  reduceIfCondition,
+} from './interpretations/ifs';
 
 enum KontKind {
   EmptyKont = 'EmptyKont',
@@ -138,7 +144,8 @@ export type Kont =
   | TupleNextComponentsKont
   | TupleProjKont
   | UnfoldKont
-  | FoldKont;
+  | FoldKont
+  | IfBranchesKont;
 
 export type State<T> = T & {
   store: Store;
@@ -266,6 +273,10 @@ const step = ({
       case RecursiveKontKind.UnfoldKont: {
         return reduceUnfold(term, store, kont);
       }
+
+      case IfKontKind.IfBranchesKont: {
+        return reduceIfBranch(term, store, kont);
+      }
     }
   }
 
@@ -328,6 +339,10 @@ const step = ({
 
     case ExprKind.Unfold: {
       return reduceUnfoldedExpression(term, store, kont);
+    }
+
+    case ExprKind.If: {
+      return reduceIfCondition(term, store, kont);
     }
 
     case StmtKind.VarStmt: {

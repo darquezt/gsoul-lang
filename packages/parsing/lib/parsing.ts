@@ -38,6 +38,7 @@ import {
   Unfold,
   Tuple,
   Projection,
+  If,
 } from './ast';
 import Token from './lexing/Token';
 import TokenType from './lexing/TokenType';
@@ -321,7 +322,11 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     //     break;
     //   }
     // }
-    while (check(TokenType.LEFT_PAREN) || check(TokenType.LEFT_BRACKET)) {
+    while (
+      check(TokenType.LEFT_PAREN) ||
+      check(TokenType.LEFT_BRACKET) ||
+      check(TokenType.AT)
+    ) {
       if (match(TokenType.LEFT_PAREN)) {
         const arg = expression();
 
@@ -376,11 +381,24 @@ export function parse(tokens: Token[]): Result<Statement[]> {
           index: index.literal as number,
           projectToken,
         });
-      }
+      } else if (match(TokenType.AT)) {
+        const bracket = consume(
+          TokenType.LEFT_BRACKET,
+          errorMessage({
+            expected: '[',
+            after: 'a sensitive application',
+          }),
+        );
 
-      if (check(TokenType.LEFT_BRACKET)) {
-        const bracket = peek();
         const arg = senv();
+
+        consume(
+          TokenType.RIGHT_BRACKET,
+          errorMessage({
+            expected: ']',
+            end: 'a sensitive environment',
+          }),
+        );
 
         callee = SCall({
           callee,
@@ -629,6 +647,51 @@ export function parse(tokens: Token[]): Result<Statement[]> {
       return Unfold({
         unfoldToken,
         expression: expr,
+      });
+    } else if (match(TokenType.IF)) {
+      const ifToken = previous();
+
+      consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: `${ifToken.lexeme}`,
+        }),
+      );
+      const condition = expression();
+      consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: `${ifToken.lexeme} condition`,
+        }),
+      );
+
+      consume(
+        TokenType.THEN,
+        errorMessage({
+          expected: 'then',
+          after: `${ifToken.lexeme} condition`,
+        }),
+      );
+
+      const then = expression();
+
+      consume(
+        TokenType.ELSE,
+        errorMessage({
+          expected: 'else',
+          after: `${ifToken.lexeme} then expression`,
+        }),
+      );
+
+      const els = expression();
+
+      return If({
+        condition,
+        then,
+        else: els,
+        ifToken,
       });
     } else if (match(TokenType.NUMBERLIT)) {
       return Literal({

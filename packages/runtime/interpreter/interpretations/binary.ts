@@ -83,14 +83,14 @@ export const reduceLeftOperand = (
 
 export const reduceRightOperand = (
   term: Value,
-  store: Store,
+  _store: Store,
   kont: RightOpKont,
 ): Result<StepState, InterpreterError> => {
   return OkState(
     { term: kont.state.expression },
-    store,
+    kont.state.store,
     LeftOpKont({
-      state: State({ value: term }, store, kont.state.kont),
+      state: State({ value: term }, kont.state.store, kont.state.kont),
       op: kont.op,
     }),
   );
@@ -124,7 +124,7 @@ export const reduceBinaryOperation = (
     }
 
     const innerSum =
-      kont.op.lexeme === TokenType.PLUS
+      kont.op.type === TokenType.PLUS
         ? left.expression.value + inner.value
         : left.expression.value - inner.value;
 
@@ -177,14 +177,14 @@ export const reduceNLLeftOperand = (
 
 export const reduceNLRightOperand = (
   term: Value,
-  store: Store,
+  _store: Store,
   kont: NLRightOpKont,
 ): Result<StepState, InterpreterError> => {
   return OkState(
     { term: kont.state.expression },
-    store,
+    kont.state.store,
     NLLeftOpKont({
-      state: State({ value: term }, store, kont.state.kont),
+      state: State({ value: term }, kont.state.store, kont.state.kont),
       op: kont.op,
     }),
   );
@@ -244,7 +244,7 @@ export const reduceNLBinaryOperation = (
       ),
     });
 
-    return OkState({ term: sum }, store, kont.state.kont);
+    return OkState({ term: sum }, kont.state.store, kont.state.kont);
   } else if (
     [
       TokenType.GREATER,

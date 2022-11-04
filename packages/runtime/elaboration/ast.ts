@@ -51,6 +51,7 @@ export enum ExprKind {
   Block = 'Block',
   Fold = 'Fold',
   Unfold = 'Unfold',
+  If = 'If',
 }
 
 export type RealLiteral = Term<
@@ -254,6 +255,15 @@ export type Unfold = Term<{
 }>;
 export const Unfold = factoryOf<Unfold>(ExprKind.Unfold);
 
+export type If = Term<{
+  kind: ExprKind.If;
+  condition: Expression;
+  then: Expression;
+  else: Expression;
+  ifToken: Token;
+}>;
+export const If = factoryOf<If>(ExprKind.If);
+
 export type SimpleValue =
   | RealLiteral
   | BoolLiteral
@@ -341,7 +351,8 @@ export type Expression =
   | Block
   | Ascription
   | Fold
-  | Unfold;
+  | Unfold
+  | If;
 
 type ExprMapFns = {
   senvFn: (senv: Senv) => Senv;
@@ -500,6 +511,14 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
       return Unfold({
         ...expr,
         ...inductiveCall('expression', expr),
+        typeEff,
+      });
+    case ExprKind.If:
+      return If({
+        ...expr,
+        ...inductiveCall('condition', expr),
+        ...inductiveCall('then', expr),
+        ...inductiveCall('else', expr),
         typeEff,
       });
   }
