@@ -142,7 +142,9 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
       ([teff1, teff2]) => interior(teff1, teff2),
     );
 
-    Result.all(componentInteriors).map((interiors) => {
+    return (
+      Result.all(componentInteriors) as Result<Evi<TypeEff>[], EvidenceError>
+    ).map((interiors) => {
       const leftInteriors = interiors.map((evi) => evi[0]);
       const rightInteriors = interiors.map((evi) => evi[1]);
 
@@ -200,7 +202,9 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
     }
   }
 
-  return Result.err(new EvidenceInteriorError('Unsopported type'));
+  return Result.err(
+    new EvidenceInteriorError(`Unsopported types: ${t1.kind}, ${t2.kind}`),
+  );
 };
 
 export const interior = (
