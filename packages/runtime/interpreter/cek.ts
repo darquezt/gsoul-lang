@@ -329,7 +329,7 @@ const step = ({
       return OkState({ term: term.expression }, store, kont);
     }
 
-    case ExprKind.Print: {
+    case StmtKind.PrintStmt: {
       return reducePrintInnerExpression(term, store, kont);
     }
 

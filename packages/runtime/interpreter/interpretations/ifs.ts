@@ -80,7 +80,7 @@ export const reduceIfBranch = (
     // This also does not make sense
     return Result.err(
       new InterpreterEvidenceError({
-        reason: 'Condition must be a boolean',
+        reason: evidence.error.message,
       }),
     );
   }

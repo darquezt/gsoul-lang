@@ -10,7 +10,6 @@ import {
   ExprStmt,
   Fun,
   NonLinearBinary,
-  Print,
   RealLiteral,
   Variable,
 } from '../elaboration/ast';
@@ -29,12 +28,8 @@ describe('CEK', () => {
     const body = Block({
       statements: [
         ExprStmt({
-          expression: Print({
-            expression: Variable({
-              name: variableToken('x'),
-              typeEff: RealEmptySenv,
-            }),
-            showEvidence: false,
+          expression: Variable({
+            name: variableToken('x'),
             typeEff: RealEmptySenv,
           }),
           typeEff: RealEmptySenv,

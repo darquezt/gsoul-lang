@@ -1,50 +1,43 @@
-import { Sens, Senv, SenvUtils, TypeEff } from '@gsoul-lang/core/utils';
+import { Sens, Senv, SenvUtils, Type, TypeEff } from '@gsoul-lang/core/utils';
 import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
-  Bool,
-  ForallT,
-  Nil,
+  Product,
   Real,
   RecType,
+  TypeKind,
 } from '@gsoul-lang/core/utils/Type';
 import {
   RecursiveVar,
   TypeEffect,
   TypeEffectKind,
 } from '@gsoul-lang/core/utils/TypeEff';
-
+import { head, last, reverse } from 'ramda';
 import {
-  Expression,
-  Statement,
-  Literal,
-  Fun,
-  Variable,
-  Grouping,
-  VarStmt,
-  Call,
-  ExprStmt,
-  Print,
   Ascription,
   Binary,
   Block,
-  NonLinearBinary,
-  Forall,
-  SCall,
-  Pair,
-  ProjFst,
-  ProjSnd,
+  Call,
+  Expression,
+  ExprStmt,
   Fold,
-  Unfold,
-  Tuple,
-  Projection,
+  Forall,
+  Fun,
+  Grouping,
   If,
+  Literal,
+  NonLinearBinary,
+  PrintStmt,
+  Projection,
+  SCall,
+  Statement,
+  Tuple,
+  Unfold,
+  Variable,
+  VarStmt,
 } from './ast';
-import Token from './lexing/Token';
-import TokenType from './lexing/TokenType';
+import { Token, TokenType } from './lexing';
 import { errorMessage } from './utils/errors';
-
-// const MAX_ARGS = 255;
 
 export type Failure = { token: Token; reason?: string };
 export const Failure = (token: Token, reason?: string): Failure => ({
@@ -61,427 +54,490 @@ export const Result = <T>(result: T, failures: Failure[]): Result<T> => ({
   failures,
 });
 
-enum EffectSource {
-  INFERRED = 'INFERRED',
-  EXPLICIT = 'EXPLICIT',
+export enum ParsingErrorKind {
+  ParsingSyntaxError = 'ParsingSyntaxError',
 }
 
-type WithEffectInfo<T> = [EffectSource, T];
-
-class ParseError extends Error {
+export class ParsingError extends Error {
+  name = ParsingErrorKind.ParsingSyntaxError as const;
   constructor(public token: Token, public reason?: string) {
-    super();
+    super(reason);
   }
 }
 
-export function parse(tokens: Token[]): Result<Statement[]> {
-  let current = 0;
+const prefixOps = [TokenType.FUN, TokenType.FORALL] as const;
+type PrefixOpType = typeof prefixOps[number];
 
-  const statements: Statement[] = [];
-  const failures: Failure[] = [];
+const linearInfixOps = [TokenType.PLUS, TokenType.MINUS] as const;
+const nonLinearInfixOps = [
+  TokenType.STAR,
+  TokenType.GREATER,
+  TokenType.GREATER_EQUAL,
+  TokenType.LESS,
+  TokenType.LESS_EQUAL,
+  TokenType.EQUAL_EQUAL,
+] as const;
+const infixOps = [
+  ...linearInfixOps,
+  ...nonLinearInfixOps,
+  TokenType.QUESTION,
+] as const;
 
-  function declaration(): Statement | null {
-    return synchronized(() => {
-      if (check(TokenType.LET)) {
-        return varDeclaration(false);
+type InfixOpType = typeof infixOps[number];
+
+const postfixOps = [
+  TokenType.LEFT_PAREN,
+  TokenType.AT,
+  TokenType.LEFT_BRACKET,
+  TokenType.COLON_COLON,
+] as const;
+type PostfixOpType = typeof postfixOps[number];
+
+const typePrefixOps = [TokenType.RECTYPE] as const;
+type TypePrefixOpsType = typeof typePrefixOps[number];
+
+const typeInfixOps = [TokenType.ARROW] as const;
+type TypeInfixOpsType = typeof typeInfixOps[number];
+
+const typePostfixOps = [TokenType.BANG] as const;
+type TypePostfixOpsType = typeof typePostfixOps[number];
+
+enum TypeParsingResultKind {
+  Type = 'Type',
+  TypeAndEffect = 'TypeAndEffect',
+}
+type TypeParsingResultType = { kind: TypeParsingResultKind.Type; result: Type };
+type TypeParsingResultTypeAndEffect = {
+  kind: TypeParsingResultKind.TypeAndEffect;
+  result: TypeEffect;
+};
+
+type TypeParsingResult = TypeParsingResultType | TypeParsingResultTypeAndEffect;
+
+const typeResult = (result: Type): TypeParsingResultType => ({
+  kind: TypeParsingResultKind.Type,
+  result,
+});
+const typeAndEffectResult = (
+  result: TypeEffect,
+): TypeParsingResultTypeAndEffect => ({
+  kind: TypeParsingResultKind.TypeAndEffect,
+  result,
+});
+
+const normalizeTypeResult = (result: TypeParsingResult): TypeEffect => {
+  switch (result.kind) {
+    case TypeParsingResultKind.Type:
+      return TypeEff(result.result, Senv());
+    case TypeParsingResultKind.TypeAndEffect:
+      return result.result;
+  }
+};
+
+const BindingPower = {
+  type: {
+    prefix(op: TypePrefixOpsType): [number, number] {
+      switch (op) {
+        case TokenType.RECTYPE:
+          return [6, 7];
       }
-      if (check(TokenType.SLET)) {
-        return varDeclaration(true);
+    },
+    infix(op: TypeInfixOpsType): [number, number] {
+      switch (op) {
+        case TokenType.ARROW:
+          return [9, 8];
       }
+    },
+    postfix(op: TypePostfixOpsType): [number, number] {
+      switch (op) {
+        case TokenType.BANG:
+          return [18, 19];
+      }
+    },
+  },
+  expr: {
+    prefix(op: PrefixOpType): [null, number] {
+      switch (op) {
+        case TokenType.FUN:
+        case TokenType.FORALL:
+          return [null, 1];
+      }
+    },
+    infix(op: InfixOpType): [number, number] {
+      switch (op) {
+        case TokenType.QUESTION:
+          return [15, 16];
+        case TokenType.EQUAL_EQUAL:
+          return [17, 18];
+        case TokenType.GREATER:
+        case TokenType.GREATER_EQUAL:
+        case TokenType.LESS:
+        case TokenType.LESS_EQUAL:
+          return [19, 20];
+        case TokenType.PLUS:
+        case TokenType.MINUS:
+          return [23, 24];
+        case TokenType.STAR:
+          return [25, 26];
+      }
+    },
+    postfix(op: PostfixOpType): [number, null] {
+      switch (op) {
+        case TokenType.LEFT_PAREN:
+        case TokenType.LEFT_BRACKET:
+        case TokenType.AT:
+          return [33, null];
+        case TokenType.COLON_COLON:
+          return [31, null];
+      }
+    },
+  },
+};
 
-      return statement();
-    });
+class Parser {
+  eof: Token;
+  program: Statement[] = [];
+  failures: Failure[] = [];
+
+  constructor(private tokens: Token[]) {
+    const eof = head(tokens);
+
+    if (!eof) {
+      throw new Error('Cannot initialize a parser without tokens');
+    }
+
+    this.eof = eof;
   }
 
-  function varDeclaration(resource = false): Statement {
-    consume(
-      resource ? TokenType.SLET : TokenType.LET,
-      errorMessage({
-        expected: resource ? '`slet` keyword' : '`let` keyword',
-        beginning: 'a variable declaration',
-      }),
-    );
+  parse(): Result<Statement[]> {
+    while (!this.isAtEnd()) {
+      const stmt = this.statement();
 
-    const name = consume(
-      TokenType.IDENTIFIER,
-      errorMessage({ expected: 'variable name' }),
-    );
-
-    consume(
-      TokenType.EQUAL,
-      errorMessage({
-        expected: '= (equal sign)',
-        after: 'variable name',
-      }),
-    );
-
-    const assignment = expression();
-
-    consume(
-      TokenType.SEMICOLON,
-      errorMessage({ expected: ';', after: 'variable declaration' }),
-    );
-
-    return VarStmt({ name, assignment, resource });
-  }
-
-  function statement(): Statement {
-    return expressionStatement();
-  }
-
-  function block(): Expression {
-    consume(
-      TokenType.LEFT_BRACE,
-      errorMessage({ expected: '{', beginning: 'a block' }),
-    );
-
-    const statements: Statement[] = [];
-
-    while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
-      const decl = declaration();
-
-      if (decl) {
-        statements.push(decl);
+      if (stmt) {
+        this.program.push(stmt);
       }
     }
 
-    consume(
-      TokenType.RIGHT_BRACE,
-      errorMessage({ expected: '}', end: 'a block' }),
-    );
-
-    return Block({
-      statements,
-    });
+    return Result(this.program, this.failures);
   }
 
-  function expressionStatement(): Statement {
-    const value = expression();
+  statement(): Statement | null {
+    return this.synchronized(() => {
+      if (this.check(TokenType.LET)) {
+        /**
+         * @case let declaration
+         */
+        this.advance();
 
-    consume(
-      TokenType.SEMICOLON,
-      errorMessage({
-        expected: ';',
-        end: 'a statement',
-      }),
-    );
+        const name = this.consume(
+          TokenType.IDENTIFIER,
+          errorMessage({ expected: 'variable name' }),
+        );
 
-    return ExprStmt({
-      expression: value,
-    });
-  }
-
-  function printExpression(showEvidence = false): Expression {
-    const token = previous();
-    const value = expression();
-
-    return Print({
-      token,
-      expression: value,
-      showEvidence,
-    });
-  }
-
-  function expression(): Expression {
-    if (match(TokenType.PRINT)) {
-      return printExpression(false);
-    }
-    if (match(TokenType.PRINTEV)) {
-      return printExpression(true);
-    }
-    if (check(TokenType.LEFT_BRACE)) {
-      return block();
-    }
-
-    return ascription();
-  }
-
-  function ascription(): Expression {
-    let expr: Expression = equality();
-
-    while (match(TokenType.COLON_COLON)) {
-      const doubleColon = previous();
-      const ascrTE = typeEff();
-
-      if (ascrTE.kind === TypeEffectKind.RecursiveVar) {
-        throw error(
-          previous(),
+        this.consume(
+          TokenType.EQUAL,
           errorMessage({
-            beginning: 'ascription type. Ascription types cannot be recursive',
+            expected: '= (equal sign)',
+            after: 'variable name',
           }),
         );
+
+        const assignment = this.expression(0);
+
+        this.consume(
+          TokenType.SEMICOLON,
+          errorMessage({ expected: ';', after: 'variable declaration' }),
+        );
+
+        return VarStmt({ name, assignment, resource: false });
       }
 
-      expr = Ascription({
+      if (this.checkMany(TokenType.PRINT, TokenType.PRINTEV)) {
+        /**
+         * @case print statement
+         */
+
+        const token = this.advance();
+
+        const expr = this.expression(0);
+
+        this.consume(
+          TokenType.SEMICOLON,
+          errorMessage({ expected: ';', end: 'print statement' }),
+        );
+
+        return PrintStmt({
+          token,
+          expression: expr,
+          showEvidence: token.type === TokenType.PRINTEV,
+        });
+      }
+
+      /**
+       * @case expression statement
+       */
+
+      const expr = this.expression(0);
+
+      this.consume(
+        TokenType.SEMICOLON,
+        errorMessage({ expected: ';', end: 'statement' }),
+      );
+
+      return ExprStmt({
         expression: expr,
-        typeEff: ascrTE,
-        ascriptionToken: doubleColon,
       });
-    }
-
-    return expr;
+    });
   }
 
-  function equality(): Expression {
-    let expr = comparison();
+  expression(minBP: number): Expression {
+    let left: Expression;
 
-    while (match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
-      const operator = previous();
-      const right = comparison();
-      expr = Binary({
-        operator,
-        left: expr,
-        right,
+    if (this.check(TokenType.FALSE)) {
+      /**
+       * @case false literal
+       */
+      left = Literal({ value: false, token: this.advance() });
+    } else if (this.check(TokenType.TRUE)) {
+      /**
+       * @case true literal
+       */
+      left = Literal({ value: true, token: this.advance() });
+    } else if (this.check(TokenType.NILLIT)) {
+      /**
+       * @case nil literal
+       */
+      left = Literal({ value: null, token: this.advance() });
+    } else if (this.check(TokenType.NUMBERLIT)) {
+      /**
+       * @case number literal
+       */
+      const num = this.advance();
+
+      left = Literal({
+        value: num.literal as number,
+        token: num,
       });
-    }
-
-    return expr;
-  }
-
-  function comparison(): Expression {
-    let expr: Expression = additive();
-
-    while (
-      match(
-        TokenType.GREATER,
-        TokenType.GREATER_EQUAL,
-        TokenType.LESS,
-        TokenType.LESS_EQUAL,
-        TokenType.EQUAL_EQUAL,
-      )
-    ) {
-      const operator = previous();
-      const right = additive();
-      expr = NonLinearBinary({
-        operator,
-        left: expr,
-        right,
+    } else if (this.check(TokenType.IDENTIFIER)) {
+      /**
+       * @case variable
+       */
+      left = Variable({
+        name: this.advance(),
       });
-    }
+    } else if (this.check(TokenType.LEFT_PAREN)) {
+      const paren = this.advance();
 
-    return expr;
-  }
+      const inner = this.expression(0);
 
-  function additive(): Expression {
-    let expr = multiplicative();
+      if (this.check(TokenType.COMMA)) {
+        /**
+         * @case tuple
+         */
 
-    while (match(TokenType.MINUS, TokenType.PLUS, TokenType.PLUS_PLUS)) {
-      const operator = previous();
-      const right = multiplicative();
-      expr = Binary({
-        operator,
-        left: expr,
-        right,
-      });
-    }
+        const expressions = [inner];
 
-    return expr;
-  }
+        while (this.match(TokenType.COMMA) && !this.isAtEnd()) {
+          const another = this.expression(0);
 
-  function multiplicative(): Expression {
-    let expr = unary();
+          expressions.push(another);
+        }
 
-    while (match(TokenType.SLASH, TokenType.STAR)) {
-      const operator = previous();
-      const right = unary();
-      expr = NonLinearBinary({
-        operator,
-        left: expr,
-        right,
-      });
-    }
-
-    return expr;
-  }
-
-  function unary(): Expression {
-    // if (match(TokenType.BANG, TokenType.MINUS)) {
-    //   const operator = previous();
-    //   const right = unary();
-    //   return new Unary(operator, right);
-    // }
-
-    return call();
-  }
-
-  function call(): Expression {
-    let callee = primary();
-
-    // // eslint-disable-next-line no-constant-condition
-    // while (true) {
-    //   if (match(TokenType.LEFT_PAREN)) {
-    //     expr = finishCall(expr);
-    //   } else if (match(TokenType.DOT)) {
-    //     const name = consume(
-    //       TokenType.IDENTIFIER,
-    //       'Expected identifier after ".".',
-    //     );
-
-    //     expr = new Getter(expr, name);
-    //   } else {
-    //     break;
-    //   }
-    // }
-    while (
-      check(TokenType.LEFT_PAREN) ||
-      check(TokenType.LEFT_BRACKET) ||
-      check(TokenType.AT)
-    ) {
-      if (match(TokenType.LEFT_PAREN)) {
-        const arg = expression();
-
-        const paren = consume(
+        this.consume(
           TokenType.RIGHT_PAREN,
           errorMessage({
             expected: ')',
-            end: 'a function call',
+            after: 'function argument',
           }),
         );
 
-        callee = Call({
-          callee,
-          arg,
-          paren,
+        left = Tuple({
+          expressions,
+          constructorToken: paren,
         });
-      } else if (match(TokenType.LESS)) {
-        const arg = senv();
+      } else {
+        /**
+         * @case grouping
+         */
 
-        const bracket = consume(
-          TokenType.GREATER,
-          errorMessage({
-            expected: '>',
-            end: 'a sensitivity effect call',
-          }),
-        );
-
-        callee = SCall({
-          callee,
-          arg,
-          bracket,
+        left = Grouping({
+          expression: inner,
         });
-      } else if (match(TokenType.LEFT_BRACKET)) {
-        const index = consume(
-          TokenType.NUMBERLIT,
+
+        this.consume(
+          TokenType.RIGHT_PAREN,
           errorMessage({
-            expected: 'an index',
-            after: 'tuple projection',
+            expected: ') or ,',
+            after: 'expression',
           }),
         );
-
-        const projectToken = consume(
-          TokenType.RIGHT_BRACKET,
-          errorMessage({
-            expected: ']',
-            end: 'a tuple projection',
-          }),
-        );
-
-        callee = Projection({
-          tuple: callee,
-          index: index.literal as number,
-          projectToken,
-        });
-      } else if (match(TokenType.AT)) {
-        const bracket = consume(
-          TokenType.LEFT_BRACKET,
-          errorMessage({
-            expected: '[',
-            after: 'a sensitive application',
-          }),
-        );
-
-        const arg = senv();
-
-        consume(
-          TokenType.RIGHT_BRACKET,
-          errorMessage({
-            expected: ']',
-            end: 'a sensitive environment',
-          }),
-        );
-
-        callee = SCall({
-          callee,
-          arg,
-          bracket,
-        });
       }
-    }
+    } else if (this.check(TokenType.TUPLE)) {
+      /**
+       * @case tuple 2
+       */
+      const constructorToken = this.advance();
 
-    return callee;
-  }
-
-  function primary(): Expression {
-    if (match(TokenType.FALSE)) {
-      return Literal({ value: false, token: previous() });
-    } else if (match(TokenType.TRUE)) {
-      return Literal({ value: true, token: previous() });
-    } else if (match(TokenType.NILLIT)) {
-      return Literal({ value: null, token: previous() });
-    } else if (match(TokenType.FUN)) {
-      consume(
+      this.consume(
         TokenType.LEFT_PAREN,
         errorMessage({
           expected: '(',
-          after: '`fun` keyword',
+          after: 'tuple constructor',
         }),
       );
-      const paramName = consume(
-        TokenType.IDENTIFIER,
-        errorMessage({
-          expected: 'argument name',
-          beginning: 'a function parameters',
-        }),
-      );
-      consume(
-        TokenType.COLON,
-        errorMessage({
-          expected: ':',
-          after: 'argument name',
-        }),
-      );
-      const type = typeEff();
+      const first = this.expression(0);
 
-      if (type.kind === TypeEffectKind.RecursiveVar) {
-        throw error(
-          previous(),
-          errorMessage({
-            beginning: 'argument type. Argument types cannot be recursive vars',
-          }),
-        );
+      const expressions = [first];
+
+      while (this.match(TokenType.COMMA)) {
+        const another = this.expression(0);
+
+        expressions.push(another);
       }
 
-      consume(
+      this.consume(
         TokenType.RIGHT_PAREN,
         errorMessage({
           expected: ')',
-          after: 'function parameters',
+          after: 'tuple components',
         }),
       );
-      const body = block();
 
-      return Fun({
-        binder: {
-          name: paramName,
-          type,
-        },
-        body,
+      left = Tuple({
+        expressions,
+        constructorToken,
       });
-    } else if (match(TokenType.FORALL)) {
-      if (check(TokenType.DOT)) {
-        error(
-          peek(),
+    } else if (this.check(TokenType.FOLD)) {
+      /**
+       * @case fold
+       */
+      const constructorToken = this.advance();
+
+      this.consume(
+        TokenType.LESS,
+        errorMessage({
+          expected: '<',
+          after: 'fold keyword',
+        }),
+      );
+
+      const typeResult = this.type(0);
+
+      if (typeResult.kind === TypeParsingResultKind.TypeAndEffect) {
+        throw this.makeSyntaxError(
+          constructorToken,
           errorMessage({
-            expected: 'at least one identifier',
-            after: '`forall` constructor',
+            expected: 'a recursive type without a sensitivity effect',
           }),
         );
       }
 
+      if (typeResult.result.kind !== TypeKind.RecType) {
+        throw this.makeSyntaxError(
+          constructorToken,
+          errorMessage({
+            expected: 'a recursive type',
+          }),
+        );
+      }
+
+      this.consume(
+        TokenType.GREATER,
+        errorMessage({
+          expected: '>',
+          after: 'recursive type',
+        }),
+      );
+
+      this.consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: 'fold constructor',
+        }),
+      );
+
+      const expression = this.expression(0);
+
+      this.consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: 'folded expression',
+        }),
+      );
+
+      left = Fold({
+        expression,
+        recType: typeResult.result,
+        foldToken: constructorToken,
+      });
+    } else if (this.check(TokenType.UNFOLD)) {
+      /**
+       * @case unfold
+       */
+      const constructorToken = this.advance();
+
+      this.consume(
+        TokenType.LEFT_PAREN,
+        errorMessage({
+          expected: '(',
+          after: 'unfold operator',
+        }),
+      );
+
+      const expression = this.expression(0);
+
+      this.consume(
+        TokenType.RIGHT_PAREN,
+        errorMessage({
+          expected: ')',
+          after: 'folded expression',
+        }),
+      );
+
+      left = Unfold({
+        expression,
+        unfoldToken: constructorToken,
+      });
+    } else if (this.check(TokenType.FUN)) {
+      /**
+       * @case lambda function
+       */
+
+      const prefixPower = BindingPower.expr.prefix(
+        this.advance().type as PrefixOpType,
+      );
+
+      const arg = this.functionParameters();
+
+      this.consume(
+        TokenType.FAT_ARROW,
+        errorMessage({
+          expected: '=>',
+          after: 'function parameters',
+        }),
+      );
+
+      const body = this.expression(prefixPower[1]);
+
+      left = Fun({
+        binder: arg,
+        body,
+      });
+    } else if (this.check(TokenType.FORALL)) {
+      /**
+       * @case sensitivity abstraction
+       */
+
+      const prefixPower = BindingPower.expr.prefix(
+        this.advance().type as PrefixOpType,
+      );
+
       const sensVars: Token[] = [];
 
-      while (!match(TokenType.DOT)) {
-        const sensVar = consume(
+      while (!this.check(TokenType.DOT)) {
+        const sensVar = this.consume(
           TokenType.IDENTIFIER,
           errorMessage({
             expected: 'an identifier',
@@ -492,598 +548,569 @@ export function parse(tokens: Token[]): Result<Statement[]> {
         sensVars.push(sensVar);
       }
 
-      const expr = expression();
+      this.consume(
+        TokenType.DOT,
+        errorMessage({
+          expected: '.',
+          after: 'sensitivity variables parameters',
+        }),
+      );
 
-      return Forall({
+      const body = this.expression(prefixPower[1]);
+
+      left = Forall({
         sensVars,
-        expr,
+        expr: body,
       });
-    } else if (match(TokenType.PAIR)) {
-      const constructorToken = previous();
-      consume(
-        TokenType.LEFT_PAREN,
-        errorMessage({
-          expected: '(',
-          after: 'pair constructor',
-        }),
-      );
-      const first = expression();
-      consume(
-        TokenType.COMMA,
-        errorMessage({
-          expected: ',',
-          after: 'pair component',
-        }),
-      );
-      const second = expression();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          after: 'pair components',
-        }),
-      );
+    } else if (this.check(TokenType.LEFT_BRACE)) {
+      /**
+       * @case block
+       */
+      this.advance();
 
-      return Pair({
-        first,
-        second,
-        constructorToken,
-      });
-    } else if (match(TokenType.FST, TokenType.SND)) {
-      const projToken = previous();
-      consume(
-        TokenType.LEFT_PAREN,
-        errorMessage({
-          expected: '(',
-          after: `${projToken.lexeme} projector`,
-        }),
-      );
-      const pair = expression();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          after: 'pair expression',
-        }),
-      );
+      const statements: Statement[] = [];
 
-      const constructor = projToken.type === TokenType.FST ? ProjFst : ProjSnd;
+      while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+        const stmt = this.statement();
 
-      return constructor({
-        projToken,
-        pair,
-      });
-    } else if (match(TokenType.FOLD)) {
-      const foldToken = previous();
-
-      consume(
-        TokenType.LESS,
-        errorMessage({
-          expected: '<',
-          after: `${foldToken.lexeme} constructor`,
-        }),
-      );
-      const teff = typeEff();
-      consume(
-        TokenType.GREATER,
-        errorMessage({
-          expected: '>',
-          after: `${foldToken.lexeme} fold type instantiation`,
-        }),
-      );
-
-      consume(
-        TokenType.LEFT_PAREN,
-        errorMessage({
-          expected: '(',
-          after: `${foldToken.lexeme}`,
-        }),
-      );
-      const expr = expression();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          after: `${foldToken.lexeme} expression`,
-        }),
-      );
-
-      return Fold({
-        foldToken,
-        expression: expr,
-        recType: (teff as TypeEff<RecType, Senv>).type,
-      });
-    } else if (match(TokenType.TUPLE)) {
-      const constructorToken = previous();
-
-      consume(
-        TokenType.LEFT_PAREN,
-        errorMessage({
-          expected: '(',
-          after: 'tuple constructor',
-        }),
-      );
-      const first = expression();
-
-      const expressions = [first];
-
-      while (match(TokenType.COMMA)) {
-        const another = expression();
-
-        expressions.push(another);
+        if (stmt) {
+          statements.push(stmt);
+        }
       }
 
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          after: 'tuple components',
-        }),
+      this.consume(
+        TokenType.RIGHT_BRACE,
+        errorMessage({ expected: '}', end: 'a block' }),
       );
 
-      return Tuple({
-        expressions,
-        constructorToken,
+      left = Block({
+        statements,
       });
-    } else if (match(TokenType.UNFOLD)) {
-      const unfoldToken = previous();
-
-      consume(
-        TokenType.LEFT_PAREN,
-        errorMessage({
-          expected: '(',
-          after: `${unfoldToken.lexeme}`,
-        }),
+    } else {
+      /**
+       * @case Syntax error
+       */
+      throw this.makeSyntaxError(
+        this.peek(),
+        errorMessage({ expected: 'an expression' }),
       );
-      const expr = expression();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          after: `${unfoldToken.lexeme} expression`,
-        }),
-      );
-
-      return Unfold({
-        unfoldToken,
-        expression: expr,
-      });
-    } else if (match(TokenType.IF)) {
-      const ifToken = previous();
-
-      consume(
-        TokenType.LEFT_PAREN,
-        errorMessage({
-          expected: '(',
-          after: `${ifToken.lexeme}`,
-        }),
-      );
-      const condition = expression();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          after: `${ifToken.lexeme} condition`,
-        }),
-      );
-
-      consume(
-        TokenType.THEN,
-        errorMessage({
-          expected: 'then',
-          after: `${ifToken.lexeme} condition`,
-        }),
-      );
-
-      const then = expression();
-
-      consume(
-        TokenType.ELSE,
-        errorMessage({
-          expected: 'else',
-          after: `${ifToken.lexeme} then expression`,
-        }),
-      );
-
-      const els = expression();
-
-      return If({
-        condition,
-        then,
-        else: els,
-        ifToken,
-      });
-    } else if (match(TokenType.NUMBERLIT)) {
-      return Literal({
-        value: previous().literal as number,
-        token: previous(),
-      });
-    } else if (match(TokenType.IDENTIFIER)) {
-      return Variable({
-        name: previous(),
-      });
-    } else if (match(TokenType.LEFT_PAREN)) {
-      const expr = expression();
-      consume(
-        TokenType.RIGHT_PAREN,
-        errorMessage({
-          expected: ')',
-          end: 'a grouping (parenthesized expression)',
-        }),
-      );
-
-      return Grouping({
-        expression: expr,
-      });
     }
 
-    throw error(peek(), errorMessage());
+    while (!this.isAtEnd()) {
+      const op = this.peek();
+
+      /**
+       * @case postfix operators
+       */
+      if (this.checkMany(...postfixOps)) {
+        const postFixPower = BindingPower.expr.postfix(
+          op.type as PostfixOpType,
+        );
+
+        if (postFixPower[0] < minBP) {
+          break;
+        }
+
+        this.advance();
+
+        if (op.type === TokenType.LEFT_PAREN) {
+          /**
+           * @case function call
+           */
+
+          const arg = this.expression(0);
+
+          this.consume(
+            TokenType.RIGHT_PAREN,
+            errorMessage({
+              expected: ')',
+              after: 'function argument',
+            }),
+          );
+
+          left = Call({
+            callee: left,
+            arg,
+            paren: op,
+          });
+        } else if (op.type === TokenType.AT) {
+          /**
+           * @case function call
+           */
+
+          const args = this.sensitivityCallArguments();
+
+          left = SCall({
+            args,
+            bracket: op,
+            callee: left,
+          });
+        } else if (op.type === TokenType.LEFT_BRACKET) {
+          /**
+           * @case tuple projection
+           */
+
+          const index = this.consume(
+            TokenType.NUMBERLIT,
+            errorMessage({
+              expected: 'an index',
+              after: 'tuple projection',
+            }),
+          );
+
+          this.consume(
+            TokenType.RIGHT_BRACKET,
+            errorMessage({
+              expected: ']',
+              after: 'index',
+            }),
+          );
+
+          left = Projection({
+            index: index.literal as number,
+            tuple: left,
+            projectToken: op,
+          });
+        } else if (op.type === TokenType.COLON_COLON) {
+          /**
+           * @case ascription
+           */
+
+          const ascribedType = this.type(0);
+
+          const typeEff = normalizeTypeResult(ascribedType);
+
+          if (typeEff.kind === TypeEffectKind.RecursiveVar) {
+            throw this.makeSyntaxError(
+              op,
+              'Ascriptions cannot be a recursive variable',
+            );
+          }
+
+          left = Ascription({
+            expression: left,
+            typeEff,
+            ascriptionToken: op,
+          });
+        }
+
+        continue;
+      }
+
+      /**
+       * @case infix operators
+       */
+      if (this.checkMany(...infixOps)) {
+        const infixPower = BindingPower.expr.infix(op.type as InfixOpType);
+
+        if (infixPower[0] < minBP) {
+          break;
+        }
+
+        this.advance();
+
+        if ((linearInfixOps as readonly TokenType[]).includes(op.type)) {
+          /**
+           * @case linear binary (+, -)
+           */
+
+          const right = this.expression(infixPower[1]);
+
+          left = Binary({
+            left,
+            operator: op,
+            right,
+          });
+        } else if (
+          (nonLinearInfixOps as readonly TokenType[]).includes(op.type)
+        ) {
+          /**
+           * @case non-linear binary (*, <, etc)
+           */
+
+          const right = this.expression(infixPower[1]);
+
+          left = NonLinearBinary({
+            left,
+            operator: op,
+            right,
+          });
+        } else if (op.type === TokenType.QUESTION) {
+          /**
+           * @case ternary operator
+           */
+
+          const then = this.expression(0);
+
+          this.consume(
+            TokenType.COLON,
+            errorMessage({
+              expected: ':',
+              after: 'then-expression in ternary operator',
+            }),
+          );
+
+          const els = this.expression(infixPower[1]);
+
+          left = If({
+            condition: left,
+            then,
+            else: els,
+            ifToken: op,
+          });
+        }
+
+        continue;
+      }
+
+      break;
+    }
+
+    return left;
   }
 
-  function sensitivity(): Sens {
-    if (match(TokenType.QUESTION)) {
-      return UnknownSens();
-    } else if (match(TokenType.NUMBERLIT)) {
-      return Sens(previous().literal as number);
-    }
-
-    throw error(
-      peek(),
+  sensitivityCallArguments(): Senv[] {
+    this.consume(
+      TokenType.LEFT_BRACKET,
       errorMessage({
-        expected:
-          'a sensitivty (either a number, e.g. 2 or 3.14, or the unknown sensitivity `?`)',
+        expected: '[',
+        beginning: 'sensitivity effect instantiation',
       }),
     );
-  }
 
-  function senv(): Senv {
-    let s = Senv();
-
-    if (!check(TokenType.RIGHT_BRACKET)) {
-      const sens = sensitivity();
-      const identifier = consume(
-        TokenType.IDENTIFIER,
+    if (this.check(TokenType.RIGHT_BRACKET)) {
+      throw this.makeSyntaxError(
+        this.peek(),
         errorMessage({
-          expected: 'variable name',
-          after: 'sensitivity value',
-        }),
+          expected: 'at least one sensitivity effect',
+          before: 'ending a sensitivity effect instantiation',
+        }) + '. If you want to pass an empty effect use `\\` as an argument',
       );
-
-      s = SenvUtils.extend(s, identifier.lexeme, sens);
-
-      while (!check(TokenType.RIGHT_BRACKET) && !isAtEnd()) {
-        consume(
-          TokenType.PLUS,
-          errorMessage({
-            expected: '+',
-            before: 'declaring more sensitivities',
-          }),
-        );
-        const sens = sensitivity();
-        const identifier = consume(
-          TokenType.IDENTIFIER,
-          errorMessage({
-            expected: 'variable name',
-            after: 'sensitivity value',
-          }),
-        );
-
-        s = SenvUtils.extend(s, identifier.lexeme, sens);
-      }
     }
 
-    // consume(
-    //   TokenType.RIGHT_BRACKET,
-    //   errorMessage({
-    //     expected: ']',
-    //     end: 'a sensitivity environment',
-    //   }),
-    // );
+    const first = this.match(TokenType.BACKSLASH) ? Senv() : this.senv();
 
-    return Senv(s);
-  }
+    const args = [first];
 
-  function optionalSenv(): WithEffectInfo<Senv> {
-    if (match(TokenType.BANG)) {
-      consume(
-        TokenType.LEFT_BRACKET,
-        errorMessage({
-          expected: '[',
-          beginning: 'a sensitivity environment',
-        }),
-      );
+    while (this.check(TokenType.COMMA)) {
+      this.advance();
 
-      const eff = senv();
-
-      consume(
-        TokenType.RIGHT_BRACKET,
-        errorMessage({
-          expected: ']',
-          end: 'a sensitivity environment',
-        }),
-      );
-
-      return [EffectSource.EXPLICIT, eff];
-    }
-
-    return [EffectSource.INFERRED, Senv()];
-  }
-
-  function atomTypeEff(): WithEffectInfo<TypeEffect> {
-    let currentType = null;
-
-    if (match(TokenType.NUMBER)) {
-      currentType = Real();
-    } else if (match(TokenType.BOOL)) {
-      currentType = Bool();
-    } else if (match(TokenType.NIL)) {
-      currentType = Nil();
-    } else if (match(TokenType.FORALLT)) {
-      const forallKeyword = previous();
-
-      const firstSensVar = consume(
-        TokenType.IDENTIFIER,
-        errorMessage({
-          expected: 'at least one sensitive variable name',
-          after: `${forallKeyword.lexeme} keyword`,
-        }),
-      );
-      const sensVars = [firstSensVar.lexeme];
-
-      while (match(TokenType.IDENTIFIER)) {
-        sensVars.push(previous().lexeme);
+      if (this.checkMany(TokenType.COMMA, TokenType.RIGHT_BRACKET)) {
+        throw this.makeSyntaxError(
+          this.peek(),
+          errorMessage({
+            expected: 'a sensitivity effect',
+          }) + '. If you want to pass an empty effect use `\\` as an argument',
+        );
       }
 
-      consume(
-        TokenType.DOT,
-        errorMessage({
-          expected: 'a dot (.)',
-          after: 'sensitive variables',
+      const another = this.match(TokenType.BACKSLASH) ? Senv() : this.senv();
+
+      args.push(another);
+    }
+
+    this.consume(
+      TokenType.RIGHT_BRACKET,
+      errorMessage({
+        expected: ']',
+        after: 'sensitivity effect arguments',
+      }),
+    );
+
+    return args;
+  }
+
+  functionParameters(): { name: Token; type: TypeEff } {
+    this.consume(
+      TokenType.LEFT_PAREN,
+      errorMessage({
+        expected: '(',
+        beginning: 'function parameters',
+      }),
+    );
+
+    const name = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({
+        expected: 'a variable name',
+        beginning: 'function parameters',
+      }),
+    );
+
+    const colon = this.consume(
+      TokenType.COLON,
+      errorMessage({
+        expected: ': [type]',
+        after: 'parameter name',
+      }),
+    );
+
+    const type = normalizeTypeResult(this.type(0));
+
+    if (type.kind === TypeEffectKind.RecursiveVar) {
+      throw this.makeSyntaxError(
+        colon,
+        'function parameters cannot be of a recursive variable type',
+      );
+    }
+
+    this.consume(
+      TokenType.RIGHT_PAREN,
+      errorMessage({
+        expected: ')',
+        end: 'function parameters',
+      }),
+    );
+
+    return { name, type };
+  }
+
+  type(minBP: number): TypeParsingResult {
+    let left: TypeParsingResult;
+
+    if (this.check(TokenType.NUMBER)) {
+      /**
+       * @case number type
+       */
+
+      this.advance();
+
+      left = typeResult(Real());
+    } else if (this.check(TokenType.IDENTIFIER)) {
+      /**
+       * @case recursive variable type-and-effect
+       */
+
+      left = typeAndEffectResult(
+        RecursiveVar({
+          name: this.advance().lexeme,
         }),
       );
+    } else if (this.check(TokenType.LEFT_PAREN)) {
+      this.advance();
 
-      const codomain = typeEff();
+      left = this.type(0);
 
-      currentType = ForallT({
-        sensVars,
-        codomain,
-      });
-    } else if (match(TokenType.RECTYPE)) {
-      const rectypeKeyword = previous();
+      if (this.check(TokenType.COMMA)) {
+        /**
+         * @case tuple
+         */
 
-      const variable = consume(
+        const types = [normalizeTypeResult(left)];
+
+        while (this.match(TokenType.COMMA) && !this.isAtEnd()) {
+          const another = this.type(0);
+
+          types.push(normalizeTypeResult(another));
+        }
+
+        this.consume(
+          TokenType.RIGHT_PAREN,
+          errorMessage({
+            expected: ')',
+            after: 'function argument',
+          }),
+        );
+
+        left = typeResult(
+          Product({
+            typeEffects: types,
+          }),
+        );
+      } else {
+        this.consume(
+          TokenType.RIGHT_PAREN,
+          errorMessage({
+            expected: ')',
+            end: 'type grouping',
+          }),
+        );
+      }
+    } else if (this.checkMany(...typePrefixOps)) {
+      /**
+       * @case prefix type operators
+       */
+
+      const prefixPower = BindingPower.type.prefix(
+        this.advance().type as TypePrefixOpsType,
+      );
+
+      const variable = this.consume(
         TokenType.IDENTIFIER,
         errorMessage({
-          expected: 'a type variable name',
-          after: `${rectypeKeyword.lexeme} keyword`,
+          expected: 'recursive type variable name',
+          after: '`rec` keyword',
         }),
-      ).lexeme;
+      );
 
-      consume(
+      this.consume(
         TokenType.DOT,
         errorMessage({
-          expected: 'a dot (.)',
-          after: 'the recursive type variable',
+          expected: '. (dot)',
+          after: 'recursive variable',
         }),
       );
 
-      const body = typeEff();
+      const body = this.type(prefixPower[1]);
 
-      currentType = RecType({
-        variable,
-        body,
-      });
-    }
-
-    if (currentType) {
-      const [source, effect] = optionalSenv();
-
-      return [source, TypeEff(currentType, effect)];
-    }
-
-    if (match(TokenType.LEFT_PAREN)) {
-      const [senvSource, teff] = internalTypeEff();
-
-      consume(
-        TokenType.RIGHT_PAREN,
+      left = typeResult(
+        RecType({
+          variable: variable.lexeme,
+          body: normalizeTypeResult(body),
+        }),
+      );
+    } else {
+      throw this.makeSyntaxError(
+        this.peek(),
         errorMessage({
-          expected: 'a right parenthesis )',
-          after: 'declaring a pure type',
+          expected: 'a type',
         }),
       );
+    }
 
-      if (match(TokenType.BANG)) {
-        if (senvSource === EffectSource.EXPLICIT) {
-          throw error(
-            peek(),
+    while (!this.isAtEnd()) {
+      const op = this.peek();
+
+      /**
+       * @case postfix type operators
+       */
+      if (this.checkMany(...typePostfixOps)) {
+        const postFixPower = BindingPower.type.postfix(
+          op.type as TypePostfixOpsType,
+        );
+
+        if (postFixPower[0] < minBP) {
+          break;
+        }
+
+        this.advance();
+
+        if (op.type === TokenType.BANG) {
+          if (left.kind === TypeParsingResultKind.TypeAndEffect) {
+            throw this.makeSyntaxError(op, 'Cannot bang a type-and-effect');
+          }
+
+          this.consume(
+            TokenType.LEFT_BRACKET,
             errorMessage({
-              after: 'type-and-effect',
+              expected: '[',
+              after: 'a bang modality',
+            }),
+          );
+
+          const effect = this.check(TokenType.RIGHT_BRACKET)
+            ? Senv()
+            : this.senv();
+
+          this.consume(
+            TokenType.RIGHT_BRACKET,
+            errorMessage({
+              expected: ']',
+              end: 'a sensitivity effect',
+            }),
+          );
+
+          left = typeAndEffectResult(TypeEff(left.result, effect));
+        }
+
+        continue;
+      }
+
+      /**
+       * @case infix type operators
+       */
+      if (this.checkMany(...typeInfixOps)) {
+        const infixPower = BindingPower.type.infix(op.type as TypeInfixOpsType);
+
+        if (infixPower[0] < minBP) {
+          break;
+        }
+
+        this.advance();
+
+        if (op.type === TokenType.ARROW) {
+          const right = this.type(infixPower[1]);
+
+          left = typeResult(
+            Arrow({
+              domain: normalizeTypeResult(left),
+              codomain: normalizeTypeResult(right),
             }),
           );
         }
 
-        consume(
-          TokenType.LEFT_BRACKET,
-          errorMessage({
-            expected: '[',
-            beginning: 'a sensitivity environment',
-          }),
-        );
-
-        const effect = senv();
-
-        consume(
-          TokenType.RIGHT_BRACKET,
-          errorMessage({
-            expected: ']',
-            end: 'a sensitivity environment',
-          }),
-        );
-
-        return [EffectSource.EXPLICIT, TypeEff((teff as TypeEff).type, effect)];
+        continue;
       }
 
-      return [senvSource, teff];
+      break;
     }
 
-    if (match(TokenType.IDENTIFIER)) {
-      const identifier = previous();
+    return left;
+  }
 
-      return [
-        EffectSource.EXPLICIT,
-        RecursiveVar({
-          name: identifier.lexeme,
-        }),
-      ];
-    }
+  senv(): Senv {
+    let s = Senv();
 
-    throw error(
-      peek(),
+    const sens = this.sensitivity();
+    const identifier = this.consume(
+      TokenType.IDENTIFIER,
       errorMessage({
-        expected: 'a type',
+        expected: 'a sensitivity variable name',
       }),
     );
-  }
 
-  function internalTypeEff(): WithEffectInfo<TypeEffect> {
-    const ty = atomTypeEff();
+    s = SenvUtils.extend(s, identifier.lexeme, sens);
 
-    const arrows = [];
+    while (this.check(TokenType.PLUS) && !this.isAtEnd()) {
+      this.advance();
 
-    while (match(TokenType.ARROW)) {
-      const [, codomain] = atomTypeEff();
+      const sens = this.sensitivity();
+      const identifier = this.consume(
+        TokenType.IDENTIFIER,
+        errorMessage({
+          expected: 'sensitivity variable name',
+        }),
+      );
 
-      arrows.push(codomain);
+      s = SenvUtils.extend(s, identifier.lexeme, sens);
     }
 
-    if (arrows.length === 0) {
-      return ty;
+    return Senv(s);
+  }
+
+  sensitivity(): Sens {
+    if (this.check(TokenType.QUESTION)) {
+      /**
+       * @case unknown sensitivity
+       */
+
+      this.advance();
+
+      return UnknownSens();
+    } else if (this.check(TokenType.NUMBERLIT)) {
+      /**
+       * @case fully-static sensitivity
+       */
+
+      return Sens(this.advance().literal as number);
+    } else {
+      /**
+       * @case implicit unitary sensitivity
+       */
+
+      return Sens(1);
     }
-
-    const arrow = arrows.reduceRight(
-      (domain, codomain) =>
-        TypeEff(
-          Arrow({
-            domain,
-            codomain,
-          }),
-          Senv(),
-        ),
-      ty[1],
-    );
-
-    return [EffectSource.INFERRED, arrow];
   }
 
-  function typeEff(): TypeEffect {
-    const [, teff] = internalTypeEff();
-
-    return teff;
-  }
-
-  // function typeEff(): TypeEff {
-  //   let t: TypeEff | null = null;
-
-  //   if (match(TokenType.NUMBER, TokenType.BOOL, TokenType.NIL)) {
-  //     const typeToken = previous();
-
-  //     const effect = match(TokenType.BANG) ? senv() : MaxSenv();
-
-  //     switch (typeToken.type) {
-  //       case TokenType.NUMBER: {
-  //         t = TypeEff(Real(), effect);
-  //         break;
-  //       }
-  //       case TokenType.BOOL: {
-  //         t = TypeEff(Bool(), effect);
-  //         break;
-  //       }
-  //       case TokenType.NIL: {
-  //         t = TypeEff(Nil(), effect);
-  //         break;
-  //       }
-  //     }
-  //   }
-
-  //   if (match(TokenType.LEFT_PAREN)) {
-  //     t = typeEff();
-
-  //     consume(
-  //       TokenType.RIGHT_PAREN,
-  //       errorMessage({
-  //         expected: 'aclosing paranthesis )',
-  //         end: 'this type-and-effect',
-  //       }),
-  //     );
-
-  //     if (match(TokenType.BANG)) {
-  //       const effect = senv();
-
-  //       t = TypeEff(t.type, SenvUtils.add(t.effect, effect));
-  //     }
-  //   }
-
-  //   if (!t) {
-  //     throw error(
-  //       peek(),
-  //       errorMessage({ expected: 'a type or a type-and-effect' }),
-  //     );
-  //   }
-
-  //   while (match(TokenType.ARROW)) {
-  //     switch (previous().type) {
-  //       case TokenType.ARROW: {
-  //         const codomain = typeEff();
-
-  //         t = TypeEff(
-  //           Arrow({
-  //             domain: t,
-  //             codomain,
-  //           }),
-  //           Senv(),
-  //         );
-
-  //         break;
-  //       }
-  //     }
-  //   }
-
-  //   return t;
-  // }
-
-  function consume(type: TokenType, message: string): Token {
-    if (check(type)) {
-      return advance();
-    }
-
-    throw error(peek(), message);
-  }
-
-  function error(token: Token, message: string): ParseError {
-    return new ParseError(token, message);
-  }
-
-  /**
-   * It tries to execute a parser and return its result.
-   * In the case of an error during the parser execution:
-   *    1. The source is synchronized, e.g. the input is thrown away until reaching an end of statement
-   *    2. A new failure is created and pushed into `failures` for blaming the bad syntax
-   *    3. `null` is returned
-   *
-   * In the case of an unknown error (not related to parsing), the error is thrown up.
-   *
-   * @param parser A Parser function
-   * @returns The result of the parser or `null`
-   */
-  function synchronized<T>(parser: () => T): T | null {
+  synchronized<T>(parser: () => T): T | null {
     try {
       const parsed = parser();
 
       return parsed;
     } catch (error) {
-      if (error instanceof ParseError) {
-        synchronize();
-        failures.push(Failure(error.token, error.reason));
+      if (error.name === ParsingErrorKind.ParsingSyntaxError) {
+        this.synchronize();
+        this.failures.push(Failure(error.token, error.reason));
         return null;
       }
 
@@ -1095,17 +1122,16 @@ export function parse(tokens: Token[]): Result<Statement[]> {
    * It discards tokens until a new statement is reached
    *
    * _Note: This is a best effort synchronization and is not meant to be perfect_
-   * @returns void
    */
-  function synchronize(): void {
-    advance();
+  synchronize(): void {
+    let current = this.advance();
 
-    while (!isAtEnd()) {
-      if (previous().type === TokenType.SEMICOLON) {
+    while (!this.isAtEnd()) {
+      if (current.type === TokenType.SEMICOLON) {
         return;
       }
 
-      switch (peek().type) {
+      switch (this.peek().type) {
         case TokenType.LET:
         case TokenType.SLET:
         case TokenType.PRINT:
@@ -1113,14 +1139,29 @@ export function parse(tokens: Token[]): Result<Statement[]> {
           return;
       }
 
-      advance();
+      current = this.advance();
     }
   }
 
-  function match(...types: TokenType[]): boolean {
+  makeSyntaxError(token: Token, message: string) {
+    return new ParsingError(token, message);
+  }
+
+  consume(type: TokenType, message: string): Token {
+    if (this.check(type)) {
+      return this.advance();
+    }
+
+    throw this.makeSyntaxError(this.peek(), message);
+  }
+
+  advance(): Token {
+    return this.tokens.pop() ?? this.eof;
+  }
+
+  checkMany(...types: TokenType[]): boolean {
     for (const type of types) {
-      if (check(type)) {
-        advance();
+      if (this.check(type)) {
         return true;
       }
     }
@@ -1128,41 +1169,29 @@ export function parse(tokens: Token[]): Result<Statement[]> {
     return false;
   }
 
-  function check(type: TokenType): boolean {
-    if (isAtEnd()) {
-      return false;
+  peek(): Token {
+    return last(this.tokens) ?? this.eof;
+  }
+
+  check(tokenType: TokenType): boolean {
+    return this.peek().type === tokenType;
+  }
+
+  match(tokenType: TokenType): boolean {
+    if (this.check(tokenType)) {
+      this.advance();
+
+      return true;
     }
 
-    return peek().type === type;
+    return false;
   }
 
-  function advance(): Token {
-    if (!isAtEnd()) {
-      current++;
-    }
-
-    return previous();
+  isAtEnd(): boolean {
+    return this.check(TokenType.EOF);
   }
-
-  function isAtEnd(): boolean {
-    return peek().type === TokenType.EOF;
-  }
-
-  function peek(): Token {
-    return tokens[current];
-  }
-
-  function previous(): Token {
-    return tokens[current - 1];
-  }
-
-  while (!isAtEnd()) {
-    const decl = declaration();
-
-    if (decl) {
-      statements.push(decl);
-    }
-  }
-
-  return Result(statements, failures);
 }
+
+export const parse = (tokens: Token[]): Result<Statement[]> => {
+  return new Parser(reverse(tokens)).parse();
+};

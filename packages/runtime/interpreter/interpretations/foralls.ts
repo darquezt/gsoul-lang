@@ -17,6 +17,7 @@ import { EvidenceUtils, Store } from '../../utils';
 import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterTypeError } from '../errors';
+import { zip } from 'ramda';
 
 export enum PolyKontKind {
   ForallKont = 'ForallKont',
@@ -25,7 +26,7 @@ export enum PolyKontKind {
 
 export type ForallKont = {
   kind: PolyKontKind.ForallKont;
-  state: State<{ senv: Senv }>;
+  state: State<{ args: Senv[] }>;
   bracket: Token;
 };
 export const ForallKont: KindedFactory<ForallKont> = factoryOf(
@@ -34,7 +35,7 @@ export const ForallKont: KindedFactory<ForallKont> = factoryOf(
 
 export type ForallSubstKont = {
   kind: PolyKontKind.ForallSubstKont;
-  state: State<{ name: string; senv: Senv }>;
+  state: State<{ variables: string[]; args: Senv[] }>;
 };
 export const ForallSubstKont: KindedFactory<ForallSubstKont> = factoryOf(
   PolyKontKind.ForallSubstKont,
@@ -49,7 +50,7 @@ export const reduceForallCallee = (
     { term: term.callee },
     store,
     ForallKont({
-      state: State({ senv: term.arg }, store, kont),
+      state: State({ args: term.args }, store, kont),
       bracket: term.bracket,
     }),
   );
@@ -69,10 +70,7 @@ export const reduceForallBody = (
       }),
     );
   }
-  const {
-    sensVars: [svar, ...sensVars],
-    expr: body,
-  } = term.expression.forall;
+  const { sensVars, expr } = term.expression.forall;
 
   const evidenceRes = EvidenceUtils.iscod(term.evidence);
 
@@ -87,23 +85,13 @@ export const reduceForallBody = (
 
   const evidence = evidenceRes.value;
 
-  const newTypeEff = TypeEffUtils.ForallsUtils.instance(
-    term.expression.forall.typeEff,
-  );
-  const newAscrTypeEff = TypeEffUtils.ForallsUtils.instance(
+  const newAscrTypeEff = TypeEffUtils.ForallsUtils.scod(
     term.typeEff as TypeEff<ForallT, Senv>,
   );
 
   const result = Ascription({
     evidence,
-    expression:
-      sensVars.length === 0
-        ? body
-        : Forall({
-            sensVars,
-            expr: body,
-            typeEff: newTypeEff as TypeEff<ForallT, Senv>,
-          }),
+    expression: expr,
     typeEff: newAscrTypeEff,
   });
 
@@ -112,8 +100,8 @@ export const reduceForallBody = (
     term.expression.store,
     ForallSubstKont({
       state: {
-        name: svar.lexeme,
-        senv: kont.state.senv,
+        variables: sensVars.map((s) => s.lexeme),
+        args: kont.state.args,
         store: kont.state.store,
         kont: kont.state.kont,
       },
@@ -126,15 +114,14 @@ export const reduceForallSubstitutedBody = (
   _store: Store,
   kont: ForallSubstKont,
 ): Result<StepState, InterpreterError> => {
-  const substitutedTerm = ExpressionUtils.subst(
+  const body = zip(kont.state.variables, kont.state.args).reduce(
+    (acc, [svar, effect]) => ExpressionUtils.subst(acc, svar, effect),
     term,
-    kont.state.name,
-    kont.state.senv,
   );
 
   return OkState(
     {
-      term: substitutedTerm,
+      term: body,
     },
     kont.state.store,
     kont.state.kont,
@@ -149,7 +136,8 @@ export const forallClosureCreation = (
   return OkState(
     {
       term: Ascription({
-        ...term,
+        evidence: term.evidence,
+        typeEff: term.typeEff,
         expression: SClosure({
           forall: term.expression,
           typeEff: term.expression.typeEff,

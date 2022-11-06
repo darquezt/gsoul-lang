@@ -78,10 +78,6 @@ ${formatError('Resource dependency error', error.message)}
   ${formatFileName(file, error.variable.line, error.variable.col)}`;
 
     case ElaborationErrorKind.ElaborationSubtypingError:
-      console.log(
-        JSON.stringify(error.type, null, 2),
-        JSON.stringify(error.superType, null, 2),
-      );
       return chalk`
 ${lines[error.operator.line - 1]}
 ${arrows(error.operator.col - 1, error.operator.lexeme.length)}

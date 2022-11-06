@@ -5,6 +5,7 @@ import { Evidence, EvidenceUtils, Store } from '../../utils';
 import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterEvidenceError } from '../errors';
+import { format } from '../../utils/Evidence';
 
 export enum AscrKontKind {
   AscrKont = 'AscrKont',
@@ -65,6 +66,10 @@ export const reduceDoubleAscription = (
   const evidenceRes = EvidenceUtils.trans(term.evidence, kont.state.evidence);
 
   if (!evidenceRes.isOk) {
+    console.log(format(term.evidence));
+    console.log(format(kont.state.evidence));
+    console.log('ascr failed');
+
     return Result.err(
       new InterpreterEvidenceError({
         reason: evidenceRes.error.message,

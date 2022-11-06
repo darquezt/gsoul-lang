@@ -22,12 +22,10 @@ export enum ExprKind {
   Forall = 'Forall',
   Tuple = 'Tuple',
   Projection = 'Projection',
-  // Untup = 'Untup',
   Pair = 'Pair',
   ProjFst = 'ProjFst',
   ProjSnd = 'ProjSnd',
   Ascription = 'Ascription',
-  Print = 'Print',
   Block = 'Block',
   Fold = 'Fold',
   Unfold = 'Unfold',
@@ -70,7 +68,7 @@ export const Call = factoryOf<Call>(ExprKind.Call);
 export type SCall = {
   kind: ExprKind.SCall;
   callee: Expression;
-  arg: Senv;
+  args: Senv[];
   bracket: Token;
 };
 export const SCall = factoryOf<SCall>(ExprKind.SCall);
@@ -110,15 +108,6 @@ export type Projection = {
 };
 export const Projection = factoryOf<Projection>(ExprKind.Projection);
 
-// export type Untup = {
-//   kind: ExprKind.Untup;
-//   identifiers: [Token, Token];
-//   tuple: Expression;
-//   body: Expression;
-//   untupToken: Token;
-// };
-// export const Untup = factoryOf<Untup>(ExprKind.Untup);
-
 export type Pair = {
   kind: ExprKind.Pair;
   first: Expression;
@@ -148,14 +137,6 @@ export type Ascription = {
   ascriptionToken: Token;
 };
 export const Ascription = factoryOf<Ascription>(ExprKind.Ascription);
-
-export type Print = {
-  kind: ExprKind.Print;
-  expression: Expression;
-  token: Token;
-  showEvidence: boolean;
-};
-export const Print = factoryOf<Print>(ExprKind.Print);
 
 export type Fold = {
   kind: ExprKind.Fold;
@@ -196,12 +177,10 @@ export type Expression =
   | Forall
   | Tuple
   | Projection
-  // | Untup
   | Pair
   | ProjFst
   | ProjSnd
   | Block
-  | Print
   | Ascription
   | Fold
   | Unfold
@@ -213,6 +192,7 @@ export type Expression =
 
 export enum StmtKind {
   ExprStmt = 'ExprStmt',
+  PrintStmt = 'PrintStmt',
   VarStmt = 'VarStmt',
 }
 
@@ -227,7 +207,15 @@ export type VarStmt = {
 };
 export const VarStmt = factoryOf<VarStmt>(StmtKind.VarStmt);
 
-export type Statement = ExprStmt | VarStmt;
+export type PrintStmt = {
+  kind: StmtKind.PrintStmt;
+  expression: Expression;
+  token: Token;
+  showEvidence: boolean;
+};
+export const PrintStmt = factoryOf<PrintStmt>(StmtKind.PrintStmt);
+
+export type Statement = ExprStmt | PrintStmt | VarStmt;
 
 export type Program = Statement[];
 

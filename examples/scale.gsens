@@ -1,33 +1,31 @@
-forall x. {
-  let Y = fun (f : (Number -> (Number![1x] -> Number![?x])) -> (Number -> (Number![1x] -> Number![?x]))) {
-    let A = fun (x : rec alpha . (alpha -> (Number -> (Number![1x] -> Number![?x])))) {
-      fun (n1: Number) {
-        fun (a : Number![1x]) {
-          f(unfold(x)(x))(n1)(a);
-        };
+printEv (forall x . {
+  let Y = fn (f : (Number -> Number![1x] -> Number![?x]) -> (Number -> Number![1x] -> Number![?x])) => {
+    let A =
+      fn (x : rec alpha . alpha -> Number -> Number![1x] -> Number![?x]) =>
+      fn (n1: Number) =>
+      fn (a : Number![1x]) => {
+        f(unfold(x)(x))(n1)(a);
       };
-    };
 
-    let B = fun (y : rec alpha . (alpha -> (Number -> (Number![1x] -> Number![?x])))) {
-      fun (n2: Number) {
-        fun (b : Number![1x]) {
-          f(unfold(y)(y))(n2)(b);
-        };
+    let B =
+      fn (y : rec alpha . alpha -> Number -> Number![1x] -> Number![?x]) =>
+      fn (n2: Number) =>
+      fn (b : Number![1x]) => {
+        f(unfold(y)(y))(n2)(b);
       };
-    };
 
-    A(fold<rec alpha . (alpha -> (Number -> (Number![1x] -> Number![?x])))>(B));
+
+    A(fold<rec alpha . alpha -> Number -> Number![1x] -> Number![?x]>(B));
   };
 
-  let scale = fun (scaleFn: Number -> (Number![1x] -> Number![?x])) {
-    fun (n: Number) {
-      fun (x: Number![1x]) {
-        if (n == 0) then 0 else {
-          (scaleFn(n - 1)(x) + x) :: Number![?x];
-        };
-      };
+  let scale =
+    fn (scaleFn: Number -> Number![1x] -> Number![?x]) =>
+    fn (n: Number) =>
+    fn (x: Number![1x]) => {
+      n == 0
+        ? 0
+        : (scaleFn(n - 1)(x) + x) :: Number![?x];
     };
-  };
 
   printEv Y(scale)(21)(3);
-} @[];
+}) @[\];

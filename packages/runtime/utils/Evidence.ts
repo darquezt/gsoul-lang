@@ -577,10 +577,7 @@ export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
   ]);
 };
 
-export const iscod = (
-  ev: Evidence,
-  effect?: Senv,
-): Result<Evidence, EvidenceError> => {
+export const iscod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
@@ -606,8 +603,8 @@ export const iscod = (
   }
 
   return Result.ok([
-    TypeEffUtils.ForallsUtils.instance(left, effect),
-    TypeEffUtils.ForallsUtils.instance(right, effect),
+    TypeEffUtils.ForallsUtils.scod(left),
+    TypeEffUtils.ForallsUtils.scod(right),
   ]);
 };
 

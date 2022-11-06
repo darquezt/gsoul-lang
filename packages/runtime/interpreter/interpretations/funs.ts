@@ -99,6 +99,8 @@ export const reduceFunCall = (
   const argEviRes = EvidenceUtils.trans(term.evidence, idomRes.value);
 
   if (!argEviRes.isOk) {
+    console.log('app failed');
+
     return Result.err(
       new InterpreterTypeError({
         reason: argEviRes.error.message,

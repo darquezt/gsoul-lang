@@ -13,7 +13,7 @@ import {
   Literal,
   NonLinearBinary,
   Pair,
-  Print,
+  PrintStmt,
   Projection,
   ProjFst,
   ProjSnd,
@@ -308,8 +308,15 @@ const sapp = (expr: SCall, tenv: TypeEnv): PureResult => {
     );
   }
 
+  if (calleeTypeEff.type.sensVars.length !== expr.args.length) {
+    return Failure(
+      expr.bracket,
+      `Sensitivity abstraction expected ${calleeTypeEff.type.sensVars.length} arguments, but got ${expr.args.length}`,
+    );
+  }
+
   return PureSuccess(
-    TypeEffUtils.ForallsUtils.instance(calleeTypeEff, expr.arg),
+    TypeEffUtils.ForallsUtils.instance(calleeTypeEff, expr.args),
     calleeTC.typings,
   );
 };
@@ -329,19 +336,6 @@ const ascription = (expr: Ascription, tenv: TypeEnv): PureResult => {
   }
 
   return PureSuccess(expr.typeEff as TypeEff, innerTC.typings);
-};
-
-const printExpr = (expr: Print, tenv: TypeEnv): PureResult => {
-  const exprTC = expression(expr.expression, tenv);
-
-  if (!exprTC.success) {
-    return exprTC;
-  }
-
-  return PureSuccess(
-    exprTC.typeEff,
-    [[expr.token, exprTC.typeEff] as TypeAssoc].concat(exprTC.typings),
-  );
 };
 
 const block = (expr: Block, tenv: TypeEnv): PureResult => {
@@ -660,8 +654,6 @@ export const expression = (
       return ascription(expr, tenv);
     case ExprKind.Grouping:
       return expression(expr.expression, tenv);
-    case ExprKind.Print:
-      return printExpr(expr, tenv);
     case ExprKind.Block:
       return block(expr, tenv);
     case ExprKind.Tuple:
@@ -686,6 +678,16 @@ export const expression = (
 };
 
 const exprStmt = (stmt: ExprStmt, tenv: TypeEnv): StatefulResult => {
+  const exprTC = expression(stmt.expression, tenv);
+
+  if (!exprTC.success) {
+    return exprTC;
+  }
+
+  return StatefulSuccess(exprTC.typeEff, tenv, exprTC.typings);
+};
+
+const printStmt = (stmt: PrintStmt, tenv: TypeEnv): StatefulResult => {
   const exprTC = expression(stmt.expression, tenv);
 
   if (!exprTC.success) {
@@ -726,6 +728,8 @@ export const statement = (
       return exprStmt(stmt, tenv);
     case StmtKind.VarStmt:
       return varStmt(stmt, tenv);
+    case StmtKind.PrintStmt:
+      return printStmt(stmt, tenv);
   }
 };
 

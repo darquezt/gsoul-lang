@@ -30,7 +30,9 @@ enum TokenType {
   LESS = 'LESS',
   LESS_EQUAL = 'LESS_EQUAL',
 
+  BACKSLASH = 'BACKSLASH',
   ARROW = 'ARROW',
+  FAT_ARROW = 'FAT_ARROW',
   QUESTION = 'QUESTION',
 
   COLON = 'COLON',

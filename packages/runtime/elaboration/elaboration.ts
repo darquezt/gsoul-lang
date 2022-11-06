@@ -37,7 +37,7 @@ import {
   NilLiteral,
   NonLinearBinary,
   Pair,
-  Print,
+  PrintStmt,
   Projection,
   ProjFst,
   ProjSnd,
@@ -64,6 +64,7 @@ import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import { isKinded } from '@gsoul-lang/core/utils/ADT';
 import SJoin from '@gsoul-lang/core/utils/lib/SJoin';
 import { liftSenvOp } from '@gsoul-lang/core/utils/lib/LiftSenvOp';
+import { format } from '@gsoul-lang/core/utils/TypeEff';
 
 export type Stateful<T> = {
   term: T;
@@ -316,6 +317,9 @@ const app = (
       const inter = interior(arg.typeEff, calleeArgType);
 
       if (!inter.isOk) {
+        console.log(format(arg.typeEff));
+        console.log(format(calleeArgType));
+
         return Result.err(
           new ElaborationSubtypingError({
             reason:
@@ -376,11 +380,11 @@ const sapp = (
   return calleeElaboration.map((callee) => {
     return SCall({
       callee,
-      arg: expr.arg,
+      args: expr.args,
       bracket: expr.bracket,
       typeEff: TypeEffUtils.ForallsUtils.instance(
         callee.typeEff as TypeEff<ForallT, Senv>,
-        expr.arg,
+        expr.args,
       ),
     });
   });
@@ -415,21 +419,6 @@ const ascription = (
       }),
     );
   });
-};
-
-const printExpr = (
-  expr: past.Print,
-  tenv: TypeEnv,
-): Result<Print, ElaborationError> => {
-  const exprElaboration = expression(expr.expression, tenv);
-
-  return exprElaboration.map((inner) =>
-    Print({
-      expression: inner,
-      typeEff: inner.typeEff,
-      showEvidence: expr.showEvidence,
-    }),
-  );
 };
 
 const block = (
@@ -801,8 +790,6 @@ export const expression = (
       return ascription(expr, tenv);
     case past.ExprKind.Grouping:
       return expression(expr.expression, tenv);
-    case past.ExprKind.Print:
-      return printExpr(expr, tenv);
     case past.ExprKind.Block:
       return block(expr, tenv);
     case past.ExprKind.Tuple:
@@ -841,6 +828,30 @@ const exprStmt = (
       ExprStmt({
         expression: expr,
         typeEff: expr.typeEff,
+      }),
+      tenv,
+    ),
+  );
+};
+
+const printStmt = (
+  stmt: past.PrintStmt,
+  tenv: TypeEnv,
+): Result<Stateful<PrintStmt>, ElaborationError> => {
+  const exprElaboration = expression(stmt.expression, tenv);
+
+  if (!exprElaboration.isOk) {
+    return Result.err(exprElaboration.error);
+  }
+
+  const { value: expr } = exprElaboration;
+
+  return Result.ok(
+    Stateful(
+      PrintStmt({
+        expression: expr,
+        typeEff: expr.typeEff,
+        showEvidence: stmt.showEvidence,
       }),
       tenv,
     ),
@@ -902,6 +913,8 @@ export const statement = (
       return exprStmt(stmt, tenv);
     case past.StmtKind.VarStmt:
       return varStmt(stmt, tenv);
+    case past.StmtKind.PrintStmt:
+      return printStmt(stmt, tenv);
   }
 };
 

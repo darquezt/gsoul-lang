@@ -47,7 +47,6 @@ export enum ExprKind {
   ProjFst = 'ProjFst',
   ProjSnd = 'ProjSnd',
   Ascription = 'Ascription',
-  Print = 'Print',
   Block = 'Block',
   Fold = 'Fold',
   Unfold = 'Unfold',
@@ -117,7 +116,7 @@ export const Call = factoryOf<Call>(ExprKind.Call);
 export type SCall = Term<{
   kind: ExprKind.SCall;
   callee: Expression;
-  arg: Senv;
+  args: Senv[];
   bracket: Token;
 }>;
 export const SCall = factoryOf<SCall>(ExprKind.SCall);
@@ -185,13 +184,6 @@ export const AscribedValue = <T extends SimpleValue>(
   kind: ExprKind.Ascription,
   ...params,
 });
-
-export type Print = Term<{
-  kind: ExprKind.Print;
-  expression: Expression;
-  showEvidence: boolean;
-}>;
-export const Print = factoryOf<Print>(ExprKind.Print);
 
 export type Tuple = Term<{
   kind: ExprKind.Tuple;
@@ -347,7 +339,6 @@ export type Expression =
   | Pair
   | ProjFst
   | ProjSnd
-  | Print
   | Block
   | Ascription
   | Fold
@@ -396,7 +387,7 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
       return SCall({
         ...expr,
         ...inductiveCall('callee', expr),
-        arg: senvFn(expr.arg),
+        args: expr.args.map(senvFn),
         typeEff,
       });
     case ExprKind.Grouping:
@@ -441,12 +432,6 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
         ...expr,
         store: storeFn(expr.store),
         ...inductiveCall('forall', expr),
-        typeEff,
-      });
-    case ExprKind.Print:
-      return Print({
-        ...expr,
-        ...inductiveCall('expression', expr),
         typeEff,
       });
     case ExprKind.Block:
@@ -545,6 +530,7 @@ export const ExpressionUtils = {
 
 export enum StmtKind {
   ExprStmt = 'ExprStmt',
+  PrintStmt = 'PrintStmt',
   VarStmt = 'VarStmt',
 }
 
@@ -561,7 +547,14 @@ export type VarStmt = Term<{
 }>;
 export const VarStmt = factoryOf<VarStmt>(StmtKind.VarStmt);
 
-export type Statement = ExprStmt | VarStmt;
+export type PrintStmt = Term<{
+  kind: StmtKind.PrintStmt;
+  expression: Expression;
+  showEvidence: boolean;
+}>;
+export const PrintStmt = factoryOf<PrintStmt>(StmtKind.PrintStmt);
+
+export type Statement = ExprStmt | VarStmt | PrintStmt;
 
 const substStmt = (stmt: Statement, name: string, senv: Senv): Statement => {
   const typeEff = TypeEffUtils.subst(stmt.typeEff, name, senv);
@@ -569,6 +562,12 @@ const substStmt = (stmt: Statement, name: string, senv: Senv): Statement => {
   switch (stmt.kind) {
     case StmtKind.ExprStmt:
       return ExprStmt({
+        ...stmt,
+        expression: ExpressionUtils.subst(stmt.expression, name, senv),
+        typeEff,
+      });
+    case StmtKind.PrintStmt:
+      return PrintStmt({
         ...stmt,
         expression: ExpressionUtils.subst(stmt.expression, name, senv),
         typeEff,

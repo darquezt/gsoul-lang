@@ -15,7 +15,7 @@ const keywords: Record<string, TokenType> = {
   printEv: TokenType.PRINTEV,
   Number: TokenType.NUMBER,
   Bool: TokenType.BOOL,
-  fun: TokenType.FUN,
+  fn: TokenType.FUN,
   forall: TokenType.FORALL,
   Forall: TokenType.FORALLT,
   Tuple: TokenType.TUPLE,
@@ -105,7 +105,13 @@ export const scanTokens = (source: string): Token[] => {
         break;
       }
       case '=': {
-        addToken(match('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL);
+        if (match('=')) {
+          addToken(TokenType.EQUAL_EQUAL);
+        } else if (match('>')) {
+          addToken(TokenType.FAT_ARROW);
+        } else {
+          addToken(TokenType.EQUAL);
+        }
         break;
       }
       case '<': {
@@ -124,6 +130,10 @@ export const scanTokens = (source: string): Token[] => {
         } else {
           addToken(TokenType.SLASH);
         }
+        break;
+      }
+      case '\\': {
+        addToken(TokenType.BACKSLASH);
         break;
       }
       case ' ':

@@ -3,7 +3,7 @@ import * as SenvUtils from './Senv';
 import { Type, Arrow, ForallT, AProduct, RecType } from './Type';
 import * as TypeUtils from './Type';
 import { factoryOf, isKinded, KindedFactory } from './ADT';
-import { identity } from 'ramda';
+import { identity, zip } from 'ramda';
 import { Result } from '@badrap/result';
 import { UndefinedMeetError } from './Sens';
 
@@ -139,29 +139,27 @@ export const ArrowsUtils = {
  * Utilities for working with forall type-and-effects
  */
 export const ForallsUtils = {
-  instance(teff: TypeEff<ForallT, Senv>, senv?: Senv): TypeEff {
-    const {
-      sensVars: [svar, ...sensVars],
-      codomain,
-    } = teff.type;
+  scod(teff: TypeEff<ForallT, Senv>): TypeEff {
+    const { codomain } = teff.type;
 
-    const { type: codomainType, effect: codomainEffect } =
-      sensVars.length === 0
-        ? (codomain as TypeEff)
-        : TypeEff(
-            ForallT({
-              sensVars,
-              codomain: codomain,
-            }),
-            Senv(),
-          );
+    return TypeEff(
+      (codomain as TypeEff).type,
+      SenvUtils.add((codomain as TypeEff).effect, teff.effect),
+    );
+  },
+  instance(teff: TypeEff<ForallT, Senv>, args: Senv[]): TypeEff {
+    const { sensVars } = teff.type;
 
-    const payedCodomain = TypeEff(
-      codomainType,
-      SenvUtils.add(codomainEffect, teff.effect),
+    const instantiations = zip(sensVars, args);
+
+    const payedCodomain = ForallsUtils.scod(teff);
+
+    const result = instantiations.reduce(
+      (acc, [svar, arg]) => subst(acc, svar, arg),
+      payedCodomain,
     );
 
-    return senv ? subst(payedCodomain, svar, senv) : payedCodomain;
+    return result;
   },
 };
 

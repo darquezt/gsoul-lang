@@ -1,6 +1,6 @@
 import { TypeEffUtils } from '@gsoul-lang/core/utils';
 import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
-import { Print, Value } from '../../elaboration/ast';
+import { PrintStmt, Value } from '../../elaboration/ast';
 import { EvidenceUtils, Store } from '../../utils';
 import { formatValue } from '../../utils/format';
 import { Result } from '@badrap/result';
@@ -21,7 +21,7 @@ export const PrintKont: KindedFactory<PrintKont> = factoryOf(
 );
 
 export const reducePrintInnerExpression = (
-  term: Print,
+  term: PrintStmt,
   store: Store,
   kont: Kont,
 ): Result<StepState, InterpreterError> => {
