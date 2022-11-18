@@ -166,7 +166,7 @@ const BindingPower = {
     infix(op: InfixOpType): [number, number] {
       switch (op) {
         case TokenType.QUESTION:
-          return [15, 16];
+          return [16, 15];
         case TokenType.EQUAL_EQUAL:
           return [17, 18];
         case TokenType.GREATER:
