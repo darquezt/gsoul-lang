@@ -49,7 +49,12 @@ import {
   Variable,
   VarStmt,
 } from './ast';
-import { initialEvidence, interior } from '../utils/Evidence';
+import {
+  Evidence,
+  EvidenceError,
+  initialEvidence,
+  interior,
+} from '../utils/Evidence';
 import { Result } from '@badrap/result';
 import {
   ElaborationDependencyError,
@@ -59,12 +64,11 @@ import {
   ElaborationTypeError,
   ElaborationUnsupportedExpressionError,
 } from './errors';
-import { prop } from 'ramda';
+import { prop, zip } from 'ramda';
 import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import { isKinded } from '@gsoul-lang/core/utils/ADT';
 import SJoin from '@gsoul-lang/core/utils/lib/SJoin';
 import { liftSenvOp } from '@gsoul-lang/core/utils/lib/LiftSenvOp';
-import { format } from '@gsoul-lang/core/utils/TypeEff';
 
 export type Stateful<T> = {
   term: T;
@@ -222,20 +226,22 @@ const fun = (
   expr: past.Fun,
   tenv: TypeEnv,
 ): Result<Ascription, ElaborationError> => {
-  const varName = expr.binder.name.lexeme;
+  const extensions = expr.binders.map(
+    (binder) => [binder.name.lexeme, binder.type] as [string, TypeEff],
+  );
 
   const bodyElaboration = expression(
     expr.body,
-    TypeEnvUtils.extend(tenv, varName, expr.binder.type),
+    TypeEnvUtils.extendAll(tenv, ...extensions),
   );
 
   return bodyElaboration.map((body) => {
     const lambda = Fun({
-      binder: expr.binder,
+      binders: expr.binders,
       body,
       typeEff: TypeEff(
         Arrow({
-          domain: expr.binder.type,
+          domain: expr.binders.map((binder) => binder.type),
           codomain: body.typeEff,
         }),
         Senv(),
@@ -306,51 +312,60 @@ const app = (
     checkApplicationCalleeType(expr.paren),
   );
 
-  const argElaboration = expression(expr.arg, tenv);
+  const argsElaboration = Result.all(
+    expr.args.map((arg) => expression(arg, tenv)),
+  ) as unknown as Result<Expression[], ElaborationError>;
 
-  const evidenceResult = Result.all([calleeElaboration, argElaboration]).chain(
-    ([callee, arg]) => {
+  const evidenceResult = Result.all([calleeElaboration, argsElaboration]).chain(
+    ([callee, args]) => {
       const calleeArgType = TypeEffUtils.ArrowsUtils.domain(
         callee.typeEff as TypeEff<Arrow, Senv>,
       );
 
-      const inter = interior(arg.typeEff, calleeArgType);
+      const inter = zip(args, calleeArgType).map(([arg, calleeArgType]) =>
+        interior(arg.typeEff, calleeArgType),
+      );
 
-      if (!inter.isOk) {
-        console.log(format(arg.typeEff));
-        console.log(format(calleeArgType));
+      const allInteriors = Result.all(inter) as unknown as Result<
+        Evidence[],
+        EvidenceError
+      >;
 
+      if (!allInteriors.isOk) {
         return Result.err(
           new ElaborationSubtypingError({
             reason:
               'Argument type is not subtype of the expected type in the function',
             operator: expr.paren,
-            superType: calleeArgType,
-            type: arg.typeEff,
           }),
         );
       }
 
-      return Result.ok(inter.value);
+      return Result.ok(allInteriors.value);
     },
   );
 
-  return Result.all([calleeElaboration, argElaboration, evidenceResult]).map(
-    ([callee, arg, evidence]) =>
-      Call({
+  return Result.all([calleeElaboration, argsElaboration, evidenceResult]).map(
+    ([callee, arg, evidence]) => {
+      const dom = TypeEffUtils.ArrowsUtils.domain(
+        callee.typeEff as TypeEff<Arrow, Senv>,
+      );
+
+      return Call({
         callee,
-        arg: Ascription({
-          evidence,
-          typeEff: TypeEffUtils.ArrowsUtils.domain(
-            callee.typeEff as TypeEff<Arrow, Senv>,
-          ),
-          expression: arg,
-        }),
+        args: zip(arg, evidence).map(([arg, evidence], index) =>
+          Ascription({
+            evidence,
+            typeEff: dom[index],
+            expression: arg,
+          }),
+        ),
         paren: expr.paren,
         typeEff: TypeEffUtils.ArrowsUtils.codomain(
           callee.typeEff as TypeEff<Arrow, Senv>,
         ),
-      }),
+      });
+    },
   );
 };
 
@@ -405,8 +420,6 @@ const ascription = (
           reason:
             'Expression type-and-effect is not a subtype of the ascription type-and-effect',
           operator: expr.ascriptionToken,
-          superType: expr.typeEff,
-          type: inner.typeEff,
         }),
       );
     }
@@ -650,8 +663,6 @@ export const fold = (
           reason:
             'Body type-and-effect is not a subtype of the unfolded expression',
           operator: expr.foldToken,
-          superType: bodyTypeEff,
-          type: body.typeEff,
         }),
       );
     }
@@ -882,7 +893,7 @@ const varStmt = (
 
     const typeEff = TypeEff(
       expr.typeEff.type,
-      Senv({ [stmt.name.lexeme]: Sens(1) }),
+      Senv({ [stmt.name.lexeme]: new Sens(1) }),
     );
 
     expr = Ascription({

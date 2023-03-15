@@ -30,7 +30,7 @@ import {
   RightOpKont,
 } from './interpretations/binary';
 import {
-  ArgKont,
+  ArgsKont,
   FnKont,
   funClosureCreation,
   FunKontKind,
@@ -129,7 +129,7 @@ export type Kont =
   | LeftOpKont
   | NLRightOpKont
   | NLLeftOpKont
-  | ArgKont
+  | ArgsKont
   | FnKont
   | ForallKont
   | ForallSubstKont
@@ -210,7 +210,7 @@ const step = ({
         return reduceNLBinaryOperation(term, store, kont);
       }
 
-      case FunKontKind.ArgKont: {
+      case FunKontKind.ArgsKont: {
         return reduceFunArg(term, store, kont);
       }
 

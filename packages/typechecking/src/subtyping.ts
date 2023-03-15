@@ -3,6 +3,7 @@ import RecursivePolarityCheck, {
   RecursivePolarityMode,
 } from '@gsoul-lang/core/utils/lib/RecursivePolarityCheck';
 import { TypeEffect, TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
+import { zip } from 'ramda';
 
 export const isSubSens = (s1: Sens, s2: Sens): boolean => s1[0] <= s2[1];
 
@@ -37,7 +38,13 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
     return true;
   }
   if (type1.kind === 'Arrow' && type2.kind === 'Arrow') {
-    const argSubtyping = isSubTypeEff(type2.domain, type1.domain);
+    if (type1.domain.length !== type2.domain.length) {
+      return false;
+    }
+
+    const argSubtyping = !zip(type2.domain, type1.domain)
+      .map(([d2, d1]) => isSubTypeEff(d2, d1))
+      .includes(false);
     const bodySubtyping = isSubTypeEff(type1.codomain, type2.codomain);
 
     return argSubtyping && bodySubtyping;

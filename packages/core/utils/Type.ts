@@ -13,6 +13,7 @@ import { Result } from '@badrap/result';
 import { Identifier, Senv } from './Senv';
 import { TypeEff, TypeEffect } from './TypeEff';
 import { UndefinedMeetError } from './Sens';
+import Meet from './lib/Meet';
 
 export enum TypeKind {
   Real = 'Real',
@@ -43,7 +44,7 @@ export const Nil: SingletonKindedFactory<Nil> = singletonFactoryOf(
 
 export type Arrow = {
   kind: TypeKind.Arrow;
-  domain: TypeEffect;
+  domain: TypeEffect[];
   codomain: TypeEffect;
 };
 export const Arrow: KindedFactory<Arrow> = factoryOf<Arrow>(TypeKind.Arrow);
@@ -159,7 +160,7 @@ export const subst = (target: Type, name: Identifier, senv: Senv): Type => {
     nil: identity,
     arrow: (ty) =>
       Arrow({
-        domain: typeEffFn(ty.domain),
+        domain: ty.domain.map(typeEffFn),
         codomain: typeEffFn(ty.codomain),
       }),
     forall: (ty) =>
@@ -201,7 +202,7 @@ export const substRecVar = (
     nil: identity,
     arrow: (ty) =>
       Arrow({
-        domain: typeEffFn(ty.domain),
+        domain: ty.domain.map(typeEffFn),
         codomain: typeEffFn(ty.codomain),
       }),
     forall: (ty) =>
@@ -251,14 +252,24 @@ export const meet = (
     const { domain: dom1, codomain: cod1 } = ty1;
     const { domain: dom2, codomain: cod2 } = ty2;
 
-    return Result.all([
-      TypeEffUtils.meet(dom1, dom2),
-      TypeEffUtils.meet(cod1, cod2),
-    ]).map(([dom, cod]) =>
-      Arrow({
-        domain: dom,
-        codomain: cod,
-      }),
+    if (dom1.length !== dom2.length) {
+      return Result.err(
+        new UndefinedMeetError(
+          'function types have uncompatible number of arguments',
+        ),
+      );
+    }
+
+    const domsMeet = Result.all(
+      zip(dom1, dom2).map(([d1, d2]) => Meet.TypeEffect(d1, d2)),
+    ) as unknown as Result<TypeEffect[], UndefinedMeetError>;
+
+    return Result.all([domsMeet, TypeEffUtils.meet(cod1, cod2)]).map(
+      ([dom, cod]) =>
+        Arrow({
+          domain: dom,
+          codomain: cod,
+        }),
     );
   }
 
@@ -339,9 +350,9 @@ export const format: (ty: Type) => string = match<string>({
   bool: (ty) => chalk.yellow(ty.kind),
   nil: (ty) => chalk.yellow(ty.kind),
   arrow: (ty) =>
-    chalk`${TypeEffUtils.format(ty.domain)} -> ${TypeEffUtils.format(
-      ty.codomain,
-    )}`,
+    chalk`(${ty.domain
+      .map((d) => `${TypeEffUtils.format(d)}`)
+      .join(', ')}) -> ${TypeEffUtils.format(ty.codomain)}`,
   forall: (ty) =>
     chalk`forall {green ${ty.sensVars.join(' ')}} . ${TypeEffUtils.format(
       ty.codomain,

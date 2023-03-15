@@ -7,7 +7,7 @@ enum TokenType {
   LEFT_BRACKET = 'LEFT_BRACKET',
   RIGHT_BRACKET = 'RIGHT_BRACKET',
 
-  AT = '@',
+  AT = 'AT',
   COMMA = 'COMMA',
   DOT = 'DOT',
   MINUS = 'MINUS',

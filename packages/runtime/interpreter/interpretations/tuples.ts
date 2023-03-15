@@ -18,9 +18,7 @@ import { InterpreterEvidenceError, InterpreterTypeError } from '../errors';
 
 export enum TupleKontKind {
   TupleNextComponentsKont = 'TupleNextComponentsKont',
-  TuplePreviousComponentsKont = 'TuplePreviousComponentsKont',
   TupleProjKont = 'TupleProjKont',
-  TupleSecondProjKont = 'TupleSecondProjKont',
 }
 
 export type TupleNextComponentsKont = {

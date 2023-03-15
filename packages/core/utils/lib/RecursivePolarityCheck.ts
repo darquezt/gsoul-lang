@@ -38,13 +38,15 @@ const typeCheckPolarity = (
   }
 
   if (isKinded(ty1, TypeKind.Arrow) && isKinded(ty2, TypeKind.Arrow)) {
+    const domChecks = zip(ty1.domain, ty2.domain).map(([d1, d2]) =>
+      typeEffectCheckPolarity(variable, flipMode(mode), d1, d2),
+    );
+
+    const allDomAreSound = !domChecks.includes(false);
+
     return (
-      typeEffectCheckPolarity(
-        variable,
-        flipMode(mode),
-        ty1.domain,
-        ty2.domain,
-      ) && typeEffectCheckPolarity(variable, mode, ty1.codomain, ty2.codomain)
+      allDomAreSound &&
+      typeEffectCheckPolarity(variable, mode, ty1.codomain, ty2.codomain)
     );
   }
 

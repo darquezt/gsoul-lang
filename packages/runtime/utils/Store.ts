@@ -11,6 +11,17 @@ export const extend = (store: Store, name: string, value: Value): Store => ({
   [name]: value,
 });
 
+export const extendMany = (
+  store: Store,
+  names: string[],
+  values: Value[],
+): Store => {
+  return names.reduce(
+    (storep, name, i) => extend(storep, name, values[i]),
+    store,
+  );
+};
+
 export const subst = (store: Store, name: string, senv: Senv): Store => {
   return Object.keys(store).reduce(
     (storep, id) =>

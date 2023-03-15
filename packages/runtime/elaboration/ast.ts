@@ -108,7 +108,7 @@ export const NonLinearBinary = factoryOf<NonLinearBinary>(
 export type Call = Term<{
   kind: ExprKind.Call;
   callee: Expression;
-  arg: Expression;
+  args: Expression[];
   paren: Token;
 }>;
 export const Call = factoryOf<Call>(ExprKind.Call);
@@ -133,7 +133,7 @@ export const Variable = factoryOf<Variable>(ExprKind.Variable);
 export type Fun = Term<
   {
     kind: ExprKind.Fun;
-    binder: { name: Token; type: TypeEff };
+    binders: Array<{ name: Token; type: TypeEff }>;
     body: Expression;
   },
   TypeEff<Arrow, Senv>
@@ -380,7 +380,7 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
       return Call({
         ...expr,
         ...inductiveCall('callee', expr),
-        ...inductiveCall('arg', expr),
+        args: expr.args.map((arg) => map(arg, fns)),
         typeEff,
       });
     case ExprKind.SCall:
@@ -405,10 +405,10 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
       return Fun({
         ...expr,
         ...inductiveCall('body', expr),
-        binder: {
-          ...expr.binder,
-          type: teffFn(expr.binder.type),
-        },
+        binders: expr.binders.map((binder) => ({
+          ...binder,
+          type: teffFn(binder.type),
+        })),
         typeEff: typeEff as TypeEff<Arrow, Senv>,
       });
     case ExprKind.Closure: {

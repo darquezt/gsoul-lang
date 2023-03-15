@@ -1,4 +1,3 @@
-import { TypeEff } from '@gsoul-lang/core/utils';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 
 export enum ElaborationErrorKind {
@@ -31,25 +30,11 @@ export class ElaborationTypeError extends Error {
 
 export class ElaborationSubtypingError extends Error {
   operator: Token;
-  type: TypeEff;
-  superType: TypeEff;
   name = ElaborationErrorKind.ElaborationSubtypingError as const;
 
-  constructor({
-    reason,
-    operator,
-    type,
-    superType,
-  }: {
-    reason: string;
-    operator: Token;
-    type: TypeEff;
-    superType: TypeEff;
-  }) {
+  constructor({ reason, operator }: { reason: string; operator: Token }) {
     super(reason);
     this.operator = operator;
-    this.type = type;
-    this.superType = superType;
   }
 }
 

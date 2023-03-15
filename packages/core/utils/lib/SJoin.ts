@@ -5,6 +5,7 @@ import { TypeEff, TypeEffect, TypeEffectKind } from '../TypeEff';
 import { Sens } from '../Sens';
 import { mergeWith, zip } from 'ramda';
 import { isKinded } from '../ADT';
+import SMeet from './SMeet';
 
 export class UndefinedSJoinError extends Error {}
 
@@ -33,14 +34,24 @@ const typeSJoin = (ty1: Type, ty2: Type): Result<Type, UndefinedSJoinError> => {
     const { domain: dom1, codomain: cod1 } = ty1;
     const { domain: dom2, codomain: cod2 } = ty2;
 
-    return Result.all([
-      typeEffectSJoin(dom1, dom2),
-      typeEffectSJoin(cod1, cod2),
-    ]).map(([dom, cod]) =>
-      Arrow({
-        domain: dom,
-        codomain: cod,
-      }),
+    if (dom1.length !== dom2.length) {
+      return Result.err(
+        new UndefinedSJoinError(
+          'function types have uncompatible number of arguments',
+        ),
+      );
+    }
+
+    const domsMeet = Result.all(
+      zip(dom1, dom2).map(([d1, d2]) => SMeet.TypeEffect(d1, d2)),
+    ) as unknown as Result<TypeEffect[], UndefinedSJoinError>;
+
+    return Result.all([domsMeet, typeEffectSJoin(cod1, cod2)]).map(
+      ([dom, cod]) =>
+        Arrow({
+          domain: dom,
+          codomain: cod,
+        }),
     );
   }
 

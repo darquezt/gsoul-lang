@@ -1,0 +1,26 @@
+let Y = fn (f : (Number![1x] -> Number![?x]) -> Number![1x] -> Number![?x]) => {
+  let A =
+    fn (x : rec a . a -> Number![1x] -> Number![?x]) =>
+    fn (a : Number![1x]) => {
+      f(unfold(x)(x))(a);
+    };
+
+  let B =
+    fn (y : rec a . a -> Number![1x] -> Number![?x]) =>
+    fn (b : Number![1x]) => {
+      f(unfold(y)(y))(b);
+    };
+
+  A(fold<rec a . a -> Number![1x] -> Number![?x]>(B));
+};
+
+let fib = Y(
+  fn (fib : Number![1x] -> Number![?x]) =>
+  fn (n : Number![1x]) => {
+    n == 1 ? 1
+    : n == 2 ? 1
+      : fib(n - 1) + fib(n - 2);
+  }
+);
+
+printEv fib(10);

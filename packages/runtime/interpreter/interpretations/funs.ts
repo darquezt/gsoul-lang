@@ -18,22 +18,30 @@ import { EvidenceUtils, Store, StoreUtils } from '../../utils';
 import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterTypeError } from '../errors';
+import { zip } from 'ramda';
+import { Evidence, EvidenceError } from '../../utils/Evidence';
 
 export enum FunKontKind {
-  ArgKont = 'ArgKont',
+  ArgsKont = 'ArgsKont',
   FnKont = 'FnKont',
 }
 
-export type ArgKont = {
-  kind: FunKontKind.ArgKont;
-  state: State<{ expression: Expression }>;
+export type ArgsKont = {
+  kind: FunKontKind.ArgsKont;
+  state: State<{ expressions: Expression[] }>;
   paren: Token;
 };
-export const ArgKont: KindedFactory<ArgKont> = factoryOf(FunKontKind.ArgKont);
+export const ArgsKont: KindedFactory<ArgsKont> = factoryOf(
+  FunKontKind.ArgsKont,
+);
 
 export type FnKont = {
   kind: FunKontKind.FnKont;
-  state: State<{ value: Value<Closure> }>;
+  state: State<{
+    value: Value<Closure>;
+    nextArgs: Expression[];
+    previousArgs: Value[];
+  }>;
   paren: Token;
 };
 export const FnKont: KindedFactory<FnKont> = factoryOf(FunKontKind.FnKont);
@@ -46,8 +54,8 @@ export const reduceFunCallee = (
   return OkState(
     { term: term.callee },
     store,
-    ArgKont({
-      state: State({ expression: term.arg }, store, kont),
+    ArgsKont({
+      state: State({ expressions: term.args, values: [] }, store, kont),
       paren: term.paren,
     }),
   );
@@ -55,8 +63,8 @@ export const reduceFunCallee = (
 
 export const reduceFunArg = (
   term: Value,
-  store: Store,
-  kont: ArgKont,
+  _store: Store,
+  kont: ArgsKont,
 ): Result<StepState, InterpreterError> => {
   if (!simpleValueIsKinded(term, ExprKind.Closure)) {
     return Result.err(
@@ -67,11 +75,26 @@ export const reduceFunArg = (
     );
   }
 
+  if (kont.state.expressions.length === 0) {
+    return Result.err(
+      new InterpreterTypeError({
+        reason: 'Not enough arguments',
+        operator: kont.paren,
+      }),
+    );
+  }
+
+  const [nextArg, ...nextArgs] = kont.state.expressions;
+
   return OkState(
-    { term: kont.state.expression },
+    { term: nextArg },
     kont.state.store,
     FnKont({
-      state: State({ value: term }, store, kont.state.kont),
+      state: State(
+        { value: term, nextArgs, previousArgs: [] },
+        kont.state.store,
+        kont.state.kont,
+      ),
       paren: kont.paren,
     }),
   );
@@ -82,6 +105,27 @@ export const reduceFunCall = (
   _store: Store,
   kont: FnKont,
 ): Result<StepState, InterpreterError> => {
+  if (kont.state.nextArgs.length > 0) {
+    const [nextArg, ...nextArgs] = kont.state.nextArgs;
+
+    return OkState(
+      { term: nextArg },
+      kont.state.store,
+      FnKont({
+        state: State(
+          {
+            value: kont.state.value,
+            nextArgs,
+            previousArgs: [...kont.state.previousArgs, term],
+          },
+          kont.state.store,
+          kont.state.kont,
+        ),
+        paren: kont.paren,
+      }),
+    );
+  }
+
   const ascrFun = kont.state.value;
   const closure = ascrFun.expression;
 
@@ -96,24 +140,34 @@ export const reduceFunCall = (
     );
   }
 
-  const argEviRes = EvidenceUtils.trans(term.evidence, idomRes.value);
+  const args = [...kont.state.previousArgs, term];
 
-  if (!argEviRes.isOk) {
-    console.log('app failed');
+  const argsEviRes = Result.all(
+    zip(
+      args.map((a) => a.evidence),
+      idomRes.value,
+    ).map(([ev, idom]) => EvidenceUtils.trans(ev, idom)),
+  ) as unknown as Result<Evidence[], EvidenceError>;
 
+  if (!argsEviRes.isOk) {
     return Result.err(
       new InterpreterTypeError({
-        reason: argEviRes.error.message,
+        reason: argsEviRes.error.message,
         operator: kont.paren,
       }),
     );
   }
 
-  const arg = AscribedValue({
-    typeEff: closure.fun.binder.type,
-    evidence: argEviRes.value,
-    expression: term.expression,
-  });
+  const ascribedArgs = zip(
+    argsEviRes.value,
+    zip(args, closure.fun.binders),
+  ).map(([evi, [arg, binder]]) =>
+    AscribedValue({
+      typeEff: binder.type,
+      evidence: evi,
+      expression: arg.expression,
+    }),
+  );
 
   const bodyEviRes = EvidenceUtils.icod(ascrFun.evidence);
 
@@ -137,7 +191,11 @@ export const reduceFunCall = (
 
   return OkState(
     { term: body },
-    StoreUtils.extend(closure.store, closure.fun.binder.name.lexeme, arg),
+    StoreUtils.extendMany(
+      closure.store,
+      closure.fun.binders.map((b) => b.name.lexeme),
+      ascribedArgs,
+    ),
     kont.state.kont,
   );
 };

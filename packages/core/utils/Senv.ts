@@ -25,7 +25,7 @@ export const access = (senv: Senv, name: Identifier): Sens => {
   const sens = senv[name];
 
   if (!sens) {
-    return Sens(0);
+    return new Sens(0);
   }
 
   return sens;

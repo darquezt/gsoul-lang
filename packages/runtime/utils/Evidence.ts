@@ -54,7 +54,11 @@ export type Evidence = Evi<TypeEffect>;
 // export const EvidenceTypeError =
 //   factoryOf<EvidenceTypeError>('EvidenceTypeError');
 
-export class EvidenceInteriorError extends Error {}
+export class EvidenceInteriorError<T = TypeEffect> extends Error {
+  constructor(message: string, public type: T, public superType: T) {
+    super(message);
+  }
+}
 export class EvidenceTransitivityError extends Error {}
 export class EvidenceTypeError extends Error {}
 
@@ -71,10 +75,12 @@ const interiorSens = (
   const s13 = Math.max(s1, s3);
 
   if (s1 <= s24 && s13 <= s4) {
-    return Result.ok([Sens(s1, s24), Sens(s13, s4)]);
+    return Result.ok([new Sens(s1, s24), new Sens(s13, s4)]);
   }
 
-  return Result.err(new EvidenceInteriorError('Interior is not defined'));
+  return Result.err(
+    new EvidenceInteriorError('Interior is not defined', [s1, s2], [s3, s4]),
+  );
 };
 
 const interiorSenv = (
@@ -115,17 +121,24 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
   }
 
   if (isKinded(t1, TypeKind.Arrow) && isKinded(t2, TypeKind.Arrow)) {
-    const eviT11Res = interior(t2.domain, t1.domain);
+    const eviT11Res = zip(t2.domain, t1.domain).map(([t2i, t1i]) =>
+      interior(t2i, t1i),
+    );
 
     const eviT12Res = interior(t1.codomain, t2.codomain);
 
-    return Result.all([eviT11Res, eviT12Res]).map(([eviT11, eviT12]) => [
+    return (
+      Result.all([eviT12Res, ...eviT11Res]) as unknown as Result<
+        Evi<TypeEffect>[],
+        EvidenceError
+      >
+    ).map(([eviT12, ...eviT11]) => [
       Arrow({
-        domain: eviT11[1],
+        domain: eviT11.map((evi) => evi[1]),
         codomain: eviT12[0],
       }),
       Arrow({
-        domain: eviT11[0],
+        domain: eviT11.map((evi) => evi[0]),
         codomain: eviT12[1],
       }),
     ]);
@@ -134,7 +147,7 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
   if (isKinded(t1, TypeKind.Product) && isKinded(t2, TypeKind.Product)) {
     if (t1.typeEffects.length !== t2.typeEffects.length) {
       return Result.err(
-        new EvidenceInteriorError('Wrong number of product components'),
+        new EvidenceInteriorError('Wrong number of product components', t1, t2),
       );
     }
 
@@ -160,6 +173,8 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
       return Result.err(
         new EvidenceInteriorError(
           'Bound variables of recursive types are incompatible',
+          t1,
+          t2,
         ),
       );
     }
@@ -203,7 +218,11 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
   }
 
   return Result.err(
-    new EvidenceInteriorError(`Unsopported types: ${t1.kind}, ${t2.kind}`),
+    new EvidenceInteriorError(
+      `Unsopported types: ${t1.kind}, ${t2.kind}`,
+      t1,
+      t2,
+    ),
   );
 };
 
@@ -219,7 +238,9 @@ export const interior = (
       return Result.ok([te1, te2]);
     }
 
-    return Result.err(new EvidenceInteriorError('Interior is not defined'));
+    return Result.err(
+      new EvidenceInteriorError('Interior is not defined', te1, te2),
+    );
   }
 
   if (
@@ -236,7 +257,9 @@ export const interior = (
     ]);
   }
 
-  return Result.err(new EvidenceInteriorError('Interior is not defined'));
+  return Result.err(
+    new EvidenceInteriorError('Interior is not defined', te1, te2),
+  );
 };
 
 export const initialEvidence = (te1: TypeEff): Evidence => {
@@ -259,7 +282,7 @@ export const transSens = (
     );
   }
 
-  return Result.ok([Sens(s11, s1p), Sens(s2p, s24)]);
+  return Result.ok([new Sens(s11, s1p), new Sens(s2p, s24)]);
 };
 
 export const transSenv = (
@@ -546,7 +569,7 @@ export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   ]);
 };
 
-export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
+export const idom = (ev: Evidence): Result<Evidence[], EvidenceError> => {
   const [left, right] = ev;
 
   if (
@@ -571,10 +594,12 @@ export const idom = (ev: Evidence): Result<Evidence, EvidenceError> => {
     );
   }
 
-  return Result.ok([
-    TypeEffUtils.ArrowsUtils.domain(left),
-    TypeEffUtils.ArrowsUtils.domain(right),
-  ]);
+  return Result.ok(
+    zip(
+      TypeEffUtils.ArrowsUtils.domain(left),
+      TypeEffUtils.ArrowsUtils.domain(right),
+    ),
+  );
 };
 
 export const iscod = (ev: Evidence): Result<Evidence, EvidenceError> => {

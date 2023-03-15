@@ -1,69 +1,155 @@
+(***********)
 (* Program *)
+(***********)
 
-program ::= declaration* EOF;
+program ::= statement* EOF;
 
-(* Declarations *)
-
-declaration ::= resDecl | varDecl | statement;
-varDecl ::= "let" IDENTIFIER "=" expression ";";
-resDecl ::= "slet" IDENTIFIER "=" expression ";";
-
+(**************)
 (* Statements *)
+(**************)
 
-statement ::= exprStmt
-            | print
-            | block;
-exprStmt ::= expression ";";
+statement     ::=
+              | letDeclaration
+              | print
+              | block
+              | exprStmt;
+letDeclaration ::= "let" IDENTIFIER "=" expression ";";
 print ::= "print" expression ";";
 printEv ::= "printEv" expression ";";
-block ::= "{" declaration* "}";
+exprStmt ::= expression ";";
 
+(***************)
 (* Expressions *)
+(***************)
 
-expression ::= ascription;
-ascription ::= equality ("::" typeEff)* | equality ("::" type)* | equality ("::" senv)*;
-(* Logic ops and assignments can be added here *)
-equality ::= comparison; (* Equality and inequality should be added here *)
-comparison ::= additive ("<=" additive)*;
-additive ::= factor ("+" factor)*; (* Minus op should be added here *)
-multiplicative ::= unary ("*" unary)*; (* Division should be added here *)
-unary ::= call; (* Unary operators may be added before `call` in the future *)
-call ::= primary ("(" arguments ")")* | primary ("<" senv ">")* | primary ("[" NUMBER "]")*;
+expression    ::=
+              | "false"
+              | "true"
+              | "nil"
+              | numberLiteral
+              | variable
+              | tuple
+              | grouping
+              | fold
+              | unfold
+              | block
+              | fun
+              | forall
+              | call
+              | scall
+              | tupleProjection
+              | ascription
+              | binary
+              | nonLinearBinary
+              | ternary;
 
-primary ::= "true" | "false"
-          | "nil"
-          | "fun" "(" parameters ")" block
-          | "forall" IDENTIFIER "." expression
-          | "tuple" "(" expression, expression ")"
-          | "untup" IDENTIFIER, IDENTIFIER "=" expression "in" expression
-          | NUMBER
-          | IDENTIFIER
-          | "(" expression ")";
+numberLiteral ::= NUMBER;
+variable      ::= IDENTIFIER;
+tuple         ::= "(" expression ("," expression)+ ")";
+grouping      ::= "(" expression ")";
+fold          ::= "fold" "<" recursiveType ">" "(" expression ")";
+unfold        ::= "unfold" "(" expression ")";
+block         ::= "{" statement* "}";
+(*
+       prefix operator
+       at level 1
+ *)
+fun           ::=  "fn" "(" parameters ")" "=>" expression;
+(*
+       prefix operator
+       at level 1
+ *)
+forall        ::=  "forall" IDENTIFIER* "." expression;
+(*
+       postfix operator
+       at level 33
+ *)
+call          ::=  expression "(" expression ")";
+(*
+       postfix operator
+       at level 33
+ *)
+scall         ::=  expression "@" "[" sensitivityArgs "]";
+(*
+       postfix operator
+       at level 33
+ *)
+tupleProjection      ::=  expression "[" NUMBER "]";
+(*
+       postfix operator
+       at level 31
+ *)
+ascription    ::=  expression "::" type;
+(*
+       infix operator
+       at level 23
+ *)
+binary        ::=
+              | expression "+" expression
+              | expression "-" expression;
+nonLinearBinary      ::=
+                     | multiplication
+                     | comparison
+                     | equality;
+(*
+       infix operator
+       at level 25
+ *)
+multiplication       ::= expression "*" expression;
+(*
+       infix operator
+       at level 19
+ *)
+comparison    ::=
+              | expression ">" expression
+              | expression ">=" expression
+              | expression "<" expression
+              | expression "<=" expression;
+(*
+       infix operator
+       at level 17
+ *)
+equality      ::= expression "==" expression;
+(*
+       infix operator
+       at level 15
+       right-associative
+ *)
+ternary       ::= expression "?" expression ":" expression;
 
-(* Types )*
+(*********)
+(* Types *)
+(*********)
 
-typeEff ::= type "!" senv; (* Should the @[] be in the def of senv? *)
-type ::= "Number" | "Bool" | "Nil"
-       | typeEff  "->"  typeEff | "forall" IDENTIFIER "." typeEff;
+type   ::=
+       | "Number"
+       | "Nil"
+       | recursiveVariable
+       | tupleType
+       | typeGrouping
+       | recursiveType
+       | typeAndEffect
+       | arrowType;
 
-
-typeEff ::= "Number" | "Bool" | "Nil" | typeEff "->" typeEff | typeEff "!" senv;
-baseTypeEff ::= baseType "!" senv;
-type ::= baseType | typeEff "->" typeEff;
-baseType = ;
-
-typeEff ::= finiteType "!" senv | type | "(" type ")" "!" senv | "(" type "!" senv ")" | IDENTIFIER;
-type ::= finiteType | typeEff "->" typeEff;
-finiteType ::= "Number" | "Bool" | "Nil" | "forall" IDENTIFIER* "." typeEff | "rec" IDENTIFIER "." typeEff;
-
-typeEff ::=  atomTypeEff ("->" atomTypeEff)*;
-atomTypeEff ::= "Number" ["!" senv]
-           | "Bool" ["!" senv]
-           | "Nil" ["!" senv]
-           | "forall" IDENTIFIER* "." typeEff ["!" senv]
-           | "rec" IDENTIFIER "." typeEff ["!" senv]
-           | IDENTIFIER
-           | "(" typeEff ")" ["!" senv];
+recursiveVariable    ::= IDENTIFIER;
+tupleType     ::= "(" type ("," type)+ ")";
+typeGrouping  ::= "(" type ")";
+(*
+       prefix operator
+       at level 7
+*)
+recursiveType ::= "rec" IDENTIFIER "." type;
+(*
+       postfix operator
+       at level 19
+*)
+typeAndEffect ::= type "!" "[" senv "]";
+(*
+       infix operator
+       at level 9
+       right-associative
+*)
+arrowType     ::= type "->" type;
 
 senv ::= ( sensitivity IDENTIFIER ("+" sensitivity IDENTIFIER)* )?;
 sensitivity ::= NUMBER | "?";

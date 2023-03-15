@@ -123,8 +123,8 @@ export const format = match<string>({
  * Utilities for working with arrow type-and-effects
  */
 export const ArrowsUtils = {
-  domain(teff: TypeEff<Arrow, Senv>): TypeEff {
-    return teff.type.domain as TypeEff;
+  domain(teff: TypeEff<Arrow, Senv>): TypeEff[] {
+    return teff.type.domain as TypeEff[];
   },
 
   codomain(teff: TypeEff<Arrow, Senv>): TypeEff {

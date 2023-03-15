@@ -60,7 +60,7 @@ export const NonLinearBinary = factoryOf<NonLinearBinary>(
 export type Call = {
   kind: ExprKind.Call;
   callee: Expression;
-  arg: Expression;
+  args: Expression[];
   paren: Token;
 };
 export const Call = factoryOf<Call>(ExprKind.Call);
@@ -81,7 +81,7 @@ export const Variable = factoryOf<Variable>(ExprKind.Variable);
 
 export type Fun = {
   kind: ExprKind.Fun;
-  binder: { name: Token; type: TypeEff };
+  binders: Array<{ name: Token; type: TypeEff }>;
   body: Expression;
 };
 export const Fun = factoryOf<Fun>(ExprKind.Fun);

@@ -10,3 +10,9 @@ export const extend = (
   id: Identifier,
   typeEff: TypeEff,
 ): TypeEnv => ({ ...tenv, [id]: typeEff });
+
+export const extendAll = (
+  tenv: TypeEnv,
+  ...pairs: [Identifier, TypeEff][]
+): TypeEnv =>
+  pairs.reduce((acc, [id, typeEff]) => extend(acc, id, typeEff), tenv);

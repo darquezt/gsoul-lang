@@ -68,6 +68,9 @@ export const PureSuccess = (
   typings,
 });
 
+const allAreSuccess = (results: PureResult[]): results is PureSuccess[] =>
+  results.every((r) => r.success);
+
 export type StatefulSuccess = {
   success: true;
   typeEff: TypeEff;
@@ -212,14 +215,13 @@ const nonLinearBinary = (expr: NonLinearBinary, tenv: TypeEnv): PureResult => {
 };
 
 const fun = (expr: Fun, tenv: TypeEnv): PureResult => {
-  const { binder, body } = expr;
+  const { binders, body } = expr;
 
-  const varName = binder.name.lexeme;
-
-  const bodyTC = expression(
-    body,
-    TypeEnvUtils.extend(tenv, varName, binder.type as TypeEff),
+  const extensions = binders.map(
+    (b) => [b.name.lexeme, b.type] as [string, TypeEff],
   );
+
+  const bodyTC = expression(body, TypeEnvUtils.extendAll(tenv, ...extensions));
 
   if (!bodyTC.success) {
     return bodyTC;
@@ -228,7 +230,7 @@ const fun = (expr: Fun, tenv: TypeEnv): PureResult => {
   return PureSuccess(
     TypeEff(
       Arrow({
-        domain: binder.type,
+        domain: binders.map((b) => b.type),
         codomain: bodyTC.typeEff,
       }),
       Senv(),
@@ -271,15 +273,28 @@ const app = (expr: Call, tenv: TypeEnv): PureResult => {
     return Failure(expr.paren, 'Expression called is not a function');
   }
 
-  const argTC = expression(expr.arg, tenv);
-
-  if (!argTC.success) {
-    return argTC;
+  if (calleeTypeEff.type.domain.length !== expr.args.length) {
+    return Failure(
+      expr.paren,
+      'Number of arguments does not match the number of parameters',
+    );
   }
 
-  const argType = argTC.typeEff;
+  const argsTC = expr.args.map((arg) => expression(arg, tenv));
 
-  if (!isSubTypeEff(argType, TypeEffUtils.ArrowsUtils.domain(calleeTypeEff))) {
+  if (!allAreSuccess(argsTC)) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return argsTC.find((argTC) => !argTC.success)!;
+  }
+
+  const subtypingCondition = argsTC.every((argTC, i) =>
+    isSubTypeEff(
+      argTC.typeEff,
+      TypeEffUtils.ArrowsUtils.domain(calleeTypeEff)[i],
+    ),
+  );
+
+  if (!subtypingCondition) {
     return Failure(
       expr.paren,
       'Argument type is not subtype of the expected type in the function',
@@ -288,7 +303,7 @@ const app = (expr: Call, tenv: TypeEnv): PureResult => {
 
   return PureSuccess(
     TypeEffUtils.ArrowsUtils.codomain(calleeTypeEff),
-    calleeTC.typings.concat(argTC.typings),
+    calleeTC.typings.concat(...argsTC.map((argTC) => argTC.typings)),
   );
 };
 
@@ -709,7 +724,7 @@ const varStmt = (stmt: VarStmt, tenv: TypeEnv): StatefulResult => {
   }
 
   const typeEff = stmt.resource
-    ? TypeEff(exprTC.typeEff.type, Senv({ [stmt.name.lexeme]: Sens(1) }))
+    ? TypeEff(exprTC.typeEff.type, Senv({ [stmt.name.lexeme]: new Sens(1) }))
     : exprTC.typeEff;
 
   return StatefulSuccess(

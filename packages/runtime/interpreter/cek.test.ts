@@ -48,17 +48,20 @@ describe('CEK', () => {
       typeEff: RealEmptySenv,
     });
 
+    // fix this test
     const fun = Ascription({
       expression: Fun({
-        binder: {
-          name: variableToken('x'),
-          type: RealEmptySenv,
-        },
+        binders: [
+          {
+            name: variableToken('x'),
+            type: RealEmptySenv,
+          },
+        ],
         body,
         typeEff: {
           kind: TypeEffectKind.TypeEff,
           type: Arrow({
-            domain: RealEmptySenv,
+            domain: [RealEmptySenv],
             codomain: RealEmptySenv,
           }),
           effect: Senv(),
@@ -66,7 +69,7 @@ describe('CEK', () => {
       }),
       typeEff: TypeEff(
         Arrow({
-          domain: RealEmptySenv,
+          domain: [RealEmptySenv],
           codomain: RealEmptySenv,
         }),
         Senv(),
@@ -74,7 +77,7 @@ describe('CEK', () => {
       evidence: initialEvidence(
         TypeEff(
           Arrow({
-            domain: RealEmptySenv,
+            domain: [RealEmptySenv],
             codomain: RealEmptySenv,
           }),
           Senv(),
@@ -90,7 +93,7 @@ describe('CEK', () => {
 
     const app = Call({
       callee: fun,
-      arg,
+      args: [arg],
       typeEff: RealEmptySenv,
       paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 1),
     });
@@ -160,8 +163,8 @@ describe('CEK', () => {
     const leftInner = 2;
     const rightInner = 7;
 
-    const leftTypeEff = TypeEff(Real(), Senv({ x: Sens(1) }));
-    const rightTypeEff = TypeEff(Real(), Senv({ y: Sens(2) }));
+    const leftTypeEff = TypeEff(Real(), Senv({ x: new Sens(1) }));
+    const rightTypeEff = TypeEff(Real(), Senv({ y: new Sens(2) }));
 
     const left = Ascription({
       expression: RealLiteral({

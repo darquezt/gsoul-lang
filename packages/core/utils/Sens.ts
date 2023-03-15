@@ -2,17 +2,88 @@ import { Result } from '@badrap/result';
 import * as chalk from 'chalk';
 
 // export type Sens = Readonly<[number, number]>;
-export type Sens = {
-  0: number;
-  1: number;
-  [Symbol.iterator](this: Sens): Generator<number, void, unknown>;
-  plus(another: Sens): Sens;
-  times(another: Sens): Sens;
-  meet(another: Sens): Result<Sens, UndefinedMeetError>;
-  sjoin(another: Sens): Sens;
-  scaleBy(factor: number): Sens;
-  format(): string;
-};
+export class Sens {
+  private readonly 0: number;
+  private readonly 1: number;
+
+  constructor(public min?: number, public max?: number) {
+    if (isUndefined(min) && isUndefined(max)) {
+      this[0] = 0;
+      this[1] = MAX_SENS;
+    } else if (isUndefined(min) && !isUndefined(max)) {
+      this[0] = 0;
+      this[1] = max;
+    } else if (!isUndefined(min) && isUndefined(max)) {
+      this[0] = min;
+      this[1] = min;
+    } else {
+      this[0] = min as number;
+      this[1] = max as number;
+    }
+  }
+
+  *[Symbol.iterator](): Generator<number, void, unknown> {
+    yield this[0];
+    yield this[1];
+  }
+
+  plus(another: Sens): Sens {
+    return new Sens(this[0] + another[0], this[1] + another[1]);
+  }
+
+  times(another: Sens): Sens {
+    return new Sens(
+      multiplyBounds(this[0], another[0]),
+      multiplyBounds(this[1], another[1]),
+    );
+  }
+
+  meet(another: Sens): Result<Sens, UndefinedMeetError> {
+    if (another[0] > this[1] || this[0] > another[1]) {
+      return Result.err(new UndefinedMeetError());
+    }
+
+    return Result.ok(
+      new Sens(Math.max(this[0], another[0]), Math.min(this[1], another[1])),
+    );
+  }
+
+  sjoin(another: Sens): Sens {
+    return new Sens(
+      maxBounds(this[0], another[0]),
+      maxBounds(this[1], another[1]),
+    );
+  }
+
+  smeet(another: Sens): Sens {
+    return new Sens(
+      Math.min(this[0], another[0]),
+      Math.min(this[1], another[1]),
+    );
+  }
+
+  scaleBy(factor: number): Sens {
+    return new Sens(
+      multiplyBounds(this[0], factor),
+      multiplyBounds(this[1], factor),
+    );
+  }
+
+  format(): string {
+    const lowerString = this[0] === MAX_SENS ? '∞' : String(this[0]);
+    const upperString = this[1] === MAX_SENS ? '∞' : String(this[1]);
+
+    if (lowerString === upperString) {
+      return lowerString;
+    }
+
+    if (this[0] === 0 && this[1] === MAX_SENS) {
+      return chalk.magenta('?');
+    }
+
+    return `[${lowerString},${upperString}]`;
+  }
+}
 
 export const MAX_SENS = Infinity;
 
@@ -30,76 +101,69 @@ const multiplyBounds = (a: number, b: number) => {
   return a * b;
 };
 
-export const makeSens = (lower: number, upper: number): Sens => ({
-  0: lower,
-  1: upper,
-  *[Symbol.iterator]() {
-    yield lower;
-    yield upper;
-  },
-  plus(another) {
-    return makeSens(lower + another[0], upper + another[1]);
-  },
-  times(another) {
-    return makeSens(
-      multiplyBounds(lower, another[0]),
-      multiplyBounds(upper, another[1]),
-    );
-  },
-  meet(another: Sens) {
-    if (another[0] > upper || lower > another[1]) {
-      return Result.err(new UndefinedMeetError());
-    }
+// export const new Sens = (lower: number, upper: number): Sens => ({
+//   0: lower,
+//   1: upper,
+//   *[Symbol.iterator]() {
+//     yield lower;
+//     yield upper;
+//   },
+//   plus(another) {
+//     return new Sens(lower + another[0], upper + another[1]);
+//   },
+//   times(another) {
+//     return new Sens(
+//       multiplyBounds(lower, another[0]),
+//       multiplyBounds(upper, another[1]),
+//     );
+//   },
+//   meet(another: Sens) {
+//     if (another[0] > upper || lower > another[1]) {
+//       return Result.err(new UndefinedMeetError());
+//     }
 
-    return Result.ok(
-      makeSens(Math.max(lower, another[0]), Math.min(upper, another[1])),
-    );
-  },
-  sjoin(another) {
-    return makeSens(maxBounds(lower, another[0]), maxBounds(upper, another[1]));
-  },
-  scaleBy(factor) {
-    return makeSens(
-      multiplyBounds(lower, factor),
-      multiplyBounds(upper, factor),
-    );
-  },
-  format() {
-    const lowerString = lower === MAX_SENS ? '∞' : String(lower);
-    const upperString = upper === MAX_SENS ? '∞' : String(upper);
+//     return Result.ok(
+//       new Sens(Math.max(lower, another[0]), Math.min(upper, another[1])),
+//     );
+//   },
+//   sjoin(another) {
+//     return new Sens(maxBounds(lower, another[0]), maxBounds(upper, another[1]));
+//   },
+//   smeet(another) {
+//     return new Sens(Math.min(lower, another[0]), Math.min(upper, another[1]));
+//   },
+//   scaleBy(factor) {
+//     return new Sens(
+//       multiplyBounds(lower, factor),
+//       multiplyBounds(upper, factor),
+//     );
+//   },
+//   format() {
+//     const lowerString = lower === MAX_SENS ? '∞' : String(lower);
+//     const upperString = upper === MAX_SENS ? '∞' : String(upper);
 
-    if (lowerString === upperString) {
-      return lowerString;
-    }
+//     if (lowerString === upperString) {
+//       return lowerString;
+//     }
 
-    if (lower === 0 && upper === MAX_SENS) {
-      return chalk.magenta('?');
-    }
+//     if (lower === 0 && upper === MAX_SENS) {
+//       return chalk.magenta('?');
+//     }
 
-    return `[${lowerString},${upperString}]`;
-  },
-});
+//     return `[${lowerString},${upperString}]`;
+//   },
+// });
 
-export const Sens = (lower?: number, upper?: number): Sens => {
-  if (isUndefined(lower) && isUndefined(upper)) {
-    return UNKNOWN_SENS;
-  } else if (isUndefined(lower) && !isUndefined(upper)) {
-    return makeSens(0, upper);
-  } else if (!isUndefined(lower) && isUndefined(upper)) {
-    return makeSens(lower, lower);
-  }
+// export const Sens = (lower?: number, upper?: number): Sens => {};
 
-  return makeSens(lower as number, upper as number);
-};
-
-export const UNKNOWN_SENS = makeSens(0, MAX_SENS);
+export const UNKNOWN_SENS = new Sens(0, MAX_SENS);
 
 export const UnknownSens = (): Sens => {
   return UNKNOWN_SENS;
 };
 
 export const MaxSens = (): Sens => {
-  return makeSens(MAX_SENS, MAX_SENS);
+  return new Sens(MAX_SENS, MAX_SENS);
 };
 
 const addBounds = (a: number, b: number): number => {
@@ -122,14 +186,14 @@ const maxBounds = (a: number, b: number): number => {
  * @deprecated
  */
 export const add = (a: Sens, b: Sens): Sens => {
-  return makeSens(addBounds(a[0], b[0]), addBounds(a[1], b[1]));
+  return new Sens(addBounds(a[0], b[0]), addBounds(a[1], b[1]));
 };
 
 /**
  * @deprecated
  */
 export const mult = (a: Sens, b: Sens): Sens => {
-  return makeSens(multiplyBounds(a[0], b[0]), multiplyBounds(a[1], b[1]));
+  return new Sens(multiplyBounds(a[0], b[0]), multiplyBounds(a[1], b[1]));
 };
 
 export class UndefinedMeetError extends Error {}
@@ -142,21 +206,21 @@ export const meet = (a: Sens, b: Sens): Result<Sens, UndefinedMeetError> => {
     return Result.err(new UndefinedMeetError());
   }
 
-  return Result.ok(makeSens(Math.max(a[0], b[0]), Math.min(a[1], b[1])));
+  return Result.ok(new Sens(Math.max(a[0], b[0]), Math.min(a[1], b[1])));
 };
 
 /**
  * @deprecated
  */
 export const sjoin = (a: Sens, b: Sens): Sens => {
-  return makeSens(maxBounds(a[0], b[0]), maxBounds(a[1], b[1]));
+  return new Sens(maxBounds(a[0], b[0]), maxBounds(a[1], b[1]));
 };
 
 /**
  * @deprecated
  */
 export const scale = (sens: Sens, factor: number): Sens =>
-  makeSens(multiplyBounds(sens[0], factor), multiplyBounds(sens[1], factor));
+  new Sens(multiplyBounds(sens[0], factor), multiplyBounds(sens[1], factor));
 
 /**
  * @deprecated

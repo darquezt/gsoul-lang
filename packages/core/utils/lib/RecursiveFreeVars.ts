@@ -10,7 +10,7 @@ const typeFreeVars = (ty: Type): string[] => {
     case TypeKind.Bool:
       return [];
     case TypeKind.Arrow:
-      return typeEffectFreeVars(ty.domain).concat(
+      return flatten(ty.domain.map((d) => typeEffectFreeVars(d))).concat(
         typeEffectFreeVars(ty.codomain),
       );
     case TypeKind.Product:

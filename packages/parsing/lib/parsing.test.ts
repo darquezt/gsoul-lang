@@ -33,7 +33,6 @@ const exprStmt = (expression: Expression) =>
   Result<Statement[]>([ExprStmt({ expression })], []);
 
 describe('Parsing', () => {
-  console.log('parsinssss');
   describe('booleans', () => {
     test('The thuth', () => {
       expect(lexAndParse('true;')).toStrictEqual<Result<Statement[]>>(
@@ -128,15 +127,43 @@ describe('Parsing', () => {
 
   describe('functions', () => {
     test('A simple function', () => {
-      expect(lexAndParse('fun(x:Number![]) { x; };')).toStrictEqual<
+      expect(lexAndParse('fn (x:Number![]) => { x; };')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
           Fun({
-            binder: {
-              name: variableToken('x', 1, 5),
-              type: TypeEff(Real(), Senv()),
-            },
+            binders: [
+              {
+                name: variableToken('x', 1, 5),
+                type: TypeEff(Real(), Senv()),
+              },
+            ],
+            body: Block({
+              statements: [
+                ExprStmt({
+                  expression: Variable({
+                    name: variableToken('x', 1, 23),
+                  }),
+                }),
+              ],
+            }),
+          }),
+        ),
+      );
+    });
+
+    test('A simple function with Nil type', () => {
+      expect(lexAndParse('fn (x:Nil![]) => { x; };')).toStrictEqual<
+        Result<Statement[]>
+      >(
+        exprStmt(
+          Fun({
+            binders: [
+              {
+                name: variableToken('x', 1, 5),
+                type: TypeEff(Nil(), Senv()),
+              },
+            ],
             body: Block({
               statements: [
                 ExprStmt({
@@ -151,24 +178,30 @@ describe('Parsing', () => {
       );
     });
 
-    test('A simple function with Nil type', () => {
-      expect(lexAndParse('fun(x:Nil![]) { x; };')).toStrictEqual<
+    test('A sum function', () => {
+      expect(lexAndParse('fn (x: Number, y: Number) => x + y;')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
           Fun({
-            binder: {
-              name: variableToken('x', 1, 5),
-              type: TypeEff(Nil(), Senv()),
-            },
-            body: Block({
-              statements: [
-                ExprStmt({
-                  expression: Variable({
-                    name: variableToken('x', 1, 17),
-                  }),
-                }),
-              ],
+            binders: [
+              {
+                name: variableToken('x', 1, 5),
+                type: TypeEff(Real(), Senv()),
+              },
+              {
+                name: variableToken('y', 1, 16),
+                type: TypeEff(Real(), Senv()),
+              },
+            ],
+            body: Binary({
+              left: Variable({
+                name: variableToken('x', 1, 30),
+              }),
+              operator: new Token(TokenType.PLUS, '+', null, 1, 32),
+              right: Variable({
+                name: variableToken('y', 1, 34),
+              }),
             }),
           }),
         ),
@@ -221,11 +254,13 @@ describe('Parsing', () => {
             callee: Variable({
               name: someFunction,
             }),
-            arg: Literal({
-              value: 2,
-              token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 14),
-            }),
-            paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 15),
+            args: [
+              Literal({
+                value: 2,
+                token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 14),
+              }),
+            ],
+            paren: new Token(TokenType.LEFT_PAREN, '(', null, 1, 13),
           }),
         ),
       );
@@ -242,17 +277,21 @@ describe('Parsing', () => {
               callee: Variable({
                 name: someFunction,
               }),
-              arg: Literal({
-                value: 2,
-                token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 14),
+              args: [
+                Literal({
+                  value: 2,
+                  token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 14),
+                }),
+              ],
+              paren: new Token(TokenType.LEFT_PAREN, '(', null, 1, 13),
+            }),
+            args: [
+              Literal({
+                value: 3,
+                token: new Token(TokenType.NUMBERLIT, '3', 3, 1, 17),
               }),
-              paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 15),
-            }),
-            arg: Literal({
-              value: 3,
-              token: new Token(TokenType.NUMBERLIT, '3', 3, 1, 17),
-            }),
-            paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 18),
+            ],
+            paren: new Token(TokenType.LEFT_PAREN, '(', null, 1, 16),
           }),
         ),
       );
@@ -268,44 +307,50 @@ describe('Parsing', () => {
             callee: Variable({
               name: someFunction,
             }),
-            arg: Literal({
-              value: null,
-              token: new Token(TokenType.NILLIT, 'nil', null, 1, 14),
-            }),
-            paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 17),
+            args: [
+              Literal({
+                value: null,
+                token: new Token(TokenType.NILLIT, 'nil', null, 1, 14),
+              }),
+            ],
+            paren: new Token(TokenType.LEFT_PAREN, '(', null, 1, 13),
           }),
         ),
       );
     });
 
     test('Inline function call', () => {
-      expect(lexAndParse('(fun(x:Number![]) {x;})(2);')).toStrictEqual<
+      expect(lexAndParse('(fn (x:Number![]) => {x;})(2);')).toStrictEqual<
         Result<Statement[]>
       >(
         exprStmt(
           Call({
             callee: Grouping({
               expression: Fun({
-                binder: {
-                  name: variableToken('x', 1, 6),
-                  type: TypeEff(Real(), Senv()),
-                },
+                binders: [
+                  {
+                    name: variableToken('x', 1, 6),
+                    type: TypeEff(Real(), Senv()),
+                  },
+                ],
                 body: Block({
                   statements: [
                     ExprStmt({
                       expression: Variable({
-                        name: variableToken('x', 1, 20),
+                        name: variableToken('x', 1, 23),
                       }),
                     }),
                   ],
                 }),
               }),
             }),
-            arg: Literal({
-              value: 2,
-              token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 25),
-            }),
-            paren: new Token(TokenType.RIGHT_PAREN, ')', null, 1, 26),
+            args: [
+              Literal({
+                value: 2,
+                token: new Token(TokenType.NUMBERLIT, '2', 2, 1, 28),
+              }),
+            ],
+            paren: new Token(TokenType.LEFT_PAREN, '(', null, 1, 27),
           }),
         ),
       );
@@ -318,8 +363,8 @@ describe('Parsing', () => {
             callee: Variable({
               name: variableToken('f', 1, 1),
             }),
-            args: [Senv({ x: Sens(2) })],
-            bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 3),
+            args: [Senv({ x: new Sens(2) })],
+            bracket: new Token(TokenType.AT, '@', null, 1, 3),
           }),
         ),
       );
@@ -334,13 +379,13 @@ describe('Parsing', () => {
     //             callee: Variable({
     //               name: variableToken('f', 1, 1),
     //             }),
-    //             arg: Senv({ x: Sens(2) }),
+    //             arg: Senv({ x: new Sens(2) }),
     //             bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 3),
     //           }),
     //           arg: Senv(),
     //           bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 8),
     //         }),
-    //         arg: Senv({ z: Sens(4) }),
+    //         arg: Senv({ z: new Sens(4) }),
     //         bracket: new Token(TokenType.LEFT_BRACKET, '[', null, 1, 11),
     //       }),
     //     ),
@@ -469,7 +514,7 @@ describe('Parsing', () => {
             typeEff: TypeEff(
               Real(),
               Senv({
-                x: Sens(3),
+                x: new Sens(3),
               }),
             ),
           }),
@@ -491,7 +536,7 @@ describe('Parsing', () => {
             typeEff: TypeEff(
               Real(),
               Senv({
-                x: Sens(31.34),
+                x: new Sens(31.34),
               }),
             ),
           }),
@@ -514,8 +559,8 @@ describe('Parsing', () => {
               Real(),
               Senv({
                 x: UnknownSens(),
-                y: Sens(2),
-                z: Sens(3),
+                y: new Sens(2),
+                z: new Sens(3),
               }),
             ),
           }),
@@ -551,14 +596,14 @@ describe('Parsing', () => {
               typeEff: TypeEff(
                 Real(),
                 Senv({
-                  x: Sens(3),
+                  x: new Sens(3),
                 }),
               ),
             }),
             typeEff: TypeEff(
               Real(),
               Senv({
-                x: Sens(4),
+                x: new Sens(4),
               }),
             ),
           }),
@@ -581,13 +626,15 @@ describe('Parsing', () => {
             }),
             typeEff: TypeEff(
               Arrow({
-                domain: TypeEff(
-                  Arrow({
-                    domain: TypeEff(Real(), Senv({ x: Sens(2) })),
-                    codomain: TypeEff(Real(), Senv({ x: Sens(4) })),
-                  }),
-                  Senv({ x: Sens(2), y: Sens(1) }),
-                ),
+                domain: [
+                  TypeEff(
+                    Arrow({
+                      domain: [TypeEff(Real(), Senv({ x: new Sens(2) }))],
+                      codomain: TypeEff(Real(), Senv({ x: new Sens(4) })),
+                    }),
+                    Senv({ x: new Sens(2), y: new Sens(1) }),
+                  ),
+                ],
                 codomain: TypeEff(Bool(), Senv({ z: UnknownSens() })),
               }),
               Senv(),
@@ -610,13 +657,13 @@ describe('Parsing', () => {
             }),
             typeEff: TypeEff(
               Arrow({
-                domain: TypeEff(Real(), Senv({ x: Sens(2) })),
+                domain: [TypeEff(Real(), Senv({ x: new Sens(2) }))],
                 codomain: TypeEff(
                   Arrow({
-                    domain: TypeEff(Real(), Senv()),
+                    domain: [TypeEff(Real(), Senv())],
                     codomain: TypeEff(Bool(), Senv()),
                   }),
-                  Senv({ y: Sens(4) }),
+                  Senv({ y: new Sens(4) }),
                 ),
               }),
               Senv(),
@@ -720,7 +767,7 @@ describe('Parsing', () => {
 
     test('A function assignment', () => {
       const x = variableToken('x', 1, 5);
-      expect(lexAndParse('let x = fun(y: Number![]) {y;};')).toStrictEqual<
+      expect(lexAndParse('let x = fn (y: Number![]) => {y;};')).toStrictEqual<
         Result<Statement[]>
       >(
         Result(
@@ -729,15 +776,17 @@ describe('Parsing', () => {
               name: x,
               resource: false,
               assignment: Fun({
-                binder: {
-                  name: variableToken('y', 1, 13),
-                  type: TypeEff(Real(), Senv()),
-                },
+                binders: [
+                  {
+                    name: variableToken('y', 1, 13),
+                    type: TypeEff(Real(), Senv()),
+                  },
+                ],
                 body: Block({
                   statements: [
                     ExprStmt({
                       expression: Variable({
-                        name: variableToken('y', 1, 28),
+                        name: variableToken('y', 1, 31),
                       }),
                     }),
                   ],
@@ -754,7 +803,12 @@ describe('Parsing', () => {
   describe('failures', () => {
     test('Simple failure', () => {
       expect(lexAndParse('2 + * 4 <=;').failures).toContainEqual<Failure>(
-        Failure(new Token(TokenType.STAR, '*', null, 1, 5), errorMessage()),
+        Failure(
+          new Token(TokenType.STAR, '*', null, 1, 5),
+          errorMessage({
+            expected: 'an expression',
+          }),
+        ),
       );
     });
 
@@ -778,7 +832,12 @@ describe('Parsing', () => {
       ]);
 
       expect(failures).toContainEqual<Failure>(
-        Failure(new Token(TokenType.STAR, '*', null, 1, 5), errorMessage()),
+        Failure(
+          new Token(TokenType.STAR, '*', null, 1, 5),
+          errorMessage({
+            expected: 'an expression',
+          }),
+        ),
       );
     });
 
