@@ -4,7 +4,7 @@ import { Type, TypeEff } from '..';
 import { isKinded } from '../ADT';
 import { UndefinedMeetError } from '../Sens';
 import { access, extend, Senv } from '../Senv';
-import { Arrow, ForallT, Product, RecType, TypeKind } from '../Type';
+import { Arrow, ForallT, Product, RecType, Sum, TypeKind } from '../Type';
 import { TypeEffect, TypeEffectKind } from '../TypeEff';
 
 const senvMeet = (a: Senv, b: Senv): Result<Senv, UndefinedMeetError> => {
@@ -128,6 +128,25 @@ const typeMeet = (ty1: Type, ty2: Type): Result<Type, UndefinedMeetError> => {
     const result = allMeetsResult.map((teffs) => {
       return Product({
         typeEffects: teffs,
+      });
+    });
+
+    return result;
+  }
+
+  if (isKinded(ty1, TypeKind.Sum) && isKinded(ty2, TypeKind.Sum)) {
+    const { left: left1, right: right1 } = ty1;
+    const { left: left2, right: right2 } = ty2;
+
+    const leftMeet = typeEffectMeet(left1, left2);
+    const rightMeet = typeEffectMeet(right1, right2);
+
+    // Bypass to the shitty typing of Result.all
+
+    const result = Result.all([leftMeet, rightMeet]).map(([left, right]) => {
+      return Sum({
+        left,
+        right,
       });
     });
 

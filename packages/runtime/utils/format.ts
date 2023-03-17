@@ -19,5 +19,7 @@ export const formatValue = (value: SimpleValue): string => {
       return cyan('[Tuple]');
     case ExprKind.Fold:
       return cyan('[Fold]');
+    case ExprKind.Inj:
+      return cyan('[Inj]');
   }
 };

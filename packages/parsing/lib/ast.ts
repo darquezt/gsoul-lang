@@ -1,7 +1,7 @@
 import Token from './lexing/Token';
 import { TypeEff } from '@gsoul-lang/core/utils/TypeEff';
 import { factoryOf } from '@gsoul-lang/core/utils/ADT';
-import { Senv } from '@gsoul-lang/core/utils';
+import { Senv, Type } from '@gsoul-lang/core/utils';
 import { RecType } from '@gsoul-lang/core/utils/Type';
 
 // ===================
@@ -30,6 +30,8 @@ export enum ExprKind {
   Fold = 'Fold',
   Unfold = 'Unfold',
   If = 'If',
+  Inj = 'Inj',
+  Case = 'Case',
 }
 
 export type Literal = {
@@ -162,6 +164,26 @@ export type If = {
 };
 export const If = factoryOf<If>(ExprKind.If);
 
+export type Inj = {
+  kind: ExprKind.Inj;
+  index: 0 | 1;
+  type: Type;
+  expression: Expression;
+  injToken: Token;
+};
+export const Inj = factoryOf<Inj>(ExprKind.Inj);
+
+export type Case = {
+  kind: ExprKind.Case;
+  sum: Expression;
+  leftIdentifier: Token;
+  left: Expression;
+  rightIdentifier: Token;
+  right: Expression;
+  caseToken: Token;
+};
+export const Case = factoryOf<Case>(ExprKind.Case);
+
 export type Block = { kind: ExprKind.Block; statements: Statement[] };
 export const Block = factoryOf<Block>(ExprKind.Block);
 
@@ -184,7 +206,9 @@ export type Expression =
   | Ascription
   | Fold
   | Unfold
-  | If;
+  | If
+  | Inj
+  | Case;
 
 // ===================
 // STATEMENTS

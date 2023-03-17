@@ -1,11 +1,9 @@
 import { Identifier, Senv } from './Senv';
 import * as SenvUtils from './Senv';
-import { Type, Arrow, ForallT, AProduct, RecType } from './Type';
+import { Type, Arrow, ForallT, AProduct, RecType, Sum } from './Type';
 import * as TypeUtils from './Type';
-import { factoryOf, isKinded, KindedFactory } from './ADT';
+import { factoryOf, KindedFactory } from './ADT';
 import { identity, zip } from 'ramda';
-import { Result } from '@badrap/result';
-import { UndefinedMeetError } from './Sens';
 
 export enum TypeEffectKind {
   TypeEff = 'TypeEff',
@@ -53,37 +51,37 @@ const match =
     }
   };
 
-export const meet = (
-  teff1: TypeEffect,
-  teff2: TypeEffect,
-): Result<TypeEffect, UndefinedMeetError> => {
-  if (
-    isKinded(teff1, TypeEffectKind.RecursiveVar) &&
-    isKinded(teff2, TypeEffectKind.RecursiveVar)
-  ) {
-    if (teff1.name !== teff2.name) {
-      return Result.err(new UndefinedMeetError());
-    }
+// export const meet = (
+//   teff1: TypeEffect,
+//   teff2: TypeEffect,
+// ): Result<TypeEffect, UndefinedMeetError> => {
+//   if (
+//     isKinded(teff1, TypeEffectKind.RecursiveVar) &&
+//     isKinded(teff2, TypeEffectKind.RecursiveVar)
+//   ) {
+//     if (teff1.name !== teff2.name) {
+//       return Result.err(new UndefinedMeetError());
+//     }
 
-    return Result.ok(teff1);
-  }
+//     return Result.ok(teff1);
+//   }
 
-  if (
-    isKinded(teff1, TypeEffectKind.TypeEff) &&
-    isKinded(teff2, TypeEffectKind.TypeEff)
-  ) {
-    const typeMeet = TypeUtils.meet(teff1.type, teff2.type);
-    const senvMeet = SenvUtils.meet(teff1.effect, teff2.effect);
+//   if (
+//     isKinded(teff1, TypeEffectKind.TypeEff) &&
+//     isKinded(teff2, TypeEffectKind.TypeEff)
+//   ) {
+//     const typeMeet = TypeUtils.meet(teff1.type, teff2.type);
+//     const senvMeet = SenvUtils.meet(teff1.effect, teff2.effect);
 
-    return Result.all([typeMeet, senvMeet]).map(([type, senv]) =>
-      TypeEff(type, senv),
-    );
-  }
+//     return Result.all([typeMeet, senvMeet]).map(([type, senv]) =>
+//       TypeEff(type, senv),
+//     );
+//   }
 
-  return Result.err(
-    new UndefinedMeetError('Uncompatible type-and-effect constructors'),
-  );
-};
+//   return Result.err(
+//     new UndefinedMeetError('Uncompatible type-and-effect constructors'),
+//   );
+// };
 
 export const subst = <TE extends TypeEffect>(
   typeEff: TE,
@@ -116,8 +114,16 @@ export const substRecVar = (
 export const format = match<string>({
   recVar: (teff) => teff.name,
   typeEff: (teff) =>
-    `${TypeUtils.format(teff.type)}@[${SenvUtils.format(teff.effect)}]`,
+    SenvUtils.isEmpty(teff.effect)
+      ? TypeUtils.format(teff.type)
+      : `${TypeUtils.format(teff.type)}@[${SenvUtils.format(teff.effect)}]`,
 });
+
+export const applySenvFunction = (
+  teff: TypeEff,
+  op: (eff: Senv, senv: Senv) => Senv,
+  senv: Senv,
+): TypeEff => TypeEff(teff.type, op(teff.effect, senv));
 
 /**
  * Utilities for working with arrow type-and-effects
@@ -178,6 +184,23 @@ export const AdditiveProductsUtils = {
       .second as TypeEff;
 
     return TypeEff(secondType, SenvUtils.add(secondEffect, teff.effect));
+  },
+};
+
+/**
+ * Utilities for working with additive product type-and-effects
+ */
+export const SumUtils = {
+  left(teff: TypeEff<Sum, Senv>): TypeEff {
+    const { type: leftType, effect: leftEffect } = teff.type.left as TypeEff;
+
+    return TypeEff(leftType, SenvUtils.add(leftEffect, teff.effect));
+  },
+
+  right(teff: TypeEff<Sum, Senv>): TypeEff {
+    const { type: rightType, effect: rightEffect } = teff.type.right as TypeEff;
+
+    return TypeEff(rightType, SenvUtils.add(rightEffect, teff.effect));
   },
 };
 

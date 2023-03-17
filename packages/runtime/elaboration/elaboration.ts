@@ -18,6 +18,7 @@ import {
   Product,
   Real,
   RecType,
+  Sum,
   typeIsKinded,
   TypeKind,
 } from '@gsoul-lang/core/utils/Type';
@@ -28,12 +29,14 @@ import {
   Block,
   BoolLiteral,
   Call,
+  Case,
   Expression,
   ExprStmt,
   Fold,
   Forall,
   Fun,
   If,
+  Inj,
   NilLiteral,
   NonLinearBinary,
   Pair,
@@ -764,6 +767,86 @@ const ifExpr = (expr: past.If, tenv: TypeEnv): Result<If, ElaborationError> => {
   });
 };
 
+const inj = (expr: past.Inj, tenv: TypeEnv): Result<Inj, ElaborationError> => {
+  const bodyElaboration = expression(expr.expression, tenv);
+
+  return bodyElaboration.map((body) =>
+    Inj({
+      type: expr.type,
+      index: expr.index,
+      expression: body,
+      typeEff: TypeEff(
+        Sum({
+          left: expr.index === 0 ? body.typeEff : TypeEff(expr.type, Senv()),
+          right: expr.index === 1 ? body.typeEff : TypeEff(expr.type, Senv()),
+        }),
+        Senv(),
+      ),
+      injToken: expr.injToken,
+    }),
+  );
+};
+
+const caseExpr = (
+  expr: past.Case,
+  tenv: TypeEnv,
+): Result<Case, ElaborationError> => {
+  const sumElaboration = expression(expr.sum, tenv);
+
+  const leftElaboration = sumElaboration.chain((sum) =>
+    expression(
+      expr.left,
+      TypeEnvUtils.extend(
+        tenv,
+        expr.leftIdentifier.lexeme,
+        TypeEffUtils.SumUtils.left(sum.typeEff as TypeEff<Sum, Senv>),
+      ),
+    ),
+  );
+
+  const rightElaboration = sumElaboration.chain((sum) =>
+    expression(
+      expr.right,
+      TypeEnvUtils.extend(
+        tenv,
+        expr.rightIdentifier.lexeme,
+        TypeEffUtils.SumUtils.right(sum.typeEff as TypeEff<Sum, Senv>),
+      ),
+    ),
+  );
+
+  return Result.all([sumElaboration, leftElaboration, rightElaboration]).chain(
+    ([sum, left, right]) => {
+      const bodyTypeEff = SJoin.TypeEffect(left.typeEff, right.typeEff);
+
+      if (!bodyTypeEff.isOk) {
+        return Result.err(
+          new ElaborationTypeError({
+            reason: 'Branches of case expression have incompatible types',
+            operator: expr.caseToken,
+          }),
+        );
+      }
+
+      return Result.ok(
+        Case({
+          sum,
+          leftIdentifier: expr.leftIdentifier,
+          left: left,
+          rightIdentifier: expr.rightIdentifier,
+          right: right,
+          typeEff: TypeEffUtils.applySenvFunction(
+            bodyTypeEff.value as TypeEff,
+            SJoin.Senv,
+            sum.typeEff.effect,
+          ),
+          caseToken: expr.caseToken,
+        }),
+      );
+    },
+  );
+};
+
 export const expression = (
   expr: past.Expression,
   tenv: TypeEnv = {},
@@ -819,6 +902,10 @@ export const expression = (
       return unfold(expr, tenv);
     case past.ExprKind.If:
       return ifExpr(expr, tenv);
+    case past.ExprKind.Inj:
+      return inj(expr, tenv);
+    case past.ExprKind.Case:
+      return caseExpr(expr, tenv);
   }
 };
 

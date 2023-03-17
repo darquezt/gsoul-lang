@@ -3,6 +3,7 @@ import {
   Binary,
   Block,
   Call,
+  Case,
   Expression,
   ExprKind,
   ExprStmt,
@@ -10,6 +11,7 @@ import {
   Forall,
   Fun,
   If,
+  Inj,
   Literal,
   NonLinearBinary,
   Pair,
@@ -42,6 +44,7 @@ import {
   Nil,
   Product,
   Real,
+  Sum,
   typeIsKinded,
   TypeKind,
 } from '@gsoul-lang/core/utils/Type';
@@ -426,6 +429,80 @@ export const projection = (expr: Projection, tenv: TypeEnv): PureResult => {
   );
 };
 
+const inj = (expr: Inj, tenv: TypeEnv): PureResult => {
+  const exprTC = expression(expr.expression, tenv);
+
+  if (!exprTC.success) {
+    return exprTC;
+  }
+
+  return PureSuccess(
+    TypeEff(
+      Sum({
+        left: expr.index === 0 ? exprTC.typeEff : TypeEff(expr.type, Senv()),
+        right: expr.index === 1 ? exprTC.typeEff : TypeEff(expr.type, Senv()),
+      }),
+      Senv(),
+    ),
+    exprTC.typings,
+  );
+};
+
+const caseExpr = (expr: Case, tenv: TypeEnv): PureResult => {
+  const sumTC = expression(expr.sum, tenv);
+
+  if (!sumTC.success) {
+    return sumTC;
+  }
+
+  const sumTypeEff = sumTC.typeEff;
+
+  if (!typeIsKinded(sumTypeEff, TypeKind.Sum)) {
+    return Failure(expr.caseToken, 'Expression being matched must be a sum');
+  }
+
+  const leftTC = expression(
+    expr.left,
+    TypeEnvUtils.extend(
+      tenv,
+      expr.leftIdentifier.lexeme,
+      TypeEffUtils.SumUtils.left(sumTypeEff),
+    ),
+  );
+
+  if (!leftTC.success) {
+    return leftTC;
+  }
+
+  const rightTC = expression(
+    expr.right,
+    TypeEnvUtils.extend(
+      tenv,
+      expr.rightIdentifier.lexeme,
+      TypeEffUtils.SumUtils.right(sumTypeEff),
+    ),
+  );
+
+  if (!rightTC.success) {
+    return rightTC;
+  }
+
+  const join = SJoin.TypeEffect(leftTC.typeEff, rightTC.typeEff);
+
+  if (join.isErr) {
+    return Failure(expr.caseToken, join.error.message);
+  }
+
+  return PureSuccess(
+    TypeEffUtils.applySenvFunction(
+      join.value as TypeEff,
+      SJoin.Senv,
+      sumTypeEff.effect,
+    ),
+    sumTC.typings.concat(leftTC.typings, rightTC.typings),
+  );
+};
+
 // const untup = (expr: Untup, tenv: TypeEnv): PureResult => {
 //   const tuplTC = expression(expr.tuple, tenv);
 
@@ -689,6 +766,10 @@ export const expression = (
       return unfold(expr, tenv);
     case ExprKind.If:
       return ifExpr(expr, tenv);
+    case ExprKind.Inj:
+      return inj(expr, tenv);
+    case ExprKind.Case:
+      return caseExpr(expr, tenv);
   }
 };
 

@@ -7,6 +7,7 @@ import {
   Product,
   Real,
   RecType,
+  Sum,
   TypeKind,
 } from '@gsoul-lang/core/utils/Type';
 import {
@@ -20,6 +21,7 @@ import {
   Binary,
   Block,
   Call,
+  Case,
   Expression,
   ExprStmt,
   Fold,
@@ -27,6 +29,7 @@ import {
   Fun,
   Grouping,
   If,
+  Inj,
   Literal,
   NonLinearBinary,
   PrintStmt,
@@ -98,7 +101,7 @@ type PostfixOpType = typeof postfixOps[number];
 const typePrefixOps = [TokenType.RECTYPE, TokenType.ARROW] as const;
 type TypePrefixOpsType = typeof typePrefixOps[number];
 
-const typeInfixOps = [TokenType.ARROW] as const;
+const typeInfixOps = [TokenType.ARROW, TokenType.PLUS] as const;
 type TypeInfixOpsType = typeof typeInfixOps[number];
 
 const typePostfixOps = [TokenType.BANG] as const;
@@ -150,6 +153,8 @@ const BindingPower = {
       switch (op) {
         case TokenType.ARROW:
           return [10, 9];
+        case TokenType.PLUS:
+          return [11, 12];
       }
     },
     postfix(op: TypePostfixOpsType): [number, null] {
@@ -350,6 +355,16 @@ class Parser {
        * @case unfold
        */
       left = this.parseUnfoldExpr();
+    } else if (this.check(TokenType.INL) || this.check(TokenType.INR)) {
+      /**
+       * @case inl | inr
+       */
+      left = this.parseInjExpr();
+    } else if (this.check(TokenType.CASE)) {
+      /**
+       * @case case
+       */
+      left = this.parseCaseExpr();
     } else if (this.check(TokenType.LEFT_BRACE)) {
       /**
        * @case block
@@ -707,6 +722,217 @@ class Parser {
     return Fun({
       binders: arg,
       body,
+    });
+  }
+
+  private parseInjExpr(): Inj {
+    const injToken = this.advance();
+
+    this.consume(
+      TokenType.LESS,
+      errorMessage({
+        expected: '<',
+        after: `${injToken.lexeme} keyword`,
+      }),
+    );
+
+    const typeResult = this.type(0);
+
+    if (typeResult.kind !== TypeParsingResultKind.Type) {
+      throw this.makeSyntaxError(
+        injToken,
+        'Injected type cannot have an effect',
+      );
+    }
+
+    const type = typeResult.result;
+
+    this.consume(
+      TokenType.GREATER,
+      errorMessage({
+        expected: '>',
+        after: 'injected type',
+      }),
+    );
+
+    this.consume(
+      TokenType.LEFT_PAREN,
+      errorMessage({
+        expected: '(',
+        after: 'inj keyword',
+      }),
+    );
+
+    const expression = this.expression(0);
+
+    this.consume(
+      TokenType.RIGHT_PAREN,
+      errorMessage({
+        expected: ')',
+        after: 'injected expression',
+      }),
+    );
+
+    return Inj({
+      index: injToken.type === TokenType.INL ? 0 : 1,
+      type,
+      expression,
+      injToken,
+    });
+  }
+
+  private parseCaseExpr(): Case {
+    const caseToken = this.advance();
+
+    this.consume(
+      TokenType.LEFT_PAREN,
+      errorMessage({
+        expected: '(',
+        after: 'case keyword',
+      }),
+    );
+
+    const sum = this.expression(0);
+
+    this.consume(
+      TokenType.RIGHT_PAREN,
+      errorMessage({
+        expected: ')',
+        after: 'sum expression',
+      }),
+    );
+
+    this.consume(
+      TokenType.OF,
+      errorMessage({
+        expected: 'of',
+        after: 'sum expression',
+      }),
+    );
+
+    this.consume(
+      TokenType.LEFT_BRACE,
+      errorMessage({
+        expected: '{',
+        before: 'first branch',
+      }),
+    );
+
+    this.consume(
+      TokenType.INL,
+      errorMessage({
+        expected: 'inl',
+        beginning: 'first branch',
+      }),
+    );
+
+    this.consume(
+      TokenType.LEFT_PAREN,
+      errorMessage({
+        expected: '(',
+        after: 'inl keyword',
+      }),
+    );
+
+    const leftIdentifier = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({
+        expected: 'an identifier',
+        after: 'inl keyword',
+      }),
+    );
+
+    this.consume(
+      TokenType.RIGHT_PAREN,
+      errorMessage({
+        expected: ')',
+        after: 'left identifier',
+      }),
+    );
+
+    this.consume(
+      TokenType.FAT_ARROW,
+      errorMessage({
+        expected: '=>',
+        after: 'left identifier',
+      }),
+    );
+
+    const leftExpression = this.expression(0);
+
+    this.consume(
+      TokenType.RIGHT_BRACE,
+      errorMessage({
+        expected: '}',
+        after: 'left branch',
+      }),
+    );
+
+    this.consume(
+      TokenType.LEFT_BRACE,
+      errorMessage({
+        expected: '{',
+        before: 'second branch',
+      }),
+    );
+
+    this.consume(
+      TokenType.INR,
+      errorMessage({
+        expected: 'inr',
+        beginning: 'second branch',
+      }),
+    );
+
+    this.consume(
+      TokenType.LEFT_PAREN,
+      errorMessage({
+        expected: '(',
+        after: 'inr keyword',
+      }),
+    );
+
+    const rightIdentifier = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({
+        expected: 'an identifier',
+        after: 'inr keyword',
+      }),
+    );
+
+    this.consume(
+      TokenType.RIGHT_PAREN,
+      errorMessage({
+        expected: ')',
+        after: 'right identifier',
+      }),
+    );
+
+    this.consume(
+      TokenType.FAT_ARROW,
+      errorMessage({
+        expected: '=>',
+        after: 'right identifier',
+      }),
+    );
+
+    const rightExpression = this.expression(0);
+
+    this.consume(
+      TokenType.RIGHT_BRACE,
+      errorMessage({
+        expected: '}',
+        after: 'right branch',
+      }),
+    );
+
+    return Case({
+      sum,
+      leftIdentifier,
+      left: leftExpression,
+      rightIdentifier,
+      right: rightExpression,
+      caseToken,
     });
   }
 
@@ -1192,6 +1418,17 @@ class Parser {
             Arrow({
               domain: [normalizeTypeResult(left)],
               codomain: normalizeTypeResult(right),
+            }),
+          );
+        }
+
+        if (op.type === TokenType.PLUS) {
+          const right = this.type(infixPower[1]);
+
+          left = typeResult(
+            Sum({
+              left: normalizeTypeResult(left),
+              right: normalizeTypeResult(right),
             }),
           );
         }

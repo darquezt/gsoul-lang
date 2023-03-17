@@ -29,6 +29,10 @@ const keywords: Record<string, TokenType> = {
   if: TokenType.IF,
   then: TokenType.THEN,
   else: TokenType.ELSE,
+  inl: TokenType.INL,
+  inr: TokenType.INR,
+  case: TokenType.CASE,
+  of: TokenType.OF,
 };
 
 /**

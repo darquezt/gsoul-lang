@@ -51,6 +51,8 @@ export enum ExprKind {
   Fold = 'Fold',
   Unfold = 'Unfold',
   If = 'If',
+  Inj = 'Inj',
+  Case = 'Case',
 }
 
 export type RealLiteral = Term<
@@ -199,6 +201,26 @@ export type Projection = Term<{
 }>;
 export const Projection = factoryOf<Projection>(ExprKind.Projection);
 
+export type Inj = Term<{
+  kind: ExprKind.Inj;
+  index: 0 | 1;
+  type: Type;
+  expression: Expression;
+  injToken: Token;
+}>;
+export const Inj = factoryOf<Inj>(ExprKind.Inj);
+
+export type Case = Term<{
+  kind: ExprKind.Case;
+  sum: Expression;
+  leftIdentifier: Token;
+  left: Expression;
+  rightIdentifier: Token;
+  right: Expression;
+  caseToken: Token;
+}>;
+export const Case = factoryOf<Case>(ExprKind.Case);
+
 // export type Untup = Term<{
 //   kind: ExprKind.Untup;
 //   identifiers: [Token, Token];
@@ -264,7 +286,8 @@ export type SimpleValue =
   | SClosure
   | (Tuple & { expressions: Value[] })
   | (Pair & { first: Value; second: Value })
-  | (Fold & { expression: Value });
+  | (Fold & { expression: Value })
+  | (Inj & { expression: Value });
 
 export const isSimpleValue = (expr: Expression): expr is SimpleValue => {
   if (expr.kind === ExprKind.Tuple) {
@@ -274,6 +297,9 @@ export const isSimpleValue = (expr: Expression): expr is SimpleValue => {
     return isValue(expr.first) && isValue(expr.second);
   }
   if (expr.kind === ExprKind.Fold) {
+    return isValue(expr.expression);
+  }
+  if (expr.kind === ExprKind.Inj) {
     return isValue(expr.expression);
   }
 
@@ -343,7 +369,9 @@ export type Expression =
   | Ascription
   | Fold
   | Unfold
-  | If;
+  | If
+  | Inj
+  | Case;
 
 type ExprMapFns = {
   senvFn: (senv: Senv) => Senv;
@@ -504,6 +532,20 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
         ...inductiveCall('condition', expr),
         ...inductiveCall('then', expr),
         ...inductiveCall('else', expr),
+        typeEff,
+      });
+    case ExprKind.Inj:
+      return Inj({
+        ...expr,
+        ...inductiveCall('expression', expr),
+        typeEff,
+      });
+    case ExprKind.Case:
+      return Case({
+        ...expr,
+        ...inductiveCall('sum', expr),
+        ...inductiveCall('left', expr),
+        ...inductiveCall('right', expr),
         typeEff,
       });
   }

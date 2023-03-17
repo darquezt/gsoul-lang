@@ -111,6 +111,15 @@ import {
   reduceIfBranch,
   reduceIfCondition,
 } from './interpretations/ifs';
+import {
+  produceInjValue,
+  InjKont,
+  InjKontKind,
+  reduceInjection,
+  CaseBranchesKont,
+  reduceCaseBranch,
+  reduceCaseSum,
+} from './interpretations/sums';
 
 enum KontKind {
   EmptyKont = 'EmptyKont',
@@ -145,7 +154,9 @@ export type Kont =
   | TupleProjKont
   | UnfoldKont
   | FoldKont
-  | IfBranchesKont;
+  | IfBranchesKont
+  | InjKont
+  | CaseBranchesKont;
 
 export type State<T> = T & {
   store: Store;
@@ -277,6 +288,14 @@ const step = ({
       case IfKontKind.IfBranchesKont: {
         return reduceIfBranch(term, store, kont);
       }
+
+      case InjKontKind.InjKont: {
+        return produceInjValue(term, store, kont);
+      }
+
+      case InjKontKind.CaseBranchesKont: {
+        return reduceCaseBranch(term, store, kont);
+      }
     }
   }
 
@@ -319,6 +338,14 @@ const step = ({
 
     case ExprKind.Projection: {
       return reduceProjectionTuple(term, store, kont);
+    }
+
+    case ExprKind.Inj: {
+      return reduceInjection(term, store, kont);
+    }
+
+    case ExprKind.Case: {
+      return reduceCaseSum(term, store, kont);
     }
 
     case ExprKind.Block: {

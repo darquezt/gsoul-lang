@@ -1,5 +1,5 @@
 import { Result } from '@badrap/result';
-import { Arrow, ForallT, Product, RecType, Type, TypeKind } from '../Type';
+import { Arrow, ForallT, Product, RecType, Sum, Type, TypeKind } from '../Type';
 import { Senv } from '../Senv';
 import { TypeEff, TypeEffect, TypeEffectKind } from '../TypeEff';
 import { Sens } from '../Sens';
@@ -118,6 +118,25 @@ const typeSJoin = (ty1: Type, ty2: Type): Result<Type, UndefinedSJoinError> => {
     const result = allMeetsResult.map((teffs) => {
       return Product({
         typeEffects: teffs,
+      });
+    });
+
+    return result;
+  }
+
+  if (isKinded(ty1, TypeKind.Sum) && isKinded(ty2, TypeKind.Sum)) {
+    const { left: left1, right: right1 } = ty1;
+    const { left: left2, right: right2 } = ty2;
+
+    const leftMeet = typeEffectSJoin(left1, left2);
+    const rightMeet = typeEffectSJoin(right1, right2);
+
+    // Bypass to the shitty typing of Result.all
+
+    const result = Result.all([leftMeet, rightMeet]).map(([left, right]) => {
+      return Sum({
+        left,
+        right,
       });
     });
 

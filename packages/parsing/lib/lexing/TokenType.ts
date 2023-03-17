@@ -48,6 +48,11 @@ enum TokenType {
   NIL = 'NIL',
   BOOL = 'BOOL',
 
+  INL = 'INL',
+  INR = 'INR',
+  CASE = 'CASE',
+  OF = 'OF',
+
   AND = 'AND',
   CLASS = 'CLASS',
   THEN = 'THEN',
