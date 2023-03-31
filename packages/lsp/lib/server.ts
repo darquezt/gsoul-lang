@@ -62,8 +62,8 @@ const parseFile = (doc: TextDocument): void => {
     if (diagnostics.length === 0) {
       const typecheckingResult = typeCheck(parsedFile);
 
-      if (!typecheckingResult.success) {
-        const { token, reason } = typecheckingResult;
+      if (!typecheckingResult.isOk) {
+        const { token, message } = typecheckingResult.error;
 
         const line = token.line - 1;
         const col = token.col - 1;
@@ -73,13 +73,13 @@ const parseFile = (doc: TextDocument): void => {
             start: { line, character: col },
             end: { line, character: col + token.lexeme.length },
           },
-          reason ?? 'Type Error',
+          message ?? 'Type Error',
           DiagnosticSeverity.Error,
         );
 
         diagnostics.push(diagnostic);
       } else {
-        const { typings: docTypings } = typecheckingResult;
+        const { typings: docTypings } = typecheckingResult.value;
 
         typings.set(doc.uri, docTypings);
       }
