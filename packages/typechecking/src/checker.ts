@@ -32,12 +32,15 @@ export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
   switch (expr.kind) {
     case ExprKind.Literal: {
       const { value } = expr;
-      if (typeof value === 'number') {
-        return realLit(expr, ctx);
-      } else if (typeof value === 'boolean') {
-        return boolLit(expr, ctx);
+
+      switch (typeof value) {
+        case 'number':
+          return realLit(expr, ctx);
+        case 'boolean':
+          return boolLit(expr, ctx);
+        default:
+          return nilLit(expr, ctx);
       }
-      return nilLit(expr, ctx);
     }
     case ExprKind.Binary:
       return binary(expr, ctx);
