@@ -257,7 +257,7 @@ export const Block = factoryOf<Block>(ExprKind.Block);
 export type Fold = Term<{
   kind: ExprKind.Fold;
   expression: Expression;
-  recType: RecType;
+  recType: TypeEff<RecType, Senv>;
   foldToken: Token;
 }>;
 export const Fold = factoryOf<Fold>(ExprKind.Fold);
@@ -382,7 +382,7 @@ type ExprMapFns = {
   stmtFn: (stmt: Statement) => Statement;
 };
 const map = (expr: Expression, fns: ExprMapFns): Expression => {
-  const { senvFn, typeFn, teffFn, eviFn, storeFn, stmtFn } = fns;
+  const { senvFn, teffFn, eviFn, storeFn, stmtFn } = fns;
   const inductiveCall = <E extends Record<K, Expression>, K extends keyof E>(
     key: K,
     e: E,
@@ -517,7 +517,7 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
       return Fold({
         ...expr,
         ...inductiveCall('expression', expr),
-        recType: typeFn(expr.recType) as RecType,
+        recType: teffFn(expr.recType) as TypeEff<RecType, Senv>,
         typeEff,
       });
     case ExprKind.Unfold:

@@ -33,6 +33,7 @@ const keywords: Record<string, TokenType> = {
   inr: TokenType.INR,
   case: TokenType.CASE,
   of: TokenType.OF,
+  type: TokenType.TYPE,
 };
 
 /**

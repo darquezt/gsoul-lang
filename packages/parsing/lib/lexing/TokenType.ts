@@ -93,6 +93,8 @@ enum TokenType {
 
   INVALID = 'INVALID',
 
+  TYPE = 'TYPE',
+
   EOF = 'EOF',
 }
 

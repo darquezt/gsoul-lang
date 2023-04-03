@@ -203,10 +203,33 @@ const BindingPower = {
   },
 };
 
+class TypeEnvironment {
+  private types: Record<string, Type> = {};
+
+  constructor(private parent?: TypeEnvironment) {}
+
+  define(name: string, type: Type): void {
+    this.types[name] = type;
+  }
+
+  get(name: string): Type | null {
+    if (this.types[name]) {
+      return this.types[name];
+    }
+
+    if (this.parent) {
+      return this.parent.get(name);
+    }
+
+    return null;
+  }
+}
+
 class Parser {
   eof: Token;
   program: Statement[] = [];
   failures: Failure[] = [];
+  private typeEnvironment = new TypeEnvironment();
 
   constructor(private tokens: Token[]) {
     const eof = head(tokens);
@@ -232,6 +255,13 @@ class Parser {
 
   private statement(): Statement | null {
     return this.synchronized(() => {
+      if (this.check(TokenType.TYPE)) {
+        /**
+         * @case type declaration
+         */
+
+        return this.parseTypeDecl();
+      }
       if (this.check(TokenType.LET)) {
         /**
          * @case let declaration
@@ -256,7 +286,44 @@ class Parser {
     });
   }
 
-  parseExpressionStmt(): ExprStmt {
+  private parseTypeDecl(): null {
+    this.advance();
+
+    const name = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({ expected: 'type name' }),
+    );
+
+    this.consume(
+      TokenType.EQUAL,
+      errorMessage({ expected: '=', after: 'type declaration' }),
+    );
+
+    const typeResult = this.type(0);
+
+    if (typeResult.kind === TypeParsingResultKind.TypeAndEffect) {
+      throw this.makeSyntaxError(
+        name,
+        'Only types without effect can be aliased',
+      );
+    }
+
+    const ty = typeResult.result;
+
+    this.consume(
+      TokenType.SEMICOLON,
+      errorMessage({ expected: ';', end: 'type declaration' }),
+    );
+
+    this.typeEnvironment.define(
+      name.lexeme,
+      Object.assign(ty, { alias: name.lexeme }),
+    );
+
+    return null;
+  }
+
+  private parseExpressionStmt(): ExprStmt {
     const expr = this.expression(0);
 
     this.consume(
@@ -369,7 +436,7 @@ class Parser {
       /**
        * @case block
        */
-      left = this.parseBlockExpr();
+      left = this.parseBlockExpr(this.typeEnvironment);
     } else if (this.checkMany(...prefixOps)) {
       /**
        * @case prefix operators
@@ -683,27 +750,35 @@ class Parser {
     });
   }
 
-  private parseBlockExpr(): Block {
+  private parseBlockExpr(typeEnvironment: TypeEnvironment): Block {
+    const previousTypeEnvironment = this.typeEnvironment;
+
     this.advance();
 
-    const statements: Statement[] = [];
+    try {
+      this.typeEnvironment = typeEnvironment;
 
-    while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
-      const stmt = this.statement();
+      const statements: Statement[] = [];
 
-      if (stmt) {
-        statements.push(stmt);
+      while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+        const stmt = this.statement();
+
+        if (stmt) {
+          statements.push(stmt);
+        }
       }
+
+      this.consume(
+        TokenType.RIGHT_BRACE,
+        errorMessage({ expected: '}', end: 'a block' }),
+      );
+
+      return Block({
+        statements,
+      });
+    } finally {
+      this.typeEnvironment = previousTypeEnvironment;
     }
-
-    this.consume(
-      TokenType.RIGHT_BRACE,
-      errorMessage({ expected: '}', end: 'a block' }),
-    );
-
-    return Block({
-      statements,
-    });
   }
 
   private parseFunExpr(_op: Token, power: [null, number]): Fun {
@@ -974,23 +1049,30 @@ class Parser {
       }),
     );
 
-    const typeResult = this.type(0);
+    const typeResult = normalizeTypeResult(this.type(0));
 
-    if (typeResult.kind === TypeParsingResultKind.TypeAndEffect) {
-      throw this.makeSyntaxError(
-        constructorToken,
-        errorMessage({
-          expected: 'a recursive type without a sensitivity effect',
-        }),
-      );
-    }
-
-    if (typeResult.result.kind !== TypeKind.RecType) {
+    if (typeResult.kind === TypeEffectKind.RecursiveVar) {
       throw this.makeSyntaxError(
         constructorToken,
         errorMessage({
           expected: 'a recursive type',
         }),
+      );
+    }
+
+    if (typeResult.type.kind !== TypeKind.RecType) {
+      throw this.makeSyntaxError(
+        constructorToken,
+        errorMessage({
+          expected: 'a recursive type',
+        }),
+      );
+    }
+
+    if (!SenvUtils.isEmpty(typeResult.effect)) {
+      throw this.makeSyntaxError(
+        constructorToken,
+        'Recursive types cannot have effects',
       );
     }
 
@@ -1022,7 +1104,7 @@ class Parser {
 
     return Fold({
       expression,
-      recType: typeResult.result,
+      recType: typeResult as TypeEff<RecType, Senv>,
       foldToken: constructorToken,
     });
   }
@@ -1244,14 +1326,22 @@ class Parser {
       left = typeResult(Nil());
     } else if (this.check(TokenType.IDENTIFIER)) {
       /**
-       * @case recursive variable type-and-effect
+       * @case recursive variable type-and-effect | type alias
        */
 
-      left = typeAndEffectResult(
-        RecursiveVar({
-          name: this.advance().lexeme,
-        }),
-      );
+      const aliasedType = this.typeEnvironment.get(this.peek().lexeme);
+
+      if (!aliasedType) {
+        left = typeAndEffectResult(
+          RecursiveVar({
+            name: this.advance().lexeme,
+          }),
+        );
+      } else {
+        this.advance();
+
+        left = typeResult(aliasedType);
+      }
     } else if (this.check(TokenType.LEFT_PAREN)) {
       this.advance();
 

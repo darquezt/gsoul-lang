@@ -1,5 +1,5 @@
 import { Result } from '@badrap/result';
-import { TypeEff, Senv, TypeEffUtils } from '@gsoul-lang/core/utils';
+import { TypeEff, TypeEffUtils } from '@gsoul-lang/core/utils';
 import { RecType, typeIsKinded, TypeKind } from '@gsoul-lang/core/utils/Type';
 import { Fold, Unfold } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
@@ -31,7 +31,7 @@ const checkFoldBodyType =
   };
 
 export const fold: TypeCheckingRule<Fold> = (expr, ctx) => {
-  const typeEff = TypeEff(expr.recType, Senv());
+  const typeEff = expr.recType;
 
   const unfolded = TypeEffUtils.RecursiveUtils.unfold(typeEff);
 

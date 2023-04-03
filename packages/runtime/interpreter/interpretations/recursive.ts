@@ -34,7 +34,7 @@ export type FoldKont = {
   kind: RecursiveKontKind.FoldKont;
   state: State<{
     foldToken: Token;
-    foldRecType: RecType;
+    foldRecType: TypeEff<RecType, Senv>;
     foldTypeEff: TypeEff;
   }>;
 };

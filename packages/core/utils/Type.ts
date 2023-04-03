@@ -98,7 +98,7 @@ export const RecType: KindedFactory<RecType> = factoryOf<RecType>(
   TypeKind.RecType,
 );
 
-export type Type =
+export type Type = (
   | Real
   | Bool
   | Nil
@@ -108,7 +108,8 @@ export type Type =
   | AProduct
   | Product
   | RecType
-  | Sum;
+  | Sum
+) & { alias?: string };
 
 // U T I L S
 
@@ -243,168 +244,38 @@ export const substRecVar = (
   });
 };
 
-// export const meet = (
-//   ty1: Type,
-//   ty2: Type,
-// ): Result<Type, UndefinedMeetError> => {
-//   if (isKinded(ty1, TypeKind.Real) && isKinded(ty2, TypeKind.Real)) {
-//     return Result.ok(ty1);
-//   }
+export const format: (ty: Type) => string = (ty) => {
+  if (ty.alias) {
+    return chalk`{yellow ${ty.alias}}`;
+  }
 
-//   if (isKinded(ty1, TypeKind.Nil) && isKinded(ty2, TypeKind.Nil)) {
-//     return Result.ok(ty1);
-//   }
-
-//   if (isKinded(ty1, TypeKind.Bool) && isKinded(ty2, TypeKind.Bool)) {
-//     return Result.ok(ty1);
-//   }
-
-//   if (isKinded(ty1, TypeKind.Arrow) && isKinded(ty2, TypeKind.Arrow)) {
-//     const { domain: dom1, codomain: cod1 } = ty1;
-//     const { domain: dom2, codomain: cod2 } = ty2;
-
-//     if (dom1.length !== dom2.length) {
-//       return Result.err(
-//         new UndefinedMeetError(
-//           'function types have uncompatible number of arguments',
-//         ),
-//       );
-//     }
-
-//     const domsMeet = Result.all(
-//       zip(dom1, dom2).map(([d1, d2]) => Meet.TypeEffect(d1, d2)),
-//     ) as unknown as Result<TypeEffect[], UndefinedMeetError>;
-
-//     return Result.all([domsMeet, TypeEffUtils.meet(cod1, cod2)]).map(
-//       ([dom, cod]) =>
-//         Arrow({
-//           domain: dom,
-//           codomain: cod,
-//         }),
-//     );
-//   }
-
-//   if (isKinded(ty1, TypeKind.RecType) && isKinded(ty2, TypeKind.RecType)) {
-//     const { variable, body: body1 } = ty1;
-//     const { variable: variable2, body: body2 } = ty2;
-
-//     if (variable !== variable2) {
-//       return Result.err(new UndefinedMeetError());
-//     }
-
-//     return TypeEffUtils.meet(body1, body2).map((body) =>
-//       RecType({
-//         variable,
-//         body,
-//       }),
-//     );
-//   }
-
-//   if (isKinded(ty1, TypeKind.ForallT) && isKinded(ty2, TypeKind.ForallT)) {
-//     const { sensVars: sensVars1, codomain: cod1 } = ty1;
-//     const { sensVars: sensVars2, codomain: cod2 } = ty2;
-
-//     if (sensVars1.length !== sensVars2.length) {
-//       return Result.err(new UndefinedMeetError());
-//     }
-
-//     const variablesAreEqual = zip(sensVars1, sensVars2).reduce(
-//       (acc, [x1, x2]) => x1 === x2 && acc,
-//       true,
-//     );
-
-//     if (!variablesAreEqual) {
-//       return Result.err(new UndefinedMeetError());
-//     }
-
-//     return TypeEffUtils.meet(cod1, cod2).map((codomain) =>
-//       ForallT({
-//         sensVars: sensVars1,
-//         codomain,
-//       }),
-//     );
-//   }
-
-//   if (isKinded(ty1, TypeKind.Product) && isKinded(ty2, TypeKind.Product)) {
-//     const { typeEffects: teffs1 } = ty1;
-//     const { typeEffects: teffs2 } = ty2;
-
-//     if (teffs1.length !== teffs2.length) {
-//       return Result.err(new UndefinedMeetError());
-//     }
-
-//     const allMeets: Result<TypeEffect, UndefinedMeetError>[] = zip(
-//       teffs1,
-//       teffs2,
-//     ).map(([teff1, teff2]) => TypeEffUtils.meet(teff1, teff2));
-
-//     // Bypass to the shitty typing of Result.all
-//     const allMeetsResult = Result.all(allMeets) as unknown as Result<
-//       TypeEffect[],
-//       UndefinedMeetError
-//     >;
-
-//     const result = allMeetsResult.map((teffs) => {
-//       return Product({
-//         typeEffects: teffs,
-//       });
-//     });
-
-//     return result;
-//   }
-
-//   if (isKinded(ty1, TypeKind.Sum) && isKinded(ty2, TypeKind.Sum)) {
-//     const { typeEffects: teffs1 } = ty1;
-//     const { typeEffects: teffs2 } = ty2;
-
-//     if (teffs1.length !== teffs2.length) {
-//       return Result.err(new UndefinedMeetError());
-//     }
-
-//     const allMeets: Result<TypeEffect, UndefinedMeetError>[] = zip(
-//       teffs1,
-//       teffs2,
-//     ).map(([teff1, teff2]) => TypeEffUtils.meet(teff1, teff2));
-
-//     // Bypass to the shitty typing of Result.all
-//     const allMeetsResult = Result.all(allMeets) as unknown as Result<
-//       TypeEffect[],
-//       UndefinedMeetError
-//     >;
-
-//     const result = allMeetsResult.map((teffs) => {
-//       return Sum({
-//         typeEffects: teffs,
-//       });
-//     });
-
-//     return result;
-//   }
-
-//   return Result.err(new UndefinedMeetError());
-// };
-
-export const format: (ty: Type) => string = match<string>({
-  real: () => chalk.yellow('Number'),
-  bool: (ty) => chalk.yellow(ty.kind),
-  nil: (ty) => chalk.yellow(ty.kind),
-  arrow: (ty) =>
-    chalk`(${ty.domain
-      .map((d) => `${TypeEffUtils.format(d)}`)
-      .join(', ')}) -> ${TypeEffUtils.format(ty.codomain)}`,
-  forall: (ty) =>
-    chalk`forall {green ${ty.sensVars.join(' ')}} . ${TypeEffUtils.format(
-      ty.codomain,
-    )}`,
-  mprod: (ty) =>
-    chalk`${TypeEffUtils.format(ty.first)} ⊗ ${TypeEffUtils.format(ty.second)}`,
-  aprod: (ty) =>
-    chalk`${TypeEffUtils.format(ty.first)} & ${TypeEffUtils.format(ty.second)}`,
-  recursive: (ty) => `rectype ${ty.variable} . ${TypeEffUtils.format(ty.body)}`,
-  prod: (ty) => `(${ty.typeEffects.map(TypeEffUtils.format).join(', ')})`,
-  sum: (ty) =>
-    `(${TypeEffUtils.format(ty.left)} + ${TypeEffUtils.format(ty.right)}})`,
-});
+  return match<string>({
+    real: () => chalk.yellow('Number'),
+    bool: (ty) => chalk.yellow(ty.kind),
+    nil: (ty) => chalk.yellow(ty.kind),
+    arrow: (ty) =>
+      chalk`(${ty.domain
+        .map((d) => `${TypeEffUtils.format(d)}`)
+        .join(', ')}) -> ${TypeEffUtils.format(ty.codomain)}`,
+    forall: (ty) =>
+      chalk`forall {green ${ty.sensVars.join(' ')}} . ${TypeEffUtils.format(
+        ty.codomain,
+      )}`,
+    mprod: (ty) =>
+      chalk`${TypeEffUtils.format(ty.first)} ⊗ ${TypeEffUtils.format(
+        ty.second,
+      )}`,
+    aprod: (ty) =>
+      chalk`${TypeEffUtils.format(ty.first)} & ${TypeEffUtils.format(
+        ty.second,
+      )}`,
+    recursive: (ty) =>
+      `rectype ${ty.variable} . ${TypeEffUtils.format(ty.body)}`,
+    prod: (ty) => `(${ty.typeEffects.map(TypeEffUtils.format).join(', ')})`,
+    sum: (ty) =>
+      `(${TypeEffUtils.format(ty.left)} + ${TypeEffUtils.format(ty.right)})`,
+  })(ty);
+};
 
 export const typeIsKinded = <K extends Type['kind']>(
   teff: TypeEff,

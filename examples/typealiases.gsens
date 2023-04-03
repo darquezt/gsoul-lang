@@ -1,0 +1,24 @@
+type NumList = rec a. Nil + (Number, a);
+
+let l = fold<NumList>(
+  inr<Nil>(
+    (
+      1,
+      fold<NumList>(
+        inl<(Number, NumList)>(nil)
+      )
+    )
+  )
+);
+
+printEv l;
+
+
+case (unfold(l)) of {
+  inl(x) => 0
+} {
+  inr(x) => {
+    printEv x;
+    1;
+  }
+};

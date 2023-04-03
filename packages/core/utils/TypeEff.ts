@@ -113,10 +113,11 @@ export const substRecVar = (
 
 export const format = match<string>({
   recVar: (teff) => teff.name,
-  typeEff: (teff) =>
-    SenvUtils.isEmpty(teff.effect)
+  typeEff: (teff) => {
+    return SenvUtils.isEmpty(teff.effect)
       ? TypeUtils.format(teff.type)
-      : `${TypeUtils.format(teff.type)}@[${SenvUtils.format(teff.effect)}]`,
+      : `${TypeUtils.format(teff.type)}@[${SenvUtils.format(teff.effect)}]`;
+  },
 });
 
 export const applySenvFunction = (
@@ -214,11 +215,6 @@ export const ProductUtils = {
     return TypeEff(type, SenvUtils.add(effect, teff.effect));
   },
 };
-
-/**
- * unfold(rec alpha . t!E ! E2) =
- * unfold(rec alpha . alpha ! E2) =
- */
 
 /**
  * Utilities for working with recursive type-and-effects

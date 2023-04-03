@@ -143,7 +143,7 @@ export const Ascription = factoryOf<Ascription>(ExprKind.Ascription);
 export type Fold = {
   kind: ExprKind.Fold;
   expression: Expression;
-  recType: RecType;
+  recType: TypeEff<RecType, Senv>;
   foldToken: Token;
 };
 export const Fold = factoryOf<Fold>(ExprKind.Fold);

@@ -673,6 +673,7 @@ export const iunfold = (ev: Evidence): Result<Evidence, EvidenceError> => {
     );
   }
 
+  console.log('evidence');
   return Result.ok([
     TypeEffUtils.RecursiveUtils.unfold(left),
     TypeEffUtils.RecursiveUtils.unfold(right),

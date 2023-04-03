@@ -486,7 +486,7 @@ const tuple = (
 
   const typeEff = TypeEff(
     Product({
-      typeEffects: elaborations.map(prop('typeEff')),
+      typeEffects: elaborations.map((e) => prop('typeEff', e)),
     }),
     Senv(),
   );
@@ -653,9 +653,7 @@ export const fold = (
 
   // TODO: Check that expr.recType is well-formed
 
-  const bodyTypeEff = TypeEffUtils.RecursiveUtils.unfold(
-    TypeEff(expr.recType, Senv()),
-  );
+  const bodyTypeEff = TypeEffUtils.RecursiveUtils.unfold(expr.recType);
 
   const bodyEvidenceResult = bodyElaboration.chain((body) => {
     const bodyEvidence = interior(body.typeEff, bodyTypeEff);
@@ -673,7 +671,7 @@ export const fold = (
     return Result.ok(bodyEvidence.value);
   });
 
-  const typeEff = TypeEff(expr.recType, Senv());
+  const typeEff = expr.recType;
   const evidence = initialEvidence(typeEff);
 
   return Result.all([bodyElaboration, bodyEvidenceResult]).map(
