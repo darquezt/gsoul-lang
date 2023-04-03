@@ -66,10 +66,6 @@ export const reduceDoubleAscription = (
   const evidenceRes = EvidenceUtils.trans(term.evidence, kont.state.evidence);
 
   if (!evidenceRes.isOk) {
-    console.log(format(term.evidence));
-    console.log(format(kont.state.evidence));
-    console.log('ascr failed');
-
     return Result.err(
       new InterpreterEvidenceError({
         reason: evidenceRes.error.message,
