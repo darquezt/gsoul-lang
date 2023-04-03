@@ -5,7 +5,6 @@ import { Evidence, EvidenceUtils, Store } from '../../utils';
 import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterEvidenceError } from '../errors';
-import { format } from '../../utils/Evidence';
 
 export enum AscrKontKind {
   AscrKont = 'AscrKont',

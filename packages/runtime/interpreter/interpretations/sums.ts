@@ -157,7 +157,7 @@ export const reduceCaseBranch: StepReducer<Value, CaseBranchesKont> = (
     identifier.lexeme,
     AscribedValue({
       evidence: identifierEvidence.value,
-      expression: value.expression,
+      expression: value.expression.expression.expression,
       typeEff: identifierTypeEff,
     }),
   );

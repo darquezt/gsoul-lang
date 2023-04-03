@@ -20,6 +20,6 @@ export const formatValue = (value: SimpleValue): string => {
     case ExprKind.Fold:
       return cyan('[Fold]');
     case ExprKind.Inj:
-      return cyan('[Inj]');
+      return cyan(`[Inj ${value.index}]`);
   }
 };
