@@ -1,4 +1,5 @@
 import { Sens, Senv, SenvUtils, Type, TypeEff } from '@gsoul-lang/core/utils';
+import { isKinded } from '@gsoul-lang/core/utils/ADT';
 import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
@@ -304,7 +305,9 @@ class Parser {
     if (typeResult.kind === TypeParsingResultKind.TypeAndEffect) {
       throw this.makeSyntaxError(
         name,
-        'Only types without effect can be aliased',
+        isKinded(typeResult.result, TypeEffectKind.RecursiveVar)
+          ? `Type ${typeResult.result.name} does not exist in the current scope`
+          : 'Only types without effect can be aliased',
       );
     }
 
@@ -317,7 +320,7 @@ class Parser {
 
     this.typeEnvironment.define(
       name.lexeme,
-      Object.assign(ty, { alias: name.lexeme }),
+      Object.assign({}, ty, { alias: name.lexeme }),
     );
 
     return null;
@@ -436,7 +439,7 @@ class Parser {
       /**
        * @case block
        */
-      left = this.parseBlockExpr(this.typeEnvironment);
+      left = this.parseBlockExpr(new TypeEnvironment(this.typeEnvironment));
     } else if (this.checkMany(...prefixOps)) {
       /**
        * @case prefix operators
