@@ -129,7 +129,7 @@ export const scanTokens = (source: string): Token[] => {
       }
       case '/': {
         if (match('/')) {
-          while (peek() != '\n' && isAtEnd()) {
+          while (peek() !== '\n' && !isAtEnd()) {
             advance();
           }
         } else {
