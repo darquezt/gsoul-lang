@@ -1,876 +1,55 @@
 import * as past from '@gsoul-lang/parsing/lib/ast';
-import {
-  Sens,
-  Senv,
-  SenvUtils,
-  Type,
-  TypeEnv,
-  TypeEnvUtils,
-  TypeEff,
-  TypeEffUtils,
-} from '@gsoul-lang/core/utils';
-import {
-  AProduct,
-  Arrow,
-  Bool,
-  ForallT,
-  Nil,
-  Product,
-  Real,
-  RecType,
-  Sum,
-  typeIsKinded,
-  TypeKind,
-} from '@gsoul-lang/core/utils/Type';
+import { TypeEnv } from '@gsoul-lang/core/utils';
 
-import {
-  Ascription,
-  Binary,
-  Block,
-  BoolLiteral,
-  Call,
-  Case,
-  Expression,
-  ExprStmt,
-  Fold,
-  Forall,
-  Fun,
-  If,
-  Inj,
-  NilLiteral,
-  NonLinearBinary,
-  Pair,
-  PrintStmt,
-  Projection,
-  ProjFst,
-  ProjSnd,
-  RealLiteral,
-  SCall,
-  Statement,
-  Tuple,
-  Unfold,
-  Variable,
-  VarStmt,
-} from './ast';
-import {
-  Evidence,
-  EvidenceError,
-  initialEvidence,
-  interior,
-} from '../utils/Evidence';
+import { Expression, Statement } from './ast';
 import { Result } from '@badrap/result';
 import {
-  ElaborationDependencyError,
   ElaborationError,
-  ElaborationReferenceError,
-  ElaborationSubtypingError,
-  ElaborationTypeError,
   ElaborationUnsupportedExpressionError,
 } from './errors';
-import { prop, zip } from 'ramda';
-import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
-import { isKinded } from '@gsoul-lang/core/utils/ADT';
-import SJoin from '@gsoul-lang/core/utils/lib/SJoin';
-import { liftSenvOp } from '@gsoul-lang/core/utils/lib/LiftSenvOp';
 
-export type Stateful<T> = {
-  term: T;
-  tenv: TypeEnv;
-};
-export const Stateful = <T>(term: T, tenv: TypeEnv): Stateful<T> => ({
-  term,
-  tenv,
-});
-
-const realLit = (lit: past.Literal): Ascription => {
-  const r = RealLiteral({
-    value: lit.value as number,
-  });
-
-  const evidence = initialEvidence(r.typeEff);
-
-  return Ascription({
-    expression: r,
-    evidence,
-    typeEff: r.typeEff,
-  });
-};
-
-const boolLit = (lit: past.Literal): Ascription => {
-  const b = BoolLiteral({
-    value: lit.value as boolean,
-  });
-
-  const evidence = initialEvidence(b.typeEff);
-
-  return Ascription({
-    expression: b,
-    evidence,
-    typeEff: b.typeEff,
-  });
-};
-
-const unitLit = (): Ascription => {
-  const nil = NilLiteral();
-  const evidence = initialEvidence(nil.typeEff);
-
-  return Ascription({
-    expression: nil,
-    evidence,
-    typeEff: nil.typeEff,
-  });
-};
-
-const variable = (
-  variable: past.Variable,
-  tenv: TypeEnv,
-): Result<Variable, ElaborationReferenceError> => {
-  const typeFromTenv = tenv[variable.name.lexeme];
-
-  if (!typeFromTenv) {
-    return Result.err(
-      new ElaborationReferenceError({
-        reason: `Variable ${variable.name.lexeme} is not in scope`,
-        variable: variable.name,
-      }),
-    );
-  }
-
-  return Result.ok(
-    Variable({
-      name: variable.name,
-      typeEff: typeFromTenv,
-    }),
-  );
-};
-
-const binary = (
-  expr: past.Binary,
-  tenv: TypeEnv,
-): Result<Binary, ElaborationError> => {
-  const leftElaboration = expression(expr.left, tenv);
-
-  const rightElaboration = expression(expr.right, tenv);
-
-  return Result.all([leftElaboration, rightElaboration]).chain(
-    ([left, right]) => {
-      if (left.typeEff.type.kind !== right.typeEff.type.kind) {
-        return Result.err(
-          new ElaborationTypeError({
-            reason: 'Operands types do not match',
-            operator: expr.operator,
-          }),
-        );
-      }
-
-      return Result.ok(
-        Binary({
-          operator: expr.operator,
-          left,
-          right,
-          typeEff: TypeEff(
-            left.typeEff.type,
-            SenvUtils.add(left.typeEff.effect, right.typeEff.effect),
-          ),
-        }),
-      );
-    },
-  );
-};
-
-const nonLinearOperatorsBool = [
-  TokenType.GREATER,
-  TokenType.GREATER_EQUAL,
-  TokenType.LESS,
-  TokenType.LESS_EQUAL,
-  TokenType.EQUAL_EQUAL,
-];
-const nonLinearBinary = (
-  expr: past.NonLinearBinary,
-  tenv: TypeEnv,
-): Result<NonLinearBinary, ElaborationError> => {
-  const leftElaboration = expression(expr.left, tenv);
-
-  const rightElaboration = expression(expr.right, tenv);
-
-  return Result.all([leftElaboration, rightElaboration]).chain(
-    ([left, right]) => {
-      if (left.typeEff.type.kind !== right.typeEff.type.kind) {
-        return Result.err(
-          new ElaborationTypeError({
-            reason: 'Operands types do not match',
-            operator: expr.operator,
-          }),
-        );
-      }
-
-      const type = nonLinearOperatorsBool.includes(expr.operator.type)
-        ? Bool()
-        : Real();
-
-      return Result.ok(
-        NonLinearBinary({
-          operator: expr.operator,
-          left,
-          right,
-          typeEff: TypeEff(
-            type,
-            SenvUtils.scaleInf(
-              SenvUtils.add(left.typeEff.effect, right.typeEff.effect),
-            ),
-          ),
-        }),
-      );
-    },
-  );
-};
-
-const fun = (
-  expr: past.Fun,
-  tenv: TypeEnv,
-): Result<Ascription, ElaborationError> => {
-  const extensions = expr.binders.map(
-    (binder) => [binder.name.lexeme, binder.type] as [string, TypeEff],
-  );
-
-  const bodyElaboration = expression(
-    expr.body,
-    TypeEnvUtils.extendAll(tenv, ...extensions),
-  );
-
-  return bodyElaboration.map((body) => {
-    const lambda = Fun({
-      binders: expr.binders,
-      body,
-      typeEff: TypeEff(
-        Arrow({
-          domain: expr.binders.map((binder) => binder.type),
-          codomain: body.typeEff,
-        }),
-        Senv(),
-      ),
-    });
-
-    const evidence = initialEvidence(lambda.typeEff);
-
-    return Ascription({
-      expression: lambda,
-      evidence,
-      typeEff: lambda.typeEff,
-    });
-  });
-};
-
-const forall = (
-  expr: past.Forall,
-  tenv: TypeEnv,
-): Result<Ascription, ElaborationError> => {
-  const bodyElaboration = expression(expr.expr, tenv);
-
-  return bodyElaboration.map((body) => {
-    const lambda = Forall({
-      sensVars: expr.sensVars,
-      expr: body,
-      typeEff: TypeEff(
-        ForallT({
-          sensVars: expr.sensVars.map((v) => v.lexeme),
-          codomain: body.typeEff,
-        }),
-        Senv(),
-      ),
-    });
-
-    const evidence = initialEvidence(lambda.typeEff);
-
-    return Ascription({
-      expression: lambda,
-      evidence,
-      typeEff: lambda.typeEff,
-    });
-  });
-};
-
-const checkApplicationCalleeType =
-  (operator: Token) =>
-  (callee: Expression): Result<Expression, ElaborationError> => {
-    const calleeTypeEff = callee.typeEff;
-
-    if (!typeIsKinded(calleeTypeEff, TypeKind.Arrow)) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: 'Expression called is not a function',
-          operator,
-        }),
-      );
-    }
-
-    return Result.ok(callee);
-  };
-
-const app = (
-  expr: past.Call,
-  tenv: TypeEnv,
-): Result<Call, ElaborationError> => {
-  const calleeElaboration = expression(expr.callee, tenv).chain(
-    checkApplicationCalleeType(expr.paren),
-  );
-
-  const argsElaboration = Result.all(
-    expr.args.map((arg) => expression(arg, tenv)),
-  ) as unknown as Result<Expression[], ElaborationError>;
-
-  const evidenceResult = Result.all([calleeElaboration, argsElaboration]).chain(
-    ([callee, args]) => {
-      const calleeArgType = TypeEffUtils.ArrowsUtils.domain(
-        callee.typeEff as TypeEff<Arrow, Senv>,
-      );
-
-      const inter = zip(args, calleeArgType).map(([arg, calleeArgType]) =>
-        interior(arg.typeEff, calleeArgType),
-      );
-
-      const allInteriors = Result.all(inter) as unknown as Result<
-        Evidence[],
-        EvidenceError
-      >;
-
-      if (!allInteriors.isOk) {
-        return Result.err(
-          new ElaborationSubtypingError({
-            reason:
-              'Argument type is not subtype of the expected type in the function',
-            operator: expr.paren,
-          }),
-        );
-      }
-
-      return Result.ok(allInteriors.value);
-    },
-  );
-
-  return Result.all([calleeElaboration, argsElaboration, evidenceResult]).map(
-    ([callee, arg, evidence]) => {
-      const dom = TypeEffUtils.ArrowsUtils.domain(
-        callee.typeEff as TypeEff<Arrow, Senv>,
-      );
-
-      return Call({
-        callee,
-        args: zip(arg, evidence).map(([arg, evidence], index) =>
-          Ascription({
-            evidence,
-            typeEff: dom[index],
-            expression: arg,
-          }),
-        ),
-        paren: expr.paren,
-        typeEff: TypeEffUtils.ArrowsUtils.codomain(
-          callee.typeEff as TypeEff<Arrow, Senv>,
-        ),
-      });
-    },
-  );
-};
-
-const checkSensitiveApplicationCalleeType =
-  (operator: Token) =>
-  (callee: Expression): Result<Expression, ElaborationError> => {
-    if (!typeIsKinded(callee.typeEff, TypeKind.ForallT)) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: 'Expression called is not a sensitivity quantification',
-          operator,
-        }),
-      );
-    }
-
-    return Result.ok(callee);
-  };
-
-const sapp = (
-  expr: past.SCall,
-  tenv: TypeEnv,
-): Result<SCall, ElaborationError> => {
-  const calleeElaboration = expression(expr.callee, tenv).chain(
-    checkSensitiveApplicationCalleeType(expr.bracket),
-  );
-
-  return calleeElaboration.map((callee) => {
-    return SCall({
-      callee,
-      args: expr.args,
-      bracket: expr.bracket,
-      typeEff: TypeEffUtils.ForallsUtils.instance(
-        callee.typeEff as TypeEff<ForallT, Senv>,
-        expr.args,
-      ),
-    });
-  });
-};
-
-const ascription = (
-  expr: past.Ascription,
-  tenv: TypeEnv,
-): Result<Ascription, ElaborationError> => {
-  const innerElaboration = expression(expr.expression, tenv);
-
-  return innerElaboration.chain((inner) => {
-    const evidence = interior(inner.typeEff, expr.typeEff);
-
-    if (!evidence.isOk) {
-      return Result.err(
-        new ElaborationSubtypingError({
-          reason:
-            'Expression type-and-effect is not a subtype of the ascription type-and-effect',
-          operator: expr.ascriptionToken,
-        }),
-      );
-    }
-
-    return Result.ok(
-      Ascription({
-        expression: inner,
-        evidence: evidence.value,
-        typeEff: expr.typeEff,
-      }),
-    );
-  });
-};
-
-const block = (
-  expr: past.Block,
-  tenv: TypeEnv,
-): Result<Block, ElaborationError> => {
-  let result = TypeEff<Type, Senv>(Nil(), Senv());
-  let currentTenv = tenv;
-  const statements: Statement[] = [];
-
-  for (const decl of expr.statements) {
-    const stmtElaboration = statement(decl, currentTenv);
-
-    if (!stmtElaboration.isOk) {
-      return Result.err(stmtElaboration.error);
-    }
-
-    const { value: stmt } = stmtElaboration;
-
-    result = stmt.term.typeEff;
-    currentTenv = stmt.tenv;
-
-    statements.push(stmt.term);
-  }
-
-  return Result.ok(
-    Block({
-      statements,
-      typeEff: result,
-    }),
-  );
-};
-
-const tuple = (
-  expr: past.Tuple,
-  tenv: TypeEnv,
-): Result<Ascription, ElaborationError> => {
-  const elaborations: Expression[] = [];
-
-  for (const e of expr.expressions) {
-    const eTC = expression(e, tenv);
-
-    if (!eTC.isOk) {
-      return Result.err(eTC.error);
-    }
-
-    elaborations.push(eTC.value);
-  }
-
-  const typeEff = TypeEff(
-    Product({
-      typeEffects: elaborations.map((e) => prop('typeEff', e)),
-    }),
-    Senv(),
-  );
-
-  const evidence = initialEvidence(typeEff);
-
-  return Result.ok(
-    Ascription({
-      evidence,
-      expression: Tuple({
-        expressions: elaborations,
-        typeEff,
-      }),
-      typeEff,
-    }),
-  );
-};
-
-const checkExpressionProjectedIsTuple =
-  (operator: Token) =>
-  (tuple: Expression): Result<Expression, ElaborationError> => {
-    if (!typeIsKinded(tuple.typeEff, TypeKind.Product)) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: 'The expression being projected must be a tuple',
-          operator,
-        }),
-      );
-    }
-
-    return Result.ok(tuple);
-  };
-
-const checkProjectionOutOfBounds =
-  (index: number, operator: Token) =>
-  (tuple: Expression): Result<Expression, ElaborationError> => {
-    if (index >= (tuple.typeEff.type as Product).typeEffects.length) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: `Tuple has no ${index} element`,
-          operator: operator,
-        }),
-      );
-    }
-
-    return Result.ok(tuple);
-  };
-
-const projection = (
-  expr: past.Projection,
-  tenv: TypeEnv,
-): Result<Projection, ElaborationError> => {
-  const tupleElaboration = expression(expr.tuple, tenv)
-    .chain(checkExpressionProjectedIsTuple(expr.projectToken))
-    .chain(checkProjectionOutOfBounds(expr.index, expr.projectToken));
-
-  return tupleElaboration.map((tuple) =>
-    Projection({
-      tuple,
-      index: expr.index,
-      projectToken: expr.projectToken,
-      typeEff: TypeEffUtils.ProductUtils.projection(
-        expr.index,
-        tuple.typeEff as TypeEff<Product, Senv>,
-      ),
-    }),
-  );
-};
-
-const pair = (
-  expr: past.Pair,
-  tenv: TypeEnv,
-): Result<Ascription, ElaborationError> => {
-  const firstElaboration = expression(expr.first, tenv);
-
-  const secondElaboration = expression(expr.second, tenv);
-
-  return Result.all([firstElaboration, secondElaboration]).map(
-    ([first, second]) => {
-      const typeEff = TypeEff(
-        AProduct({
-          first: first.typeEff,
-          second: second.typeEff,
-        }),
-        Senv(),
-      );
-
-      const evidence = initialEvidence(typeEff);
-
-      return Ascription({
-        evidence,
-        expression: Pair({
-          first,
-          second,
-          typeEff,
-        }),
-        typeEff,
-      });
-    },
-  );
-};
-
-const projFst = (
-  expr: past.ProjFst,
-  tenv: TypeEnv,
-): Result<ProjFst, ElaborationError> => {
-  const pairElaboration = expression(expr.pair, tenv).chain((pair) => {
-    if (!typeIsKinded(pair.typeEff, TypeKind.AProduct)) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: 'The expression being projected must be a pair',
-          operator: expr.projToken,
-        }),
-      );
-    }
-
-    return Result.ok(pair);
-  });
-
-  return pairElaboration.map((pair) =>
-    ProjFst({
-      pair,
-      projToken: expr.projToken,
-      typeEff: TypeEffUtils.AdditiveProductsUtils.firstProjection(
-        pair.typeEff as TypeEff<AProduct, Senv>,
-      ),
-    }),
-  );
-};
-
-const projSnd = (
-  expr: past.ProjSnd,
-  tenv: TypeEnv,
-): Result<ProjSnd, ElaborationError> => {
-  const pairElaboration = expression(expr.pair, tenv).chain((pair) => {
-    if (!typeIsKinded(pair.typeEff, TypeKind.AProduct)) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: 'The expression being projected must be a pair',
-          operator: expr.projToken,
-        }),
-      );
-    }
-
-    return Result.ok(pair);
-  });
-
-  return pairElaboration.map((pair) =>
-    ProjSnd({
-      pair,
-      projToken: expr.projToken,
-      typeEff: TypeEffUtils.AdditiveProductsUtils.firstProjection(
-        pair.typeEff as TypeEff<AProduct, Senv>,
-      ),
-    }),
-  );
-};
-
-export const fold = (
-  expr: past.Fold,
-  tenv: TypeEnv,
-): Result<Ascription, ElaborationError> => {
-  const bodyElaboration = expression(expr.expression, tenv);
-
-  // TODO: Check that expr.recType is well-formed
-
-  const bodyTypeEff = TypeEffUtils.RecursiveUtils.unfold(expr.recType);
-
-  const bodyEvidenceResult = bodyElaboration.chain((body) => {
-    const bodyEvidence = interior(body.typeEff, bodyTypeEff);
-
-    if (!bodyEvidence.isOk) {
-      return Result.err(
-        new ElaborationSubtypingError({
-          reason:
-            'Body type-and-effect is not a subtype of the unfolded expression',
-          operator: expr.foldToken,
-        }),
-      );
-    }
-
-    return Result.ok(bodyEvidence.value);
-  });
-
-  const typeEff = expr.recType;
-  const evidence = initialEvidence(typeEff);
-
-  return Result.all([bodyElaboration, bodyEvidenceResult]).map(
-    ([body, bodyEvidence]) =>
-      Ascription({
-        expression: Fold({
-          foldToken: expr.foldToken,
-          expression: Ascription({
-            evidence: bodyEvidence,
-            expression: body,
-            typeEff: bodyTypeEff,
-          }),
-          recType: expr.recType,
-          typeEff,
-        }),
-        evidence,
-        typeEff,
-      }),
-  );
-};
-
-const checkBodyIsUnfoldable =
-  (operator: Token) =>
-  (body: Expression): Result<Expression, ElaborationError> => {
-    if (!isKinded(body.typeEff.type, TypeKind.RecType)) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: 'Cannot unfold an expression without a recursive type',
-          operator,
-        }),
-      );
-    }
-
-    return Result.ok(body);
-  };
-
-export const unfold = (
-  expr: past.Unfold,
-  tenv: TypeEnv,
-): Result<Unfold, ElaborationError> => {
-  const bodyElaboration = expression(expr.expression, tenv).chain(
-    checkBodyIsUnfoldable(expr.unfoldToken),
-  );
-
-  return bodyElaboration.map((body) =>
-    Unfold({
-      expression: body,
-      typeEff: TypeEffUtils.RecursiveUtils.unfold(
-        body.typeEff as TypeEff<RecType, Senv>,
-      ),
-      unfoldToken: expr.unfoldToken,
-    }),
-  );
-};
-
-const ifExpr = (expr: past.If, tenv: TypeEnv): Result<If, ElaborationError> => {
-  const conditionElaboration = expression(expr.condition, tenv);
-  const thenElaboration = expression(expr.then, tenv);
-  const elseElaboration = expression(expr.else, tenv);
-
-  return Result.all([
-    conditionElaboration,
-    thenElaboration,
-    elseElaboration,
-  ]).chain(([condition, then, els]) => {
-    const bodyTypeEff = SJoin.TypeEffect(then.typeEff, els.typeEff);
-
-    if (!bodyTypeEff.isOk) {
-      return Result.err(
-        new ElaborationTypeError({
-          reason: 'Branches of if expression have incompatible types',
-          operator: expr.ifToken,
-        }),
-      );
-    }
-
-    const resultTypeEff = liftSenvOp(SJoin.Senv)(
-      bodyTypeEff.value as TypeEff,
-      condition.typeEff.effect,
-    );
-
-    return Result.ok(
-      If({
-        ifToken: expr.ifToken,
-        condition,
-        then,
-        else: els,
-        typeEff: resultTypeEff,
-      }),
-    );
-  });
-};
-
-const inj = (expr: past.Inj, tenv: TypeEnv): Result<Inj, ElaborationError> => {
-  const bodyElaboration = expression(expr.expression, tenv);
-
-  return bodyElaboration.map((body) =>
-    Inj({
-      type: expr.type,
-      index: expr.index,
-      expression: body,
-      typeEff: TypeEff(
-        Sum({
-          left: expr.index === 0 ? body.typeEff : TypeEff(expr.type, Senv()),
-          right: expr.index === 1 ? body.typeEff : TypeEff(expr.type, Senv()),
-        }),
-        Senv(),
-      ),
-      injToken: expr.injToken,
-    }),
-  );
-};
-
-const caseExpr = (
-  expr: past.Case,
-  tenv: TypeEnv,
-): Result<Case, ElaborationError> => {
-  const sumElaboration = expression(expr.sum, tenv);
-
-  const leftElaboration = sumElaboration.chain((sum) =>
-    expression(
-      expr.left,
-      TypeEnvUtils.extend(
-        tenv,
-        expr.leftIdentifier.lexeme,
-        TypeEffUtils.SumUtils.left(sum.typeEff as TypeEff<Sum, Senv>),
-      ),
-    ),
-  );
-
-  const rightElaboration = sumElaboration.chain((sum) =>
-    expression(
-      expr.right,
-      TypeEnvUtils.extend(
-        tenv,
-        expr.rightIdentifier.lexeme,
-        TypeEffUtils.SumUtils.right(sum.typeEff as TypeEff<Sum, Senv>),
-      ),
-    ),
-  );
-
-  return Result.all([sumElaboration, leftElaboration, rightElaboration]).chain(
-    ([sum, left, right]) => {
-      const bodyTypeEff = SJoin.TypeEffect(left.typeEff, right.typeEff);
-
-      if (!bodyTypeEff.isOk) {
-        return Result.err(
-          new ElaborationTypeError({
-            reason: 'Branches of case expression have incompatible types',
-            operator: expr.caseToken,
-          }),
-        );
-      }
-
-      return Result.ok(
-        Case({
-          sum,
-          leftIdentifier: expr.leftIdentifier,
-          left: left,
-          rightIdentifier: expr.rightIdentifier,
-          right: right,
-          typeEff: TypeEffUtils.applySenvFunction(
-            bodyTypeEff.value as TypeEff,
-            SJoin.Senv,
-            sum.typeEff.effect,
-          ),
-          caseToken: expr.caseToken,
-        }),
-      );
-    },
-  );
-};
+import { ascription } from './elaborations/ascriptions';
+import { binary, nonLinearBinary } from './elaborations/binaries';
+import { block } from './elaborations/blocks';
+import { fold, unfold } from './elaborations/folds';
+import { sapp, forall } from './elaborations/foralls';
+import { app, fun } from './elaborations/funs';
+import { ifExpr } from './elaborations/ifs';
+import { inj, caseExpr } from './elaborations/injections';
+import { realLiteral, boolLiteral, unitLiteral } from './elaborations/literals';
+import { pair, projFst, projSnd } from './elaborations/pairs';
+import { tuple, projection } from './elaborations/tuples';
+import { variable } from './elaborations/variables';
+import { ElaborationContext, Stateful } from './types';
+import { exprStmt, varStmt, printStmt } from './elaborations/statements';
+import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 
 export const expression = (
   expr: past.Expression,
-  tenv: TypeEnv = {},
+  ctx: ElaborationContext,
 ): Result<Expression, ElaborationError> => {
   switch (expr.kind) {
     case past.ExprKind.Binary:
-      return binary(expr, tenv);
+      return binary(expr, ctx);
     case past.ExprKind.Call:
-      return app(expr, tenv);
+      return app(expr, ctx);
     case past.ExprKind.SCall:
-      return sapp(expr, tenv);
+      return sapp(expr, ctx);
     case past.ExprKind.NonLinearBinary:
-      return nonLinearBinary(expr, tenv);
+      return nonLinearBinary(expr, ctx);
     case past.ExprKind.Variable:
-      return variable(expr, tenv);
+      return variable(expr, ctx);
     case past.ExprKind.Fun:
-      return fun(expr, tenv);
+      return fun(expr, ctx);
     case past.ExprKind.Forall:
-      return forall(expr, tenv);
+      return forall(expr, ctx);
     case past.ExprKind.Literal: {
       if (typeof expr.value === 'number') {
-        return Result.ok(realLit(expr));
+        return Result.ok(realLiteral(expr));
       } else if (typeof expr.value === 'boolean') {
-        return Result.ok(boolLit(expr));
+        return Result.ok(boolLiteral(expr));
       } else if (expr.value === null) {
-        return Result.ok(unitLit());
+        return Result.ok(unitLiteral());
       }
       return Result.err(
         new ElaborationUnsupportedExpressionError({
@@ -879,138 +58,45 @@ export const expression = (
       );
     }
     case past.ExprKind.Ascription:
-      return ascription(expr, tenv);
+      return ascription(expr, ctx);
     case past.ExprKind.Grouping:
-      return expression(expr.expression, tenv);
+      return expression(expr.expression, ctx);
     case past.ExprKind.Block:
-      return block(expr, tenv);
+      return block(expr, ctx);
     case past.ExprKind.Tuple:
-      return tuple(expr, tenv);
+      return tuple(expr, ctx);
     case past.ExprKind.Projection:
-      return projection(expr, tenv);
+      return projection(expr, ctx);
     case past.ExprKind.Pair:
-      return pair(expr, tenv);
+      return pair(expr, ctx);
     case past.ExprKind.ProjFst:
-      return projFst(expr, tenv);
+      return projFst(expr, ctx);
     case past.ExprKind.ProjSnd:
-      return projSnd(expr, tenv);
+      return projSnd(expr, ctx);
     case past.ExprKind.Fold:
-      return fold(expr, tenv);
+      return fold(expr, ctx);
     case past.ExprKind.Unfold:
-      return unfold(expr, tenv);
+      return unfold(expr, ctx);
     case past.ExprKind.If:
-      return ifExpr(expr, tenv);
+      return ifExpr(expr, ctx);
     case past.ExprKind.Inj:
-      return inj(expr, tenv);
+      return inj(expr, ctx);
     case past.ExprKind.Case:
-      return caseExpr(expr, tenv);
+      return caseExpr(expr, ctx);
   }
-};
-
-const exprStmt = (
-  stmt: past.ExprStmt,
-  tenv: TypeEnv,
-): Result<Stateful<ExprStmt>, ElaborationError> => {
-  const exprElaboration = expression(stmt.expression, tenv);
-
-  if (!exprElaboration.isOk) {
-    return Result.err(exprElaboration.error);
-  }
-
-  const { value: expr } = exprElaboration;
-
-  return Result.ok(
-    Stateful(
-      ExprStmt({
-        expression: expr,
-        typeEff: expr.typeEff,
-      }),
-      tenv,
-    ),
-  );
-};
-
-const printStmt = (
-  stmt: past.PrintStmt,
-  tenv: TypeEnv,
-): Result<Stateful<PrintStmt>, ElaborationError> => {
-  const exprElaboration = expression(stmt.expression, tenv);
-
-  if (!exprElaboration.isOk) {
-    return Result.err(exprElaboration.error);
-  }
-
-  const { value: expr } = exprElaboration;
-
-  return Result.ok(
-    Stateful(
-      PrintStmt({
-        expression: expr,
-        typeEff: expr.typeEff,
-        showEvidence: stmt.showEvidence,
-      }),
-      tenv,
-    ),
-  );
-};
-
-const varStmt = (
-  stmt: past.VarStmt,
-  tenv: TypeEnv,
-): Result<Stateful<VarStmt>, ElaborationError> => {
-  const exprElaboration = expression(stmt.assignment, tenv);
-
-  if (!exprElaboration.isOk) {
-    return Result.err(exprElaboration.error);
-  }
-
-  let expr = exprElaboration.value;
-
-  if (stmt.resource) {
-    if (!SenvUtils.isEmpty(expr.typeEff.effect)) {
-      return Result.err(
-        new ElaborationDependencyError({
-          reason: 'Resources cannot depend on other resources',
-          variable: stmt.name,
-        }),
-      );
-    }
-
-    const typeEff = TypeEff(
-      expr.typeEff.type,
-      Senv({ [stmt.name.lexeme]: new Sens(1) }),
-    );
-
-    expr = Ascription({
-      expression: expr,
-      typeEff: typeEff,
-      evidence: [expr.typeEff, typeEff],
-    });
-  }
-
-  return Result.ok(
-    Stateful(
-      VarStmt({
-        name: stmt.name,
-        assignment: expr,
-        typeEff: expr.typeEff,
-      }),
-      TypeEnvUtils.extend(tenv, stmt.name.lexeme, expr.typeEff),
-    ),
-  );
 };
 
 export const statement = (
   stmt: past.Statement,
-  tenv: TypeEnv = {},
+  ctx: ElaborationContext,
 ): Result<Stateful<Statement>, ElaborationError> => {
   switch (stmt.kind) {
     case past.StmtKind.ExprStmt:
-      return exprStmt(stmt, tenv);
+      return exprStmt(stmt, ctx);
     case past.StmtKind.VarStmt:
-      return varStmt(stmt, tenv);
+      return varStmt(stmt, ctx);
     case past.StmtKind.PrintStmt:
-      return printStmt(stmt, tenv);
+      return printStmt(stmt, ctx);
   }
 };
 
@@ -1024,7 +110,7 @@ export const elaborate = (
     statements: stmts,
   });
 
-  const result = expression(block, TypeEnv());
+  const result = expression(block, [TypeEnv(), ResourcesSet()]);
 
   if (!result.isOk) {
     return result;
