@@ -37,13 +37,15 @@ export const printStmt: StatefulTypeCheckingRule<PrintStmt> = (stmt, ctx) => {
 export const varStmt: StatefulTypeCheckingRule<VarStmt> = (stmt, ctx) => {
   const exprTC = expression(stmt.assignment, ctx);
 
+  const [tenv, rset] = ctx;
+
   return exprTC.chain((exprTC) =>
     Result.ok({
       typeEff: exprTC.typeEff,
       typings: [[stmt.name, exprTC.typeEff] as TypeAssoc].concat(
         exprTC.typings,
       ),
-      ctx: [TypeEnvUtils.extend(ctx[0], stmt.name.lexeme, exprTC.typeEff)],
+      ctx: [TypeEnvUtils.extend(tenv, stmt.name.lexeme, exprTC.typeEff), rset],
     }),
   );
 };

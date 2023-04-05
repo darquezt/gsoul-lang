@@ -27,6 +27,7 @@ import { pair, projFst, projSnd } from './checkers/pairs';
 import { tuple, projection } from './checkers/tuples';
 import { variable } from './checkers/variables';
 import { exprStmt, varStmt, printStmt } from './checkers/statements';
+import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 
 export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
   switch (expr.kind) {
@@ -104,7 +105,7 @@ export type TypeChecking = {
 export const typeCheck = (
   statements: Statement[],
 ): Result<TypeChecking, TypeCheckingError> => {
-  const tc = expression(Block({ statements }), [TypeEnv()]);
+  const tc = expression(Block({ statements }), [TypeEnv(), ResourcesSet()]);
 
   return tc.chain((tc) => {
     const typings = new TypingSeeker(tc.typings);

@@ -13,7 +13,7 @@ import { isSubTypeEff } from '../subtyping';
 import { TypeCheckingError, TypeCheckingTypeError } from '../utils/errors';
 import { TypeCheckingResult, TypeCheckingRule } from '../utils/types';
 
-export const fun: TypeCheckingRule<Fun> = (expr, ctx) => {
+export const fun: TypeCheckingRule<Fun> = (expr, [tenv, rset]) => {
   const { binders, body } = expr;
 
   const extensions = binders.map(
@@ -21,7 +21,8 @@ export const fun: TypeCheckingRule<Fun> = (expr, ctx) => {
   );
 
   const bodyTC = expression(body, [
-    TypeEnvUtils.extendAll(ctx[0], ...extensions),
+    TypeEnvUtils.extendAll(tenv, ...extensions),
+    rset,
   ]);
 
   return bodyTC.map((bodyTC) => ({

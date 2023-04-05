@@ -4,8 +4,12 @@ import {
   Senv,
   TypeEnvUtils,
   TypeEffUtils,
+  Type,
 } from '@gsoul-lang/core/utils';
 import SJoin from '@gsoul-lang/core/utils/lib/SJoin';
+import WellFormed, {
+  WellFormednessContext,
+} from '@gsoul-lang/core/utils/lib/WellFormed';
 import { Sum, typeIsKinded, TypeKind } from '@gsoul-lang/core/utils/Type';
 import { Inj, Case } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
@@ -13,8 +17,27 @@ import { expression } from '../checker';
 import { TypeCheckingError, TypeCheckingTypeError } from '../utils/errors';
 import { TypeCheckingRule, TypeCheckingResult } from '../utils/types';
 
+const checkInjCalleeType =
+  (ctx: WellFormednessContext, type: Type, token: Token) =>
+  (
+    exprTC: TypeCheckingResult,
+  ): Result<TypeCheckingResult, TypeCheckingError> => {
+    if (!WellFormed.Type(ctx, type)) {
+      return Result.err(
+        new TypeCheckingTypeError({
+          reason: 'Type of the injection is not valid',
+          operator: token,
+        }),
+      );
+    }
+
+    return Result.ok(exprTC);
+  };
+
 export const inj: TypeCheckingRule<Inj> = (expr, ctx) => {
-  const exprTC = expression(expr.expression, ctx);
+  const exprTC = expression(expr.expression, ctx).chain(
+    checkInjCalleeType([ctx[1]], expr.type, expr.injToken),
+  );
 
   return exprTC.map((exprTC) => ({
     typeEff: TypeEff(
@@ -50,23 +73,27 @@ export const caseExpr: TypeCheckingRule<Case> = (expr, ctx) => {
     checkCaseCalleeType(expr.caseToken),
   );
 
+  const [tenv, rset] = ctx;
+
   const leftTC = sumTC.chain((sumTC) =>
     expression(expr.left, [
       TypeEnvUtils.extend(
-        ctx[0],
+        tenv,
         expr.leftIdentifier.lexeme,
         TypeEffUtils.SumUtils.left(sumTC.typeEff),
       ),
+      rset,
     ]),
   );
 
   const rightTC = sumTC.chain((sumTC) =>
     expression(expr.right, [
       TypeEnvUtils.extend(
-        ctx[0],
+        tenv,
         expr.rightIdentifier.lexeme,
         TypeEffUtils.SumUtils.right(sumTC.typeEff),
       ),
+      rset,
     ]),
   );
 

@@ -1,5 +1,8 @@
 import { Result } from '@badrap/result';
 import { TypeEff, TypeEffUtils } from '@gsoul-lang/core/utils';
+import WellFormed, {
+  WellFormednessContext,
+} from '@gsoul-lang/core/utils/lib/WellFormed';
 import { RecType, typeIsKinded, TypeKind } from '@gsoul-lang/core/utils/Type';
 import { Fold, Unfold } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
@@ -13,6 +16,23 @@ import {
 import { TypeCheckingResult, TypeCheckingRule } from '../utils/types';
 
 const checkFoldBodyType =
+  (ctx: WellFormednessContext, typeEff: TypeEff, token: Token) =>
+  (
+    bodyTC: TypeCheckingResult,
+  ): Result<TypeCheckingResult, TypeCheckingError> => {
+    if (!WellFormed.TypeEffect(ctx, typeEff)) {
+      return Result.err(
+        new TypeCheckingTypeError({
+          reason: 'Type of folded expression is not valid',
+          operator: token,
+        }),
+      );
+    }
+
+    return Result.ok(bodyTC);
+  };
+
+const checkFoldBodySubtyping =
   (unfolded: TypeEff, token: Token) =>
   (
     bodyTC: TypeCheckingResult,
@@ -35,9 +55,9 @@ export const fold: TypeCheckingRule<Fold> = (expr, ctx) => {
 
   const unfolded = TypeEffUtils.RecursiveUtils.unfold(typeEff);
 
-  const bodyTC = expression(expr.expression, ctx).chain(
-    checkFoldBodyType(unfolded, expr.foldToken),
-  );
+  const bodyTC = expression(expr.expression, ctx)
+    .chain(checkFoldBodyType([ctx[1]], typeEff, expr.foldToken))
+    .chain(checkFoldBodySubtyping(unfolded, expr.foldToken));
 
   return bodyTC.map((body) => ({
     typeEff,

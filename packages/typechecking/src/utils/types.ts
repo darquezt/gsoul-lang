@@ -1,10 +1,11 @@
 import { Result } from '@badrap/result';
 import { Senv, Type, TypeEff, TypeEnv } from '@gsoul-lang/core/utils';
+import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 import { Expression, Statement } from '@gsoul-lang/parsing/lib/ast';
 import { TypeCheckingError } from './errors';
 import { TypeAssoc } from './typingSeeker';
 
-export type TypeCheckingContext = [TypeEnv];
+export type TypeCheckingContext = [TypeEnv, ResourcesSet];
 
 // Expression typechecking
 
