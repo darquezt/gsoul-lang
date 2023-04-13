@@ -226,6 +226,8 @@ export const ExprStmt = factoryOf<ExprStmt>(StmtKind.ExprStmt);
 export type VarStmt = {
   kind: StmtKind.VarStmt;
   name: Token;
+  colon?: Token;
+  type?: TypeEff;
   assignment: Expression;
   resource: boolean;
 };

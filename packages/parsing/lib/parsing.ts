@@ -364,6 +364,24 @@ class Parser {
       errorMessage({ expected: 'variable name' }),
     );
 
+    let type: TypeEff | undefined = undefined;
+    let colon: Token | undefined = undefined;
+
+    if (this.check(TokenType.COLON)) {
+      colon = this.advance();
+
+      const ty = normalizeTypeResult(this.type(0));
+
+      if (ty.kind === TypeEffectKind.TypeEff) {
+        type = ty;
+      } else {
+        throw this.makeSyntaxError(
+          colon,
+          'Cannot assign a recursive variable type',
+        );
+      }
+    }
+
     this.consume(
       TokenType.EQUAL,
       errorMessage({
@@ -379,7 +397,7 @@ class Parser {
       errorMessage({ expected: ';', after: 'variable declaration' }),
     );
 
-    return VarStmt({ name, assignment, resource: false });
+    return VarStmt({ name, assignment, colon, type, resource: false });
   }
 
   private expression(minBP: number): Expression {

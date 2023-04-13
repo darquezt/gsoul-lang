@@ -6,11 +6,17 @@ import {
   Sens,
   TypeEnvUtils,
 } from '@gsoul-lang/core/utils';
-import { ExprStmt, PrintStmt, VarStmt, Ascription } from '../ast';
+import { ExprStmt, PrintStmt, VarStmt, Ascription, Expression } from '../ast';
 import { expression } from '../elaboration';
-import { ElaborationError, ElaborationDependencyError } from '../errors';
+import {
+  ElaborationError,
+  ElaborationDependencyError,
+  ElaborationSubtypingError,
+} from '../errors';
 import { ElaborationContext, Stateful } from '../types';
 import * as past from '@gsoul-lang/parsing/lib/ast';
+import { interior } from '../../utils/Evidence';
+import { Token } from '@gsoul-lang/parsing/lib/lexing';
 
 export const exprStmt = (
   stmt: past.ExprStmt,
@@ -59,11 +65,40 @@ export const printStmt = (
   );
 };
 
+const checkAssignmentType =
+  (colon: Token, type?: TypeEff) =>
+  (expr: Expression): Result<Expression, ElaborationError> => {
+    if (!type) {
+      return Result.ok(expr);
+    }
+
+    const evidence = interior(expr.typeEff, type);
+
+    if (evidence.isErr) {
+      return Result.err(
+        new ElaborationSubtypingError({
+          reason: 'Expression type is not a subtype of the declared type',
+          operator: colon,
+        }),
+      );
+    }
+
+    return Result.ok(
+      Ascription({
+        expression: expr,
+        typeEff: type,
+        evidence: evidence.value,
+      }),
+    );
+  };
+
 export const varStmt = (
   stmt: past.VarStmt,
   ctx: ElaborationContext,
 ): Result<Stateful<VarStmt>, ElaborationError> => {
-  const exprElaboration = expression(stmt.assignment, ctx);
+  const exprElaboration = expression(stmt.assignment, ctx).chain(
+    checkAssignmentType(stmt.colon ?? stmt.name, stmt.type),
+  );
 
   if (!exprElaboration.isOk) {
     return Result.err(exprElaboration.error);
