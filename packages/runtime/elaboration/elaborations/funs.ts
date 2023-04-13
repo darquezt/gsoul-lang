@@ -20,6 +20,33 @@ import {
 import * as past from '@gsoul-lang/parsing/lib/ast';
 import { ElaborationContext } from '../types';
 
+const checkReturnSubtyping =
+  (colon?: Token, returnType?: TypeEff) =>
+  (expression: Expression): Result<Expression, ElaborationError> => {
+    if (!returnType || !colon) {
+      return Result.ok(expression);
+    }
+
+    const interiorResult = interior(expression.typeEff, returnType);
+
+    if (!interiorResult.isOk) {
+      return Result.err(
+        new ElaborationSubtypingError({
+          reason: 'Return type does not match function return type',
+          operator: colon,
+        }),
+      );
+    }
+
+    return Result.ok(
+      Ascription({
+        expression,
+        evidence: interiorResult.value,
+        typeEff: returnType,
+      }),
+    );
+  };
+
 export const fun = (
   expr: past.Fun,
   [tenv, rset]: ElaborationContext,
@@ -31,7 +58,7 @@ export const fun = (
   const bodyElaboration = expression(expr.body, [
     TypeEnvUtils.extendAll(tenv, ...extensions),
     rset,
-  ]);
+  ]).chain(checkReturnSubtyping(expr.colon, expr.returnType));
 
   return bodyElaboration.map((body) => {
     const lambda = Fun({

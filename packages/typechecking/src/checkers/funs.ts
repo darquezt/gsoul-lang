@@ -10,8 +10,33 @@ import { Call, Fun } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import { expression } from '../checker';
 import { isSubTypeEff } from '../subtyping';
-import { TypeCheckingError, TypeCheckingTypeError } from '../utils/errors';
+import {
+  TypeCheckingError,
+  TypeCheckingSubtypingError,
+  TypeCheckingTypeError,
+} from '../utils/errors';
 import { TypeCheckingResult, TypeCheckingRule } from '../utils/types';
+
+const checkReturnSubtyping =
+  (colon?: Token, returnType?: TypeEff) =>
+  (
+    exprTC: TypeCheckingResult,
+  ): Result<TypeCheckingResult, TypeCheckingError> => {
+    if (!returnType || !colon) {
+      return Result.ok(exprTC);
+    }
+
+    if (!isSubTypeEff(exprTC.typeEff, returnType)) {
+      return Result.err(
+        new TypeCheckingSubtypingError({
+          reason: 'Return type is not a subtype of the declared return type',
+          operator: colon,
+        }),
+      );
+    }
+
+    return Result.ok(exprTC);
+  };
 
 export const fun: TypeCheckingRule<Fun> = (expr, [tenv, rset]) => {
   const { binders, body } = expr;
@@ -23,7 +48,7 @@ export const fun: TypeCheckingRule<Fun> = (expr, [tenv, rset]) => {
   const bodyTC = expression(body, [
     TypeEnvUtils.extendAll(tenv, ...extensions),
     rset,
-  ]);
+  ]).chain(checkReturnSubtyping(expr.colon, expr.returnType));
 
   return bodyTC.map((bodyTC) => ({
     typeEff: TypeEff(

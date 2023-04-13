@@ -85,6 +85,8 @@ export type Fun = {
   kind: ExprKind.Fun;
   binders: Array<{ name: Token; type: TypeEff }>;
   body: Expression;
+  colon?: Token;
+  returnType?: TypeEff;
 };
 export const Fun = factoryOf<Fun>(ExprKind.Fun);
 

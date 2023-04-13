@@ -805,6 +805,24 @@ class Parser {
   private parseFunExpr(_op: Token, power: [null, number]): Fun {
     const arg = this.functionParameters();
 
+    let returnType: TypeEff | undefined = undefined;
+    let colon: Token | undefined = undefined;
+
+    if (this.check(TokenType.COLON)) {
+      colon = this.advance();
+
+      const typeResult = normalizeTypeResult(this.type(0));
+
+      if (typeResult.kind === TypeEffectKind.RecursiveVar) {
+        throw this.makeSyntaxError(
+          colon,
+          'Function return type cannot be a recursive variable',
+        );
+      }
+
+      returnType = typeResult;
+    }
+
     this.consume(
       TokenType.FAT_ARROW,
       errorMessage({
@@ -817,6 +835,8 @@ class Parser {
 
     return Fun({
       binders: arg,
+      returnType,
+      colon,
       body,
     });
   }
