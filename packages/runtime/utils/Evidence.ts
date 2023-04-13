@@ -27,6 +27,7 @@ import RecursivePolarityCheck, {
 } from '@gsoul-lang/core/utils/lib/RecursivePolarityCheck';
 import Meet from '@gsoul-lang/core/utils/lib/Meet';
 import SJoin from '@gsoul-lang/core/utils/lib/SJoin';
+import { Identifier } from '@gsoul-lang/core/utils/Senv';
 
 type Evi<T> = Readonly<[T, T]>;
 
@@ -810,6 +811,16 @@ export const subst = (ev: Evidence, name: string, senv: Senv): Evidence => {
   return [
     TypeEffUtils.subst(ev[0], name, senv),
     TypeEffUtils.subst(ev[1], name, senv),
+  ];
+};
+
+export const deleteResources = (
+  ev: Evidence,
+  resources: Identifier[],
+): Evidence => {
+  return [
+    TypeEffUtils.deleteResources(ev[0], resources),
+    TypeEffUtils.deleteResources(ev[1], resources),
   ];
 };
 

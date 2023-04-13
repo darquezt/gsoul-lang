@@ -1,10 +1,21 @@
 import { Result } from '@badrap/result';
-import { TypeEff, TypeEnvUtils } from '@gsoul-lang/core/utils';
+import {
+  Sens,
+  Senv,
+  SenvUtils,
+  TypeEff,
+  TypeEnvUtils,
+} from '@gsoul-lang/core/utils';
+import * as ResourcesSetUtils from '@gsoul-lang/core/utils/ResourcesSet';
 import { ExprStmt, PrintStmt, VarStmt } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import { expression } from '../checker';
 import { isSubTypeEff } from '../subtyping';
-import { TypeCheckingError, TypeCheckingSubtypingError } from '../utils/errors';
+import {
+  TypeCheckingDependencyError,
+  TypeCheckingError,
+  TypeCheckingSubtypingError,
+} from '../utils/errors';
 import {
   TypeCheckingResult,
   TypeCheckingContext,
@@ -57,20 +68,54 @@ const checkAssignmentType =
     return Result.ok(exprTC);
   };
 
+const resourcifyIfNecessary =
+  (resource: boolean, name: Token) =>
+  (
+    exprTC: TypeCheckingResult,
+  ): Result<TypeCheckingResult, TypeCheckingError> => {
+    if (!resource) {
+      return Result.ok(exprTC);
+    }
+
+    if (!SenvUtils.isEmpty(exprTC.typeEff.effect)) {
+      return Result.err(
+        new TypeCheckingDependencyError({
+          reason: 'Resources cannot depend on other resources',
+          variable: name,
+        }),
+      );
+    }
+
+    const typeEff = TypeEff(
+      exprTC.typeEff.type,
+      Senv({ [name.lexeme]: new Sens(1) }),
+    );
+
+    return Result.ok({
+      typeEff,
+      typings: exprTC.typings,
+    });
+  };
+
 export const varStmt: StatefulTypeCheckingRule<VarStmt> = (stmt, ctx) => {
-  const exprTC = expression(stmt.assignment, ctx).chain(
-    checkAssignmentType(stmt.colon ?? stmt.name, stmt.type),
-  );
+  const exprTC = expression(stmt.assignment, ctx)
+    .chain(checkAssignmentType(stmt.colon ?? stmt.name, stmt.type))
+    .chain(resourcifyIfNecessary(stmt.resource, stmt.name));
 
-  const [tenv, rset] = ctx;
+  return exprTC.map((exprTC) => {
+    const [tenv, rset] = ctx;
 
-  return exprTC.chain((exprTC) =>
-    Result.ok({
+    const newTenv = TypeEnvUtils.extend(tenv, stmt.name.lexeme, exprTC.typeEff);
+    const newRset = stmt.resource
+      ? ResourcesSetUtils.extend(rset, stmt.name.lexeme)
+      : rset;
+
+    return {
       typeEff: exprTC.typeEff,
       typings: [[stmt.name, exprTC.typeEff] as TypeAssoc].concat(
         exprTC.typings,
       ),
-      ctx: [TypeEnvUtils.extend(tenv, stmt.name.lexeme, exprTC.typeEff), rset],
-    }),
-  );
+      ctx: [newTenv, newRset],
+    };
+  });
 };

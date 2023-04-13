@@ -197,6 +197,51 @@ export const subst = (target: Type, name: Identifier, senv: Senv): Type => {
   })(target);
 };
 
+export const deleteResources = (ty: Type, resources: Identifier[]): Type => {
+  const typeEffFn = (teff: TypeEffect) =>
+    TypeEffUtils.deleteResources(teff, resources);
+
+  return match<Type>({
+    real: identity,
+    bool: identity,
+    nil: identity,
+    arrow: (ty) =>
+      Arrow({
+        domain: ty.domain.map(typeEffFn),
+        codomain: typeEffFn(ty.codomain),
+      }),
+    forall: (ty) =>
+      ForallT({
+        sensVars: ty.sensVars,
+        codomain: typeEffFn(ty.codomain),
+      }),
+    mprod: (ty) =>
+      MProduct({
+        first: typeEffFn(ty.first),
+        second: typeEffFn(ty.second),
+      }),
+    aprod: (ty) =>
+      AProduct({
+        first: typeEffFn(ty.first),
+        second: typeEffFn(ty.second),
+      }),
+    recursive: (ty) =>
+      RecType({
+        variable: ty.variable,
+        body: typeEffFn(ty.body),
+      }),
+    prod: (ty) =>
+      Product({
+        typeEffects: ty.typeEffects.map(typeEffFn),
+      }),
+    sum: (ty) =>
+      Sum({
+        left: typeEffFn(ty.left),
+        right: typeEffFn(ty.right),
+      }),
+  })(ty);
+};
+
 export const substRecVar = (
   name: string,
   substitution: TypeEff,

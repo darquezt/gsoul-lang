@@ -68,6 +68,10 @@ export const scaleBySens = (senv: Senv, sens: Sens): Senv => {
 };
 
 export const extend = (senv: Senv, name: Identifier, sens: Sens): Senv => {
+  if (sens[1] === 0) {
+    return senv;
+  }
+
   return {
     ...senv,
     [name]: sens,
@@ -80,6 +84,10 @@ export const subst = (senv: Senv, name: Identifier, effect: Senv): Senv => {
   const scaledEffect = scaleBySens(effect, xSens);
 
   return add(withoutX, scaledEffect);
+};
+
+export const deleteResources = (senv: Senv, resources: Identifier[]): Senv => {
+  return omit(resources, senv);
 };
 
 export const substTup = (

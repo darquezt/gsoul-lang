@@ -98,6 +98,20 @@ export const subst = <TE extends TypeEffect>(
   })(typeEff);
 };
 
+export const deleteResources = <TE extends TypeEffect>(
+  teff: TE,
+  resources: Identifier[],
+): TypeEffect & { kind: TE['kind'] } => {
+  return match<TypeEffect & { kind: TE['kind'] }>({
+    recVar: identity,
+    typeEff: (teff) =>
+      TypeEff(
+        TypeUtils.deleteResources(teff.type, resources),
+        SenvUtils.deleteResources(teff.effect, resources),
+      ),
+  })(teff);
+};
+
 export const substRecVar = (
   name: Identifier,
   substitution: TypeEff,

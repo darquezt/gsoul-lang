@@ -1,9 +1,16 @@
 import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
-import { Block, NilLiteral, Statement, Value } from '../../elaboration/ast';
+import {
+  Block,
+  ExpressionUtils,
+  NilLiteral,
+  Statement,
+  Value,
+} from '../../elaboration/ast';
 import { Store } from '../../utils';
 import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError } from '../errors';
+import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 
 export enum BlockKontKind {
   BlockKont = 'BlockKont',
@@ -11,7 +18,7 @@ export enum BlockKontKind {
 
 export type BlockKont = {
   kind: BlockKontKind.BlockKont;
-  state: State<{ statements: Statement[] }>;
+  state: State<{ statements: Statement[]; resources: ResourcesSet }>;
 };
 export const BlockKont: KindedFactory<BlockKont> = factoryOf(
   BlockKontKind.BlockKont,
@@ -32,7 +39,11 @@ export const reduceFirstBlockStatement = (
     { term: firstStmt },
     store,
     BlockKont({
-      state: State({ statements: restStmts }, store, kont),
+      state: State(
+        { statements: restStmts, resources: term.resources },
+        store,
+        kont,
+      ),
     }),
   );
 };
@@ -47,7 +58,9 @@ export const reduceNextBlockStatement = (
   // When all the statements in the block have finished evaluating
   // we restore the store and the kont
   if (statements.length === 0) {
-    return OkState({ term }, kont.state.store, kont.state.kont);
+    const value = ExpressionUtils.deleteResources(term, kont.state.resources);
+
+    return OkState({ term: value }, kont.state.store, kont.state.kont);
   }
 
   // If there are more statements, we drop the value of the current one
@@ -60,7 +73,7 @@ export const reduceNextBlockStatement = (
     store,
     BlockKont({
       state: State(
-        { statements: restStmts },
+        { statements: restStmts, resources: kont.state.resources },
         kont.state.store,
         kont.state.kont,
       ),

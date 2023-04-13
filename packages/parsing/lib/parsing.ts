@@ -359,6 +359,12 @@ class Parser {
   private parseLetStmt(): VarStmt {
     this.advance();
 
+    const resource = this.check(TokenType.SENSITIVE);
+
+    if (resource) {
+      this.advance();
+    }
+
     const name = this.consume(
       TokenType.IDENTIFIER,
       errorMessage({ expected: 'variable name' }),
@@ -370,7 +376,16 @@ class Parser {
     if (this.check(TokenType.COLON)) {
       colon = this.advance();
 
-      const ty = normalizeTypeResult(this.type(0));
+      const typeRes = this.type(0);
+
+      if (typeRes.kind === TypeParsingResultKind.TypeAndEffect) {
+        throw this.makeSyntaxError(
+          colon,
+          'Cannot assign an effect to a sensitive resource',
+        );
+      }
+
+      const ty = normalizeTypeResult(typeRes);
 
       if (ty.kind === TypeEffectKind.TypeEff) {
         type = ty;
@@ -397,7 +412,7 @@ class Parser {
       errorMessage({ expected: ';', after: 'variable declaration' }),
     );
 
-    return VarStmt({ name, assignment, colon, type, resource: false });
+    return VarStmt({ name, assignment, colon, type, resource });
   }
 
   private expression(minBP: number): Expression {

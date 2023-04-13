@@ -95,6 +95,8 @@ enum TokenType {
 
   TYPE = 'TYPE',
 
+  SENSITIVE = 'SENSITIVE',
+
   EOF = 'EOF',
 }
 

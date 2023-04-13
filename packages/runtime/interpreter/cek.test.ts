@@ -45,6 +45,7 @@ describe('CEK', () => {
           typeEff: RealEmptySenv,
         }),
       ],
+      resources: [],
       typeEff: RealEmptySenv,
     });
 

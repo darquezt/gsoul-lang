@@ -19,6 +19,7 @@ import { factoryOf, isKinded } from '@gsoul-lang/core/utils/ADT';
 
 import { Evidence, EvidenceUtils, Store, StoreUtils } from '../utils';
 import { all } from 'ramda';
+import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 
 /**
  * Expressions
@@ -251,7 +252,11 @@ export type ProjSnd = Term<{
 }>;
 export const ProjSnd = factoryOf<ProjSnd>(ExprKind.ProjSnd);
 
-export type Block = Term<{ kind: ExprKind.Block; statements: Statement[] }>;
+export type Block = Term<{
+  kind: ExprKind.Block;
+  statements: Statement[];
+  resources: ResourcesSet;
+}>;
 export const Block = factoryOf<Block>(ExprKind.Block);
 
 export type Fold = Term<{
@@ -562,8 +567,23 @@ const subst = (expr: Expression, name: string, senv: Senv): Expression => {
   });
 };
 
+const deleteResources = (
+  expr: Expression,
+  resources: ResourcesSet,
+): Expression => {
+  return map(expr, {
+    senvFn: (s: Senv) => SenvUtils.deleteResources(s, resources),
+    typeFn: (ty: Type) => TypeUtils.deleteResources(ty, resources),
+    teffFn: (teff: TypeEff) => TypeEffUtils.deleteResources(teff, resources),
+    eviFn: (evi: Evidence) => EvidenceUtils.deleteResources(evi, resources),
+    storeFn: (store: Store) => StoreUtils.deleteResources(store, resources),
+    stmtFn: (stmt: Statement) => deleteResourcesStmt(stmt, resources),
+  });
+};
+
 export const ExpressionUtils = {
   subst,
+  deleteResources,
 };
 
 /**
@@ -618,6 +638,34 @@ const substStmt = (stmt: Statement, name: string, senv: Senv): Statement => {
       return VarStmt({
         ...stmt,
         assignment: ExpressionUtils.subst(stmt.assignment, name, senv),
+        typeEff,
+      });
+  }
+};
+
+const deleteResourcesStmt = (
+  stmt: Statement,
+  resources: ResourcesSet,
+): Statement => {
+  const typeEff = TypeEffUtils.deleteResources(stmt.typeEff, resources);
+
+  switch (stmt.kind) {
+    case StmtKind.ExprStmt:
+      return ExprStmt({
+        ...stmt,
+        expression: ExpressionUtils.deleteResources(stmt.expression, resources),
+        typeEff,
+      });
+    case StmtKind.PrintStmt:
+      return PrintStmt({
+        ...stmt,
+        expression: ExpressionUtils.deleteResources(stmt.expression, resources),
+        typeEff,
+      });
+    case StmtKind.VarStmt:
+      return VarStmt({
+        ...stmt,
+        assignment: ExpressionUtils.deleteResources(stmt.assignment, resources),
         typeEff,
       });
   }

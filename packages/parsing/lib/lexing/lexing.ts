@@ -10,7 +10,7 @@ const keywords: Record<string, TokenType> = {
   nil: TokenType.NILLIT,
   Nil: TokenType.NIL,
   let: TokenType.LET,
-  slet: TokenType.SLET,
+  sens: TokenType.SENSITIVE,
   print: TokenType.PRINT,
   printEv: TokenType.PRINTEV,
   Number: TokenType.NUMBER,

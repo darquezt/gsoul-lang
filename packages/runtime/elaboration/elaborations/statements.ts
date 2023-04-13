@@ -17,6 +17,7 @@ import { ElaborationContext, Stateful } from '../types';
 import * as past from '@gsoul-lang/parsing/lib/ast';
 import { interior } from '../../utils/Evidence';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
+import * as ResourcesSetUtils from '@gsoul-lang/core/utils/ResourcesSet';
 
 export const exprStmt = (
   stmt: past.ExprStmt,
@@ -106,6 +107,8 @@ export const varStmt = (
 
   let expr = exprElaboration.value;
 
+  const [tenv, rset] = ctx;
+
   if (stmt.resource) {
     if (!SenvUtils.isEmpty(expr.typeEff.effect)) {
       return Result.err(
@@ -128,7 +131,10 @@ export const varStmt = (
     });
   }
 
-  const [tenv, rset] = ctx;
+  const newTenv = TypeEnvUtils.extend(tenv, stmt.name.lexeme, expr.typeEff);
+  const newRset = stmt.resource
+    ? ResourcesSetUtils.extend(rset, stmt.name.lexeme)
+    : rset;
 
   return Result.ok(
     Stateful(
@@ -137,7 +143,7 @@ export const varStmt = (
         assignment: expr,
         typeEff: expr.typeEff,
       }),
-      [TypeEnvUtils.extend(tenv, stmt.name.lexeme, expr.typeEff), rset],
+      [newTenv, newRset],
     ),
   );
 };

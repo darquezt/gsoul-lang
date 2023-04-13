@@ -34,6 +34,21 @@ export const subst = (store: Store, name: string, senv: Senv): Store => {
   );
 };
 
+export const deleteResources = (store: Store, resources: string[]): Store => {
+  return Object.keys(store).reduce(
+    (storep, id) =>
+      extend(
+        storep,
+        id,
+        ExpressionUtils.deleteResources(
+          get(store, id) as Value,
+          resources,
+        ) as Value,
+      ),
+    {},
+  );
+};
+
 // export const substTup = (
 //   store: Store,
 //   names: [string, string],
