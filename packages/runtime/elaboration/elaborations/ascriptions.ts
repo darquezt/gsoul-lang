@@ -9,11 +9,12 @@ import WellFormed, {
   WellFormednessContext,
 } from '@gsoul-lang/core/utils/lib/WellFormed';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 
 const checkAscriptionWellFormed =
-  (ctx: WellFormednessContext, token: Token) =>
+  (ctx: WellFormednessContext, token: Token, typeEff: TypeEffect) =>
   (expr: Expression): Result<Expression, ElaborationError> => {
-    if (!WellFormed.TypeEffect(ctx, expr.typeEff)) {
+    if (!WellFormed.TypeEffect(ctx, typeEff)) {
       return Result.err(
         new ElaborationSubtypingError({
           reason: 'Expression is not ascribed to a well-formed type-and-effect',
@@ -30,7 +31,7 @@ export const ascription = (
   ctx: ElaborationContext,
 ): Result<Ascription, ElaborationError> => {
   const innerElaboration = expression(expr.expression, ctx).chain(
-    checkAscriptionWellFormed([ctx[1]], expr.ascriptionToken),
+    checkAscriptionWellFormed([ctx[1]], expr.ascriptionToken, expr.typeEff),
   );
 
   return innerElaboration.chain((inner) => {
