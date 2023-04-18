@@ -254,42 +254,71 @@ export const reduceNLBinaryOperation = (
       TokenType.EQUAL_EQUAL,
     ].includes(kont.op.type)
   ) {
-    if (!isKinded(inner, ExprKind.RealLiteral)) {
-      return Result.err(
-        new InterpreterTypeError({
-          reason: `Left operand of ${kont.op.lexeme} must be a number`,
-          operator: kont.op,
-        }),
-      );
-    }
+    // if (!isKinded(inner, ExprKind.RealLiteral)) {
+    //   return Result.err(
+    //     new InterpreterTypeError({
+    //       reason: `Left operand of ${kont.op.lexeme} must be a number`,
+    //       operator: kont.op,
+    //     }),
+    //   );
+    // }
 
     const left = kont.state.value;
 
-    if (!simpleValueIsKinded(left, ExprKind.RealLiteral)) {
+    // if (!simpleValueIsKinded(left, ExprKind.RealLiteral)) {
+    //   return Result.err(
+    //     new InterpreterTypeError({
+    //       reason: `Right operand of ${kont.op.lexeme} must be a number`,
+    //       operator: kont.op,
+    //     }),
+    //   );
+    // }
+
+    let innerResult: boolean;
+
+    if (
+      isKinded(inner, ExprKind.RealLiteral) &&
+      simpleValueIsKinded(left, ExprKind.RealLiteral)
+    ) {
+      if (kont.op.type === TokenType.EQUAL_EQUAL) {
+        innerResult = left.expression.value === inner.value;
+      } else if (kont.op.type === TokenType.LESS_EQUAL) {
+        innerResult = left.expression.value <= inner.value;
+      } else if (kont.op.type === TokenType.GREATER) {
+        innerResult = left.expression.value > inner.value;
+      } else if (kont.op.type === TokenType.GREATER_EQUAL) {
+        innerResult = left.expression.value >= inner.value;
+      } else {
+        // LESS
+        innerResult = left.expression.value < inner.value;
+      }
+    } else if (
+      isKinded(inner, ExprKind.AtomLiteral) &&
+      simpleValueIsKinded(left, ExprKind.AtomLiteral)
+    ) {
+      if (kont.op.type === TokenType.EQUAL_EQUAL) {
+        innerResult = left.expression.name.lexeme === inner.name.lexeme;
+      } else {
+        return Result.err(
+          new InterpreterTypeError({
+            reason: 'Unsupported comparison between atoms',
+            operator: kont.op,
+          }),
+        );
+      }
+    } else {
       return Result.err(
         new InterpreterTypeError({
-          reason: `Right operand of ${kont.op.lexeme} must be a number`,
+          reason: 'Operands must be either numbers or atoms',
           operator: kont.op,
         }),
       );
     }
 
-    let innerResult: boolean;
-
-    if (kont.op.type === TokenType.EQUAL_EQUAL) {
-      innerResult = left.expression.value === inner.value;
-    } else if (kont.op.type === TokenType.LESS_EQUAL) {
-      innerResult = left.expression.value <= inner.value;
-    } else if (kont.op.type === TokenType.GREATER) {
-      innerResult = left.expression.value > inner.value;
-    } else if (kont.op.type === TokenType.GREATER_EQUAL) {
-      innerResult = left.expression.value >= inner.value;
-    } else {
-      // LESS
-      innerResult = left.expression.value < inner.value;
-    }
-
-    const sumEvidenceRes = EvidenceUtils.sum(left.evidence, term.evidence);
+    const sumEvidenceRes = EvidenceUtils.realComparison(
+      left.evidence,
+      term.evidence,
+    );
 
     if (!sumEvidenceRes.isOk) {
       return Result.err(

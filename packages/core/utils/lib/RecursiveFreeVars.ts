@@ -8,6 +8,7 @@ const typeFreeVars = (ty: Type): string[] => {
     case TypeKind.Real:
     case TypeKind.Nil:
     case TypeKind.Bool:
+    case TypeKind.Atom:
       return [];
     case TypeKind.Arrow:
       return flatten(ty.domain.map((d) => typeEffectFreeVars(d))).concat(

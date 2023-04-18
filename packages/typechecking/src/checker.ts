@@ -28,6 +28,7 @@ import { tuple, projection } from './checkers/tuples';
 import { variable } from './checkers/variables';
 import { exprStmt, varStmt, printStmt } from './checkers/statements';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
+import { atomLit } from './checkers/atoms';
 
 export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
   switch (expr.kind) {
@@ -43,6 +44,8 @@ export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
           return nilLit(expr, ctx);
       }
     }
+    case ExprKind.AtomLiteral:
+      return atomLit(expr, ctx);
     case ExprKind.Binary:
       return binary(expr, ctx);
     case ExprKind.Call:

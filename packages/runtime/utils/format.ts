@@ -7,6 +7,8 @@ export const formatValue = (value: SimpleValue): string => {
       return cyan(value.value);
     case ExprKind.BoolLiteral:
       return cyan(String(value.value));
+    case ExprKind.AtomLiteral:
+      return cyan(`:${value.name.literal}`);
     case ExprKind.NilLiteral:
       return cyan('nil');
     case ExprKind.Closure:

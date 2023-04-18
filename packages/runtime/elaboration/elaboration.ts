@@ -20,6 +20,7 @@ import { realLiteral, boolLiteral, unitLiteral } from './elaborations/literals';
 import { pair, projFst, projSnd } from './elaborations/pairs';
 import { tuple, projection } from './elaborations/tuples';
 import { variable } from './elaborations/variables';
+import { atomLiteral } from './elaborations/atoms';
 import { ElaborationContext, Stateful } from './types';
 import { exprStmt, varStmt, printStmt } from './elaborations/statements';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
@@ -57,6 +58,8 @@ export const expression = (
         }),
       );
     }
+    case past.ExprKind.AtomLiteral:
+      return Result.ok(atomLiteral(expr));
     case past.ExprKind.Ascription:
       return ascription(expr, ctx);
     case past.ExprKind.Grouping:

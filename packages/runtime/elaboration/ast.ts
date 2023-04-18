@@ -9,6 +9,7 @@ import {
 } from '@gsoul-lang/core/utils';
 import {
   Arrow,
+  Atom,
   Bool,
   ForallT,
   Nil,
@@ -31,6 +32,7 @@ export enum ExprKind {
   RealLiteral = 'RealLiteral',
   BoolLiteral = 'BoolLiteral',
   NilLiteral = 'NilLiteral',
+  AtomLiteral = 'AtomLiteral',
   Binary = 'Binary',
   NonLinearBinary = 'NonLinearBinary',
   Call = 'Call',
@@ -88,6 +90,21 @@ export const NilLiteral = (): NilLiteral => ({
   kind: ExprKind.NilLiteral,
   typeEff: TypeEff(Nil(), Senv()),
   value: null,
+});
+
+export type AtomLiteral = Term<
+  { kind: ExprKind.AtomLiteral; name: Token },
+  TypeEff<Atom, Senv>
+>;
+export const AtomLiteral = (
+  params: Omit<AtomLiteral, 'kind' | 'typeEff'>,
+): AtomLiteral => ({
+  kind: ExprKind.AtomLiteral,
+  typeEff: TypeEff(
+    Atom({ name: params.name.literal as unknown as string }),
+    Senv(),
+  ),
+  ...params,
 });
 
 export type Binary = Term<{
@@ -287,6 +304,7 @@ export type SimpleValue =
   | RealLiteral
   | BoolLiteral
   | NilLiteral
+  | AtomLiteral
   | Closure
   | SClosure
   | (Tuple & { expressions: Value[] })
@@ -312,6 +330,7 @@ export const isSimpleValue = (expr: Expression): expr is SimpleValue => {
     ExprKind.RealLiteral,
     ExprKind.BoolLiteral,
     ExprKind.NilLiteral,
+    ExprKind.AtomLiteral,
     ExprKind.Closure,
     ExprKind.SClosure,
   ].some((kind) => kind === expr.kind);
@@ -354,6 +373,7 @@ export type Expression =
   | RealLiteral
   | BoolLiteral
   | NilLiteral
+  | AtomLiteral
   | Binary
   | NonLinearBinary
   | Call
@@ -400,6 +420,7 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
     case ExprKind.RealLiteral:
     case ExprKind.BoolLiteral:
     case ExprKind.NilLiteral:
+    case ExprKind.AtomLiteral:
       return expr;
     case ExprKind.Binary:
     case ExprKind.NonLinearBinary:

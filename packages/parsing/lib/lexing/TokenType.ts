@@ -43,6 +43,8 @@ enum TokenType {
   STRINGLIT = 'STRINGLIT',
   NUMBERLIT = 'NUMBERLIT',
 
+  ATOM = 'ATOM',
+
   // Keywords.
   NUMBER = 'NUMBER',
   NIL = 'NIL',

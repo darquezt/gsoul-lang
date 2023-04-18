@@ -122,6 +122,10 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
     return Result.ok([t1, t2]);
   }
 
+  if (t1.kind === TypeKind.Atom && t1.kind === t2.kind && t1.name === t2.name) {
+    return Result.ok([t1, t2]);
+  }
+
   if (isKinded(t1, TypeKind.Arrow) && isKinded(t2, TypeKind.Arrow)) {
     const eviT11Res = zip(t2.domain, t1.domain).map(([t2i, t1i]) =>
       interior(t2i, t1i),

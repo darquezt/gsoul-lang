@@ -12,6 +12,7 @@ type LiteralValue = number | boolean | null;
 
 export enum ExprKind {
   Literal = 'Literal',
+  AtomLiteral = 'AtomLiteral',
   Binary = 'Binary',
   NonLinearBinary = 'NonLinearBinary',
   Call = 'Call',
@@ -40,6 +41,12 @@ export type Literal = {
   token: Token;
 };
 export const Literal = factoryOf<Literal>(ExprKind.Literal);
+
+export type AtomLiteral = {
+  kind: ExprKind.AtomLiteral;
+  name: Token;
+};
+export const AtomLiteral = factoryOf<AtomLiteral>(ExprKind.AtomLiteral);
 
 export type Binary = {
   kind: ExprKind.Binary;
@@ -191,6 +198,7 @@ export const Block = factoryOf<Block>(ExprKind.Block);
 
 export type Expression =
   | Literal
+  | AtomLiteral
   | Binary
   | NonLinearBinary
   | Call

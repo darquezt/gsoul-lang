@@ -19,6 +19,7 @@ const typeWellFormed = (ctx: WellFormednessContext, type: Type): boolean => {
     case TypeKind.Real:
     case TypeKind.Nil:
     case TypeKind.Bool:
+    case TypeKind.Atom:
       return true;
 
     case TypeKind.Arrow:

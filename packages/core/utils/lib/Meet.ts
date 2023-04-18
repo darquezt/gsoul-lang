@@ -40,6 +40,14 @@ const typeMeet = (ty1: Type, ty2: Type): Result<Type, UndefinedMeetError> => {
     return Result.ok(ty1);
   }
 
+  if (isKinded(ty1, TypeKind.Atom) && isKinded(ty2, TypeKind.Atom)) {
+    if (ty1.name === ty2.name) {
+      return Result.ok(ty1);
+    }
+
+    return Result.err(new UndefinedMeetError());
+  }
+
   if (isKinded(ty1, TypeKind.Arrow) && isKinded(ty2, TypeKind.Arrow)) {
     const { domain: dom1, codomain: cod1 } = ty1;
     const { domain: dom2, codomain: cod2 } = ty2;

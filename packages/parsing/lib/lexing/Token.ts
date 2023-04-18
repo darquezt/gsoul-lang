@@ -1,6 +1,6 @@
 import TokenType from './TokenType';
 
-export type TokenLiteral = number | boolean;
+export type TokenLiteral = number | boolean | string;
 
 export default class Token {
   constructor(

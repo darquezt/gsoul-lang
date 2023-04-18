@@ -3,6 +3,7 @@ import { isKinded } from '@gsoul-lang/core/utils/ADT';
 import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
+  Atom,
   Bool,
   Nil,
   Product,
@@ -19,6 +20,7 @@ import {
 import { head, last, reverse } from 'ramda';
 import {
   Ascription,
+  AtomLiteral,
   Binary,
   Block,
   Call,
@@ -438,6 +440,12 @@ class Parser {
        * @case number literal
        */
       left = this.parseNumberExpr();
+    } else if (this.check(TokenType.ATOM)) {
+      /**
+       * @case atom literal
+       */
+
+      left = this.parseAtomExpr();
     } else if (this.check(TokenType.IDENTIFIER)) {
       /**
        * @case variable
@@ -1233,6 +1241,14 @@ class Parser {
     });
   }
 
+  private parseAtomExpr(): AtomLiteral {
+    const name = this.advance();
+
+    return AtomLiteral({
+      name,
+    });
+  }
+
   private parseNilExpr(): Literal {
     return Literal({ value: null, token: this.advance() });
   }
@@ -1364,6 +1380,13 @@ class Parser {
       this.advance();
 
       left = typeResult(Real());
+    } else if (this.check(TokenType.ATOM)) {
+      /**
+       * @case atom type
+       */
+      const name = this.advance().literal as unknown as string;
+
+      left = typeResult(Atom({ name }));
     } else if (this.check(TokenType.BOOL)) {
       /**
        * @case number type

@@ -23,6 +23,7 @@ export enum TypeKind {
   Product = 'Product',
   RecType = 'RecType',
   Sum = 'Sum',
+  Atom = 'Atom',
 }
 
 export type Real = { kind: TypeKind.Real };
@@ -39,6 +40,9 @@ export type Nil = { kind: TypeKind.Nil };
 export const Nil: SingletonKindedFactory<Nil> = singletonFactoryOf(
   TypeKind.Nil,
 );
+
+export type Atom = { kind: TypeKind.Atom; name: Identifier };
+export const Atom: KindedFactory<Atom> = factoryOf<Atom>(TypeKind.Atom);
 
 export type Arrow = {
   kind: TypeKind.Arrow;
@@ -102,6 +106,7 @@ export type Type = (
   | Real
   | Bool
   | Nil
+  | Atom
   | Arrow
   | ForallT
   | MProduct
@@ -117,6 +122,7 @@ type MatchFuns<R> = {
   real: (ty: Real) => R;
   bool: (ty: Bool) => R;
   nil: (ty: Nil) => R;
+  atom: (ty: Atom) => R;
   arrow: (ty: Arrow) => R;
   forall: (ty: ForallT) => R;
   mprod: (ty: MProduct) => R;
@@ -135,6 +141,8 @@ const match =
         return funs.nil(ty);
       case TypeKind.Bool:
         return funs.bool(ty);
+      case TypeKind.Atom:
+        return funs.atom(ty);
       case TypeKind.Arrow:
         return funs.arrow(ty);
       case TypeKind.ForallT:
@@ -160,6 +168,7 @@ export const subst = (target: Type, name: Identifier, senv: Senv): Type => {
     real: identity,
     bool: identity,
     nil: identity,
+    atom: identity,
     arrow: (ty) =>
       Arrow({
         domain: ty.domain.map(typeEffFn),
@@ -205,6 +214,7 @@ export const deleteResources = (ty: Type, resources: Identifier[]): Type => {
     real: identity,
     bool: identity,
     nil: identity,
+    atom: identity,
     arrow: (ty) =>
       Arrow({
         domain: ty.domain.map(typeEffFn),
@@ -252,6 +262,7 @@ export const substRecVar = (
     real: identity,
     bool: identity,
     nil: identity,
+    atom: identity,
     arrow: (ty) =>
       Arrow({
         domain: ty.domain.map(typeEffFn),
@@ -298,6 +309,7 @@ export const format: (ty: Type) => string = (ty) => {
     real: () => chalk.yellow('Number'),
     bool: (ty) => chalk.yellow(ty.kind),
     nil: (ty) => chalk.yellow(ty.kind),
+    atom: (ty) => chalk.yellow(`:${ty.name}`),
     arrow: (ty) =>
       chalk`(${ty.domain
         .map((d) => `${TypeEffUtils.format(d)}`)

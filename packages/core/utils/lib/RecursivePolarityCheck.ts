@@ -37,6 +37,10 @@ const typeCheckPolarity = (
     return true;
   }
 
+  if (isKinded(ty1, TypeKind.Atom) && isKinded(ty2, TypeKind.Atom)) {
+    return true;
+  }
+
   if (isKinded(ty1, TypeKind.Arrow) && isKinded(ty2, TypeKind.Arrow)) {
     const domChecks = zip(ty1.domain, ty2.domain).map(([d1, d2]) =>
       typeEffectCheckPolarity(variable, flipMode(mode), d1, d2),

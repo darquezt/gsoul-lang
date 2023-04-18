@@ -89,9 +89,16 @@ export const scanTokens = (source: string): Token[] => {
       case '-':
         addToken(match('>') ? TokenType.ARROW : TokenType.MINUS);
         break;
-      case ':':
-        addToken(match(':') ? TokenType.COLON_COLON : TokenType.COLON);
+      case ':': {
+        if (match(':')) {
+          addToken(TokenType.COLON_COLON);
+        } else if (isAlpha(peek())) {
+          atom();
+        } else {
+          addToken(TokenType.COLON);
+        }
         break;
+      }
       case ';':
         addToken(TokenType.SEMICOLON);
         break;
@@ -213,6 +220,16 @@ export const scanTokens = (source: string): Token[] => {
     }
 
     addToken(TokenType.NUMBERLIT, Number(getLexeme()));
+  }
+
+  function atom(): void {
+    while (isAlphaNumeric(peek())) {
+      advance();
+    }
+
+    const name = getLexeme().slice(1);
+
+    addToken(TokenType.ATOM, name);
   }
 
   function identifier(): void {
