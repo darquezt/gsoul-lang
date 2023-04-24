@@ -1,5 +1,14 @@
 import { Result } from '@badrap/result';
-import { Arrow, ForallT, Product, RecType, Sum, Type, TypeKind } from '../Type';
+import {
+  Arrow,
+  ForallT,
+  PolyT,
+  Product,
+  RecType,
+  Sum,
+  Type,
+  TypeKind,
+} from '../Type';
 import { Senv } from '../Senv';
 import { TypeEff, TypeEffect, TypeEffectKind } from '../TypeEff';
 import { Sens } from '../Sens';
@@ -104,6 +113,31 @@ const typeSMeet = (ty1: Type, ty2: Type): Result<Type, UndefinedSMeetError> => {
     );
   }
 
+  if (isKinded(ty1, TypeKind.PolyT) && isKinded(ty2, TypeKind.PolyT)) {
+    const { typeVars: typeVars1, codomain: cod1 } = ty1;
+    const { typeVars: typeVars2, codomain: cod2 } = ty2;
+
+    if (typeVars1.length !== typeVars2.length) {
+      return Result.err(new UndefinedSMeetError());
+    }
+
+    const variablesAreEqual = zip(typeVars1, typeVars2).reduce(
+      (acc, [x1, x2]) => x1 === x2 && acc,
+      true,
+    );
+
+    if (!variablesAreEqual) {
+      return Result.err(new UndefinedSMeetError());
+    }
+
+    return typeEffectSMeet(cod1, cod2).map((codomain) =>
+      PolyT({
+        typeVars: typeVars1,
+        codomain,
+      }),
+    );
+  }
+
   if (isKinded(ty1, TypeKind.Product) && isKinded(ty2, TypeKind.Product)) {
     const { typeEffects: teffs1 } = ty1;
     const { typeEffects: teffs2 } = ty2;
@@ -159,8 +193,8 @@ const typeEffectSMeet = (
   teff2: TypeEffect,
 ): Result<TypeEffect, UndefinedSMeetError> => {
   if (
-    isKinded(teff1, TypeEffectKind.RecursiveVar) &&
-    isKinded(teff2, TypeEffectKind.RecursiveVar)
+    isKinded(teff1, TypeEffectKind.TypeVar) &&
+    isKinded(teff2, TypeEffectKind.TypeVar)
   ) {
     if (teff1.name !== teff2.name) {
       return Result.err(new UndefinedSMeetError());

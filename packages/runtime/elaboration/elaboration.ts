@@ -24,6 +24,8 @@ import { atomLiteral } from './elaborations/atoms';
 import { ElaborationContext, Stateful } from './types';
 import { exprStmt, varStmt, printStmt } from './elaborations/statements';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
+import { TypevarsSet } from '@gsoul-lang/core/utils/TypevarsSet';
+import { poly, tapp } from './elaborations/polys';
 
 export const expression = (
   expr: past.Expression,
@@ -36,6 +38,8 @@ export const expression = (
       return app(expr, ctx);
     case past.ExprKind.SCall:
       return sapp(expr, ctx);
+    case past.ExprKind.TCall:
+      return tapp(expr, ctx);
     case past.ExprKind.NonLinearBinary:
       return nonLinearBinary(expr, ctx);
     case past.ExprKind.Variable:
@@ -44,6 +48,8 @@ export const expression = (
       return fun(expr, ctx);
     case past.ExprKind.Forall:
       return forall(expr, ctx);
+    case past.ExprKind.Poly:
+      return poly(expr, ctx);
     case past.ExprKind.Literal: {
       if (typeof expr.value === 'number') {
         return Result.ok(realLiteral(expr));
@@ -113,7 +119,7 @@ export const elaborate = (
     statements: stmts,
   });
 
-  const result = expression(block, [TypeEnv(), ResourcesSet()]);
+  const result = expression(block, [TypeEnv(), ResourcesSet(), TypevarsSet()]);
 
   if (!result.isOk) {
     return result;

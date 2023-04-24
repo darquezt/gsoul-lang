@@ -11,6 +11,7 @@ const keywords: Record<string, TokenType> = {
   Nil: TokenType.NIL,
   let: TokenType.LET,
   sens: TokenType.SENSITIVE,
+  as: TokenType.AS,
   print: TokenType.PRINT,
   printEv: TokenType.PRINTEV,
   Number: TokenType.NUMBER,
@@ -91,7 +92,11 @@ export const scanTokens = (source: string): Token[] => {
         break;
       case ':': {
         if (match(':')) {
-          addToken(TokenType.COLON_COLON);
+          if (match('<')) {
+            addToken(TokenType.COLON_COLON_LESS);
+          } else {
+            addToken(TokenType.COLON_COLON);
+          }
         } else if (isAlpha(peek())) {
           atom();
         } else {

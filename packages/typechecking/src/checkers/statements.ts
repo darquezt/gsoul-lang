@@ -7,6 +7,7 @@ import {
   TypeEnvUtils,
 } from '@gsoul-lang/core/utils';
 import * as ResourcesSetUtils from '@gsoul-lang/core/utils/ResourcesSet';
+import { TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
 import { ExprStmt, PrintStmt, VarStmt } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import { expression } from '../checker';
@@ -15,6 +16,7 @@ import {
   TypeCheckingDependencyError,
   TypeCheckingError,
   TypeCheckingSubtypingError,
+  TypeCheckingTypeError,
 } from '../utils/errors';
 import {
   TypeCheckingResult,
@@ -77,7 +79,18 @@ const resourcifyIfNecessary =
       return Result.ok(exprTC);
     }
 
-    if (!SenvUtils.isEmpty(exprTC.typeEff.effect)) {
+    const originalTypeEff = exprTC.typeEff;
+
+    if (originalTypeEff.kind !== TypeEffectKind.TypeEff) {
+      return Result.err(
+        new TypeCheckingTypeError({
+          reason: 'Resource must have a concrete type-and-effect',
+          operator: name,
+        }),
+      );
+    }
+
+    if (!SenvUtils.isEmpty(originalTypeEff.effect)) {
       return Result.err(
         new TypeCheckingDependencyError({
           reason: 'Resources cannot depend on other resources',
@@ -87,7 +100,7 @@ const resourcifyIfNecessary =
     }
 
     const typeEff = TypeEff(
-      exprTC.typeEff.type,
+      originalTypeEff.type,
       Senv({ [name.lexeme]: new Sens(1) }),
     );
 
@@ -103,7 +116,7 @@ export const varStmt: StatefulTypeCheckingRule<VarStmt> = (stmt, ctx) => {
     .chain(resourcifyIfNecessary(stmt.resource, stmt.name));
 
   return exprTC.map((exprTC) => {
-    const [tenv, rset] = ctx;
+    const [tenv, rset, ...rest] = ctx;
 
     const newTenv = TypeEnvUtils.extend(tenv, stmt.name.lexeme, exprTC.typeEff);
     const newRset = stmt.resource
@@ -115,7 +128,7 @@ export const varStmt: StatefulTypeCheckingRule<VarStmt> = (stmt, ctx) => {
       typings: [[stmt.name, exprTC.typeEff] as TypeAssoc].concat(
         exprTC.typings,
       ),
-      ctx: [newTenv, newRset],
+      ctx: [newTenv, newRset, ...rest],
     };
   });
 };

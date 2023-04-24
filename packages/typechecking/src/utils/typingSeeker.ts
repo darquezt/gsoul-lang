@@ -1,7 +1,7 @@
-import { TypeEff } from '@gsoul-lang/core/utils';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 
-export type TypeAssoc = [Token, TypeEff];
+export type TypeAssoc = [Token, TypeEffect];
 export type TypeAssocs = Array<TypeAssoc>;
 
 export class TypingSeeker {

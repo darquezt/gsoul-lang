@@ -17,6 +17,7 @@ import WellFormed, {
   WellFormednessContext,
 } from '@gsoul-lang/core/utils/lib/WellFormed';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
+import { checkTypeEffConcreteness } from '../utils/auxiliaryCheckers';
 
 const checkInjTypeWellFormed =
   (ctx: WellFormednessContext, type: Type, token: Token) =>
@@ -62,9 +63,14 @@ export const caseExpr = (
   expr: past.Case,
   ctx: ElaborationContext,
 ): Result<Case, ElaborationError> => {
-  const sumElaboration = expression(expr.sum, ctx);
+  const sumElaboration = expression(expr.sum, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.caseToken,
+      'Sum operand may not have a correct type',
+    ),
+  );
 
-  const [tenv, rset] = ctx;
+  const [tenv, rset, ...rest] = ctx;
 
   const leftElaboration = sumElaboration.chain((sum) =>
     expression(expr.left, [
@@ -74,6 +80,7 @@ export const caseExpr = (
         TypeEffUtils.SumUtils.left(sum.typeEff as TypeEff<Sum, Senv>),
       ),
       rset,
+      ...rest,
     ]),
   );
 
@@ -85,6 +92,7 @@ export const caseExpr = (
         TypeEffUtils.SumUtils.right(sum.typeEff as TypeEff<Sum, Senv>),
       ),
       rset,
+      ...rest,
     ]),
   );
 

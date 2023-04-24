@@ -30,7 +30,7 @@ const checkProjectionCalleeType =
   (token: Token) =>
   (
     tupleTC: TypeCheckingResult,
-  ): Result<TypeCheckingResult<Product>, TypeCheckingError> => {
+  ): Result<TypeCheckingResult<TypeEff<Product>>, TypeCheckingError> => {
     if (!typeIsKinded(tupleTC.typeEff, TypeKind.Product)) {
       return Result.err(
         new TypeCheckingTypeError({
@@ -40,14 +40,14 @@ const checkProjectionCalleeType =
       );
     }
 
-    return Result.ok(tupleTC as TypeCheckingResult<Product>);
+    return Result.ok(tupleTC as TypeCheckingResult<TypeEff<Product>>);
   };
 
 const checkProjectionIndex =
   (index: number, token: Token) =>
   (
-    tupleTC: TypeCheckingResult<Product>,
-  ): Result<TypeCheckingResult<Product>, TypeCheckingError> => {
+    tupleTC: TypeCheckingResult<TypeEff<Product>>,
+  ): Result<TypeCheckingResult<TypeEff<Product>>, TypeCheckingError> => {
     if (tupleTC.typeEff.type.typeEffects.length <= index) {
       return Result.err(
         new TypeCheckingTypeError({

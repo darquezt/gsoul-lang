@@ -1,13 +1,14 @@
 import { Result } from '@badrap/result';
 import { TypeEff, Senv } from '@gsoul-lang/core/utils';
 import { Nil } from '@gsoul-lang/core/utils/Type';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { Block } from '@gsoul-lang/parsing/lib/ast';
 import { statement } from '../checker';
 import { TypeCheckingRule } from '../utils/types';
 import { TypeAssocs } from '../utils/typingSeeker';
 
 export const block: TypeCheckingRule<Block> = (expr, ctx) => {
-  let result: TypeEff = TypeEff(Nil(), Senv());
+  let result: TypeEffect = TypeEff(Nil(), Senv());
   let currentCtx = ctx;
   const typings: TypeAssocs = [];
 

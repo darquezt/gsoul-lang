@@ -1,5 +1,4 @@
 import { Sens, Senv, SenvUtils, Type, TypeEff } from '@gsoul-lang/core/utils';
-import { isKinded } from '@gsoul-lang/core/utils/ADT';
 import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
@@ -13,9 +12,9 @@ import {
   TypeKind,
 } from '@gsoul-lang/core/utils/Type';
 import {
-  RecursiveVar,
   TypeEffect,
   TypeEffectKind,
+  TypeVar,
 } from '@gsoul-lang/core/utils/TypeEff';
 import { head, last, reverse } from 'ramda';
 import {
@@ -35,10 +34,12 @@ import {
   Inj,
   Literal,
   NonLinearBinary,
+  Poly,
   PrintStmt,
   Projection,
   SCall,
   Statement,
+  TCall,
   Tuple,
   Unfold,
   Variable,
@@ -97,7 +98,8 @@ const postfixOps = [
   TokenType.LEFT_PAREN,
   TokenType.AT,
   TokenType.LEFT_BRACKET,
-  TokenType.COLON_COLON,
+  TokenType.COLON_COLON_LESS,
+  TokenType.AS,
 ] as const;
 type PostfixOpType = typeof postfixOps[number];
 
@@ -197,9 +199,10 @@ const BindingPower = {
       switch (op) {
         case TokenType.LEFT_PAREN:
         case TokenType.LEFT_BRACKET:
+        case TokenType.COLON_COLON_LESS:
         case TokenType.AT:
           return [33, null];
-        case TokenType.COLON_COLON:
+        case TokenType.AS:
           return [31, null];
       }
     },
@@ -307,9 +310,7 @@ class Parser {
     if (typeResult.kind === TypeParsingResultKind.TypeAndEffect) {
       throw this.makeSyntaxError(
         name,
-        isKinded(typeResult.result, TypeEffectKind.RecursiveVar)
-          ? `Type ${typeResult.result.name} does not exist in the current scope`
-          : 'Only types without effect can be aliased',
+        'Only types without effect can be aliased',
       );
     }
 
@@ -549,6 +550,15 @@ class Parser {
             break;
           }
 
+          case TokenType.COLON_COLON_LESS: {
+            /**
+             * @case polymorphic expression call
+             */
+
+            left = this.parsePolyCallExpr(left, op);
+            break;
+          }
+
           case TokenType.LEFT_BRACKET: {
             /**
              * @case tuple projection
@@ -558,7 +568,7 @@ class Parser {
             break;
           }
 
-          case TokenType.COLON_COLON: {
+          case TokenType.AS: {
             /**
              * @case ascription
              */
@@ -624,6 +634,34 @@ class Parser {
     return left;
   }
 
+  private parsePolyCallExpr(
+    left: Expression,
+    op: Token & { type: PostfixOpType },
+  ): TCall {
+    const type = normalizeTypeResult(this.type(0));
+    const args = [type];
+
+    while (!this.isAtEnd() && this.check(TokenType.COMMA)) {
+      this.advance();
+
+      args.push(normalizeTypeResult(this.type(0)));
+    }
+
+    this.consume(
+      TokenType.GREATER,
+      errorMessage({
+        expected: '>',
+        after: 'polymorphic call type',
+      }),
+    );
+
+    return TCall({
+      callee: left,
+      args,
+      bracket: op,
+    });
+  }
+
   private parseIfExpr(
     condition: Expression,
     op: Token,
@@ -681,13 +719,6 @@ class Parser {
     const ascribedType = this.type(0);
 
     const typeEff = normalizeTypeResult(ascribedType);
-
-    if (typeEff.kind === TypeEffectKind.RecursiveVar) {
-      throw this.makeSyntaxError(
-        op,
-        'Ascriptions cannot be a recursive variable',
-      );
-    }
 
     return Ascription({
       expression: left,
@@ -825,23 +856,22 @@ class Parser {
     }
   }
 
-  private parseFunExpr(_op: Token, power: [null, number]): Fun {
+  private parseFunExpr(_op: Token, power: [null, number]): Fun | Poly {
+    let typeParameters = null;
+
+    if (this.check(TokenType.LESS)) {
+      typeParameters = this.parseTypeParameters();
+    }
+
     const arg = this.functionParameters();
 
-    let returnType: TypeEff | undefined = undefined;
+    let returnType: TypeEffect | undefined = undefined;
     let colon: Token | undefined = undefined;
 
     if (this.check(TokenType.COLON)) {
       colon = this.advance();
 
       const typeResult = normalizeTypeResult(this.type(0));
-
-      if (typeResult.kind === TypeEffectKind.RecursiveVar) {
-        throw this.makeSyntaxError(
-          colon,
-          'Function return type cannot be a recursive variable',
-        );
-      }
 
       returnType = typeResult;
     }
@@ -856,12 +886,14 @@ class Parser {
 
     const body = this.expression(power[1]);
 
-    return Fun({
+    const fun = Fun({
       binders: arg,
       returnType,
       colon,
       body,
     });
+
+    return typeParameters ? Poly({ typeVars: typeParameters, expr: fun }) : fun;
   }
 
   private parseInjExpr(): Inj {
@@ -1115,7 +1147,7 @@ class Parser {
 
     const typeResult = normalizeTypeResult(this.type(0));
 
-    if (typeResult.kind === TypeEffectKind.RecursiveVar) {
+    if (typeResult.kind !== TypeEffectKind.TypeEff) {
       throw this.makeSyntaxError(
         constructorToken,
         errorMessage({
@@ -1261,7 +1293,7 @@ class Parser {
     return Literal({ value: false, token: this.advance() });
   }
 
-  sensitivityCallArguments(): Senv[] {
+  private sensitivityCallArguments(): Senv[] {
     this.consume(
       TokenType.LEFT_BRACKET,
       errorMessage({
@@ -1312,7 +1344,47 @@ class Parser {
     return args;
   }
 
-  private functionParameters(): Array<{ name: Token; type: TypeEff }> {
+  private parseTypeParameters(): Token[] {
+    this.consume(
+      TokenType.LESS,
+      errorMessage({
+        expected: '<',
+        beginning: 'type parameters',
+      }),
+    );
+
+    const params: Token[] = [];
+
+    while (!this.isAtEnd() && !this.check(TokenType.GREATER)) {
+      const name = this.consume(
+        TokenType.IDENTIFIER,
+        errorMessage({
+          expected: 'a type parameter name',
+        }),
+      );
+
+      params.push(name);
+
+      if (this.check(TokenType.COMMA)) {
+        this.advance();
+      }
+    }
+
+    this.consume(
+      TokenType.GREATER,
+      errorMessage({
+        expected: '>',
+        end: 'type parameters',
+      }),
+    );
+
+    return params;
+  }
+
+  private functionParameters(): Array<{
+    name: Token;
+    type: TypeEffect;
+  }> {
     this.consume(
       TokenType.LEFT_PAREN,
       errorMessage({
@@ -1321,7 +1393,7 @@ class Parser {
       }),
     );
 
-    const params: Array<{ name: Token; type: TypeEff }> = [];
+    const params: Array<{ name: Token; type: TypeEffect }> = [];
 
     while (!this.isAtEnd() && !this.check(TokenType.RIGHT_PAREN)) {
       const name = this.consume(
@@ -1332,7 +1404,7 @@ class Parser {
         }),
       );
 
-      const colon = this.consume(
+      this.consume(
         TokenType.COLON,
         errorMessage({
           expected: ': [type]',
@@ -1341,13 +1413,6 @@ class Parser {
       );
 
       const type = normalizeTypeResult(this.type(0));
-
-      if (type.kind === TypeEffectKind.RecursiveVar) {
-        throw this.makeSyntaxError(
-          colon,
-          'function parameters cannot be of a recursive variable type',
-        );
-      }
 
       params.push({ name, type });
 
@@ -1412,7 +1477,7 @@ class Parser {
 
       if (!aliasedType) {
         left = typeAndEffectResult(
-          RecursiveVar({
+          TypeVar({
             name: this.advance().lexeme,
           }),
         );

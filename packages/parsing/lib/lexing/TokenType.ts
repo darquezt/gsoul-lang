@@ -37,6 +37,7 @@ enum TokenType {
 
   COLON = 'COLON',
   COLON_COLON = 'COLON_COLON',
+  COLON_COLON_LESS = 'COLON_COLON_LESS',
 
   // Literals.
   IDENTIFIER = 'IDENTIFIER',
@@ -67,6 +68,8 @@ enum TokenType {
   IF = 'IF',
   NILLIT = 'NILLIT',
   OR = 'OR',
+
+  AS = 'AS',
 
   PRINT = 'PRINT',
   PRINTEV = 'PRINTEV',

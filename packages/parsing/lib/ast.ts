@@ -1,5 +1,5 @@
 import Token from './lexing/Token';
-import { TypeEff } from '@gsoul-lang/core/utils/TypeEff';
+import { TypeEff, TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { factoryOf } from '@gsoul-lang/core/utils/ADT';
 import { Senv, Type } from '@gsoul-lang/core/utils';
 import { RecType } from '@gsoul-lang/core/utils/Type';
@@ -21,6 +21,8 @@ export enum ExprKind {
   Variable = 'Variable',
   Fun = 'Fun',
   Forall = 'Forall',
+  Poly = 'Poly',
+  TCall = 'TCall',
   Tuple = 'Tuple',
   Projection = 'Projection',
   Pair = 'Pair',
@@ -82,6 +84,14 @@ export type SCall = {
 };
 export const SCall = factoryOf<SCall>(ExprKind.SCall);
 
+export type TCall = {
+  kind: ExprKind.TCall;
+  callee: Expression;
+  args: TypeEffect[];
+  bracket: Token;
+};
+export const TCall = factoryOf<TCall>(ExprKind.TCall);
+
 export type Grouping = { kind: ExprKind.Grouping; expression: Expression };
 export const Grouping = factoryOf<Grouping>(ExprKind.Grouping);
 
@@ -90,10 +100,10 @@ export const Variable = factoryOf<Variable>(ExprKind.Variable);
 
 export type Fun = {
   kind: ExprKind.Fun;
-  binders: Array<{ name: Token; type: TypeEff }>;
+  binders: Array<{ name: Token; type: TypeEffect }>;
   body: Expression;
   colon?: Token;
-  returnType?: TypeEff;
+  returnType?: TypeEffect;
 };
 export const Fun = factoryOf<Fun>(ExprKind.Fun);
 
@@ -103,6 +113,13 @@ export type Forall = {
   expr: Expression;
 };
 export const Forall = factoryOf<Forall>(ExprKind.Forall);
+
+export type Poly = {
+  kind: ExprKind.Poly;
+  typeVars: Token[];
+  expr: Expression;
+};
+export const Poly = factoryOf<Poly>(ExprKind.Poly);
 
 export type Tuple = {
   kind: ExprKind.Tuple;
@@ -144,7 +161,7 @@ export const ProjSnd = factoryOf<ProjSnd>(ExprKind.ProjSnd);
 export type Ascription = {
   kind: ExprKind.Ascription;
   expression: Expression;
-  typeEff: TypeEff;
+  typeEff: TypeEffect;
   ascriptionToken: Token;
 };
 export const Ascription = factoryOf<Ascription>(ExprKind.Ascription);
@@ -203,10 +220,12 @@ export type Expression =
   | NonLinearBinary
   | Call
   | SCall
+  | TCall
   | Grouping
   | Variable
   | Fun
   | Forall
+  | Poly
   | Tuple
   | Projection
   | Pair

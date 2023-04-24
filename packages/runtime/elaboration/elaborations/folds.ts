@@ -16,6 +16,10 @@ import { ElaborationContext } from '../types';
 import WellFormed, {
   WellFormednessContext,
 } from '@gsoul-lang/core/utils/lib/WellFormed';
+import {
+  checkTypeEffConcreteness,
+  ConcreteTypeEff,
+} from '../utils/auxiliaryCheckers';
 
 const checkFoldTypeWellFormed =
   (ctx: WellFormednessContext, type: TypeEff, operator: Token) =>
@@ -82,7 +86,9 @@ export const fold = (
 
 const checkBodyIsUnfoldable =
   (operator: Token) =>
-  (body: Expression): Result<Expression, ElaborationError> => {
+  (
+    body: Expression & ConcreteTypeEff,
+  ): Result<Expression, ElaborationError> => {
     if (!isKinded(body.typeEff.type, TypeKind.RecType)) {
       return Result.err(
         new ElaborationTypeError({
@@ -99,9 +105,14 @@ export const unfold = (
   expr: past.Unfold,
   ctx: ElaborationContext,
 ): Result<Unfold, ElaborationError> => {
-  const bodyElaboration = expression(expr.expression, ctx).chain(
-    checkBodyIsUnfoldable(expr.unfoldToken),
-  );
+  const bodyElaboration = expression(expr.expression, ctx)
+    .chain(
+      checkTypeEffConcreteness(
+        expr.unfoldToken,
+        'Cannot unfold a type variable',
+      ),
+    )
+    .chain(checkBodyIsUnfoldable(expr.unfoldToken));
 
   return bodyElaboration.map((body) =>
     Unfold({

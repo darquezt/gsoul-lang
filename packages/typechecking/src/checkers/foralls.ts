@@ -14,11 +14,12 @@ import { TypeCheckingRule, TypeCheckingResult } from '../utils/types';
 export const forall: TypeCheckingRule<Forall> = (expr, ctx) => {
   const { expr: inner, sensVars } = expr;
 
-  const [tenv, rset] = ctx;
+  const [tenv, rset, ...rest] = ctx;
 
   const bodyTC = expression(inner, [
     tenv,
     ResourcesSetUtils.extendAll(rset, ...sensVars.map((v) => v.lexeme)),
+    ...rest,
   ]);
 
   return bodyTC.map((bodyTC) => ({
@@ -54,7 +55,7 @@ const checkSappCalleeType =
   (bracket: Token) =>
   (
     calleeTC: TypeCheckingResult,
-  ): Result<TypeCheckingResult<ForallT>, TypeCheckingError> => {
+  ): Result<TypeCheckingResult<TypeEff<ForallT>>, TypeCheckingError> => {
     if (!typeIsKinded(calleeTC.typeEff, TypeKind.ForallT)) {
       return Result.err(
         new TypeCheckingTypeError({
@@ -64,14 +65,14 @@ const checkSappCalleeType =
       );
     }
 
-    return Result.ok(calleeTC as TypeCheckingResult<ForallT>);
+    return Result.ok(calleeTC as TypeCheckingResult<TypeEff<ForallT>>);
   };
 
 const checkSappNumberArgs =
   (argsLength: number, bracket: Token) =>
   (
-    calleeTC: TypeCheckingResult<ForallT>,
-  ): Result<TypeCheckingResult<ForallT>, TypeCheckingError> => {
+    calleeTC: TypeCheckingResult<TypeEff<ForallT>>,
+  ): Result<TypeCheckingResult<TypeEff<ForallT>>, TypeCheckingError> => {
     if (calleeTC.typeEff.type.sensVars.length !== argsLength) {
       return Result.err(
         new TypeCheckingTypeError({

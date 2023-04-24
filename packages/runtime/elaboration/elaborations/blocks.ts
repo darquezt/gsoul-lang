@@ -7,12 +7,13 @@ import { ElaborationError } from '../errors';
 import * as past from '@gsoul-lang/parsing/lib/ast';
 import { ElaborationContext } from '../types';
 import { difference } from 'ramda';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 
 export const block = (
   expr: past.Block,
   ctx: ElaborationContext,
 ): Result<Block, ElaborationError> => {
-  let result = TypeEff<Type, Senv>(Nil(), Senv());
+  let result: TypeEffect = TypeEff<Type, Senv>(Nil(), Senv());
   let currentCtx = ctx;
   const statements: Statement[] = [];
 

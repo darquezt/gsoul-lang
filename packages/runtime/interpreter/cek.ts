@@ -43,7 +43,7 @@ import {
   forallClosureCreation,
   ForallKont,
   ForallSubstKont,
-  PolyKontKind,
+  ForallKontKind,
   reduceForallBody,
   reduceForallCallee,
   reduceForallSubstitutedBody,
@@ -120,6 +120,13 @@ import {
   reduceCaseBranch,
   reduceCaseSum,
 } from './interpretations/sums';
+import {
+  polyClosureCreation,
+  PolyKont,
+  PolyKontKind,
+  reducePolyBody,
+  reducePolyCallee,
+} from './interpretations/polys';
 
 enum KontKind {
   EmptyKont = 'EmptyKont',
@@ -142,6 +149,7 @@ export type Kont =
   | FnKont
   | ForallKont
   | ForallSubstKont
+  | PolyKont
   | AscrKont
   | BlockKont
   | VarDeclKont
@@ -229,12 +237,16 @@ const step = ({
         return reduceFunCall(term, store, kont);
       }
 
-      case PolyKontKind.ForallKont: {
+      case ForallKontKind.ForallKont: {
         return reduceForallBody(term, store, kont);
       }
 
-      case PolyKontKind.ForallSubstKont: {
+      case ForallKontKind.ForallSubstKont: {
         return reduceForallSubstitutedBody(term, store, kont);
+      }
+
+      case PolyKontKind.PolyKont: {
+        return reducePolyBody(term, store, kont);
       }
 
       case AscrKontKind.AscrKont: {
@@ -320,6 +332,10 @@ const step = ({
       return reduceForallCallee(term, store, kont);
     }
 
+    case ExprKind.TCall: {
+      return reducePolyCallee(term, store, kont);
+    }
+
     case ExprKind.Pair: {
       return reduceFirstPairComponent(term, store, kont);
     }
@@ -383,6 +399,10 @@ const step = ({
 
       if (ascrExpressionIsKinded(term, ExprKind.Forall)) {
         return forallClosureCreation(term, store, kont);
+      }
+
+      if (ascrExpressionIsKinded(term, ExprKind.Poly)) {
+        return polyClosureCreation(term, store, kont);
       }
 
       return reduceAscrInnerExpression(term, store, kont);

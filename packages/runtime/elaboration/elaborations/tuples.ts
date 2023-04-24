@@ -9,6 +9,10 @@ import { expression } from '../elaboration';
 import { ElaborationError, ElaborationTypeError } from '../errors';
 import * as past from '@gsoul-lang/parsing/lib/ast';
 import { ElaborationContext } from '../types';
+import {
+  checkTypeEffConcreteness,
+  ConcreteTypeEff,
+} from '../utils/auxiliaryCheckers';
 
 export const tuple = (
   expr: past.Tuple,
@@ -64,7 +68,9 @@ const checkExpressionProjectedIsTuple =
 
 const checkProjectionOutOfBounds =
   (index: number, operator: Token) =>
-  (tuple: Expression): Result<Expression, ElaborationError> => {
+  (
+    tuple: Expression & ConcreteTypeEff,
+  ): Result<Expression, ElaborationError> => {
     if (index >= (tuple.typeEff.type as Product).typeEffects.length) {
       return Result.err(
         new ElaborationTypeError({
@@ -82,6 +88,12 @@ export const projection = (
   ctx: ElaborationContext,
 ): Result<Projection, ElaborationError> => {
   const tupleElaboration = expression(expr.tuple, ctx)
+    .chain(
+      checkTypeEffConcreteness(
+        expr.projectToken,
+        'The expression being projected must be a tuple',
+      ),
+    )
     .chain(checkExpressionProjectedIsTuple(expr.projectToken))
     .chain(checkProjectionOutOfBounds(expr.index, expr.projectToken));
 

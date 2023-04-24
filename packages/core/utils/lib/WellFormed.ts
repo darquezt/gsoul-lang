@@ -45,6 +45,9 @@ const typeWellFormed = (ctx: WellFormednessContext, type: Type): boolean => {
         type.codomain,
       );
 
+    case TypeKind.PolyT:
+      return typeEffectWellFormed(ctx, type.codomain);
+
     case TypeKind.RecType:
       return typeEffectWellFormed(ctx, type.body);
 
@@ -62,7 +65,7 @@ const typeEffectWellFormed = (
   typeEffect: TypeEffect,
 ): boolean => {
   switch (typeEffect.kind) {
-    case TypeEffectKind.RecursiveVar:
+    case TypeEffectKind.TypeVar:
       return true;
     case TypeEffectKind.TypeEff:
       return (

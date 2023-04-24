@@ -1,8 +1,8 @@
 import { Result } from '@badrap/result';
-import { TypeEff } from '@gsoul-lang/core/utils';
 import WellFormed, {
   WellFormednessContext,
 } from '@gsoul-lang/core/utils/lib/WellFormed';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { Ascription } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import { expression } from '../checker';
@@ -11,7 +11,7 @@ import { TypeCheckingError, TypeCheckingTypeError } from '../utils/errors';
 import { TypeCheckingResult, TypeCheckingRule } from '../utils/types';
 
 const checkAscriptionSubtyping =
-  (typeEff: TypeEff, token: Token) =>
+  (typeEff: TypeEffect, token: Token) =>
   (
     exprTC: TypeCheckingResult,
   ): Result<TypeCheckingResult, TypeCheckingError> => {
@@ -29,7 +29,7 @@ const checkAscriptionSubtyping =
   };
 
 const checkAscriptionTypeIsValid =
-  (ctx: WellFormednessContext, typeEff: TypeEff, token: Token) =>
+  (ctx: WellFormednessContext, typeEff: TypeEffect, token: Token) =>
   (
     exprTC: TypeCheckingResult,
   ): Result<TypeCheckingResult, TypeCheckingError> => {

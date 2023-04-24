@@ -5,7 +5,7 @@ import {
   Statement,
   StmtKind,
 } from '@gsoul-lang/parsing/lib/ast';
-import { TypeEnv, TypeEff } from '@gsoul-lang/core/utils';
+import { TypeEnv } from '@gsoul-lang/core/utils';
 
 import { TypingSeeker } from './utils/typingSeeker';
 import { TypeCheckingError } from './utils/errors';
@@ -29,6 +29,9 @@ import { variable } from './checkers/variables';
 import { exprStmt, varStmt, printStmt } from './checkers/statements';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 import { atomLit } from './checkers/atoms';
+import { TypevarsSet } from '@gsoul-lang/core/utils/TypevarsSet';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
+import { poly, tapp } from './checkers/polys';
 
 export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
   switch (expr.kind) {
@@ -52,6 +55,8 @@ export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
       return app(expr, ctx);
     case ExprKind.SCall:
       return sapp(expr, ctx);
+    case ExprKind.TCall:
+      return tapp(expr, ctx);
     case ExprKind.NonLinearBinary:
       return nonLinearBinary(expr, ctx);
     case ExprKind.Variable:
@@ -60,6 +65,8 @@ export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
       return fun(expr, ctx);
     case ExprKind.Forall:
       return forall(expr, ctx);
+    case ExprKind.Poly:
+      return poly(expr, ctx);
     case ExprKind.Ascription:
       return ascription(expr, ctx);
     case ExprKind.Grouping:
@@ -101,14 +108,18 @@ export const statement: StatefulTypeCheckingRule = (stmt, ctx) => {
 };
 
 export type TypeChecking = {
-  typeEff: TypeEff;
+  typeEff: TypeEffect;
   typings: TypingSeeker;
 };
 
 export const typeCheck = (
   statements: Statement[],
 ): Result<TypeChecking, TypeCheckingError> => {
-  const tc = expression(Block({ statements }), [TypeEnv(), ResourcesSet()]);
+  const tc = expression(Block({ statements }), [
+    TypeEnv(),
+    ResourcesSet(),
+    TypevarsSet(),
+  ]);
 
   return tc.chain((tc) => {
     const typings = new TypingSeeker(tc.typings);

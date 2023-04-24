@@ -1,4 +1,5 @@
 import { Senv } from '@gsoul-lang/core/utils';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { ExpressionUtils, Value } from '../elaboration/ast';
 
 export type Identifier = string;
@@ -29,6 +30,26 @@ export const subst = (store: Store, name: string, senv: Senv): Store => {
         storep,
         id,
         ExpressionUtils.subst(get(store, id) as Value, name, senv) as Value,
+      ),
+    {},
+  );
+};
+
+export const substTypevar = (
+  store: Store,
+  name: string,
+  teff: TypeEffect,
+): Store => {
+  return Object.keys(store).reduce(
+    (storep, id) =>
+      extend(
+        storep,
+        id,
+        ExpressionUtils.substTypevar(
+          get(store, id) as Value,
+          name,
+          teff,
+        ) as Value,
       ),
     {},
   );

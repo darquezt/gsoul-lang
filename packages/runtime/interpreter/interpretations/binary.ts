@@ -138,6 +138,11 @@ export const reduceBinaryOperation = (
       );
     }
 
+    // We can safely cast here because we know that the type of the left and right operands are Real
+    // Otherwise, the evidence would not be valid
+    const leftTeff = left.typeEff as TypeEff;
+    const rightTeff = term.typeEff as TypeEff;
+
     const sum = AscribedValue({
       expression: RealLiteral({
         value: innerSum,
@@ -145,7 +150,7 @@ export const reduceBinaryOperation = (
       evidence: sumEvidenceRes.value,
       typeEff: TypeEff(
         Real(),
-        SenvUtils.add(left.typeEff.effect, term.typeEff.effect),
+        SenvUtils.add(leftTeff.effect, rightTeff.effect),
       ),
     });
 
@@ -231,6 +236,11 @@ export const reduceNLBinaryOperation = (
       );
     }
 
+    // We can safely cast here because we know that the type of the left and right operands are Real
+    // Otherwise, the evidence would not be valid
+    const leftTeff = left.typeEff as TypeEff;
+    const rightTeff = term.typeEff as TypeEff;
+
     const sum = AscribedValue({
       expression: RealLiteral({
         value: innerProduct,
@@ -238,9 +248,7 @@ export const reduceNLBinaryOperation = (
       evidence: EvidenceUtils.scaleInf(sumEvidenceRes.value),
       typeEff: TypeEff(
         Real(),
-        SenvUtils.scaleInf(
-          SenvUtils.add(left.typeEff.effect, term.typeEff.effect),
-        ),
+        SenvUtils.scaleInf(SenvUtils.add(leftTeff.effect, rightTeff.effect)),
       ),
     });
 
@@ -329,6 +337,11 @@ export const reduceNLBinaryOperation = (
       );
     }
 
+    // We can safely cast here because we know that the type of the left and right operands are Real
+    // Otherwise, the evidence would not be valid
+    const leftTeff = left.typeEff as TypeEff;
+    const rightTeff = term.typeEff as TypeEff;
+
     const sum = AscribedValue({
       expression: BoolLiteral({
         value: innerResult,
@@ -336,9 +349,7 @@ export const reduceNLBinaryOperation = (
       evidence: sumEvidenceRes.value,
       typeEff: TypeEff(
         Bool(),
-        SenvUtils.scaleInf(
-          SenvUtils.add(left.typeEff.effect, term.typeEff.effect),
-        ),
+        SenvUtils.scaleInf(SenvUtils.add(leftTeff.effect, rightTeff.effect)),
       ),
     });
 

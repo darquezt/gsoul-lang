@@ -85,6 +85,14 @@ const typeCheckPolarity = (
     return typeEffectCheckPolarity(variable, mode, ty1.codomain, ty2.codomain);
   }
 
+  if (isKinded(ty1, TypeKind.PolyT) && isKinded(ty2, TypeKind.PolyT)) {
+    if (ty1.typeVars.length !== ty2.typeVars.length) {
+      return false;
+    }
+
+    return typeEffectCheckPolarity(variable, mode, ty1.codomain, ty2.codomain);
+  }
+
   if (isKinded(ty1, TypeKind.RecType) && isKinded(ty2, TypeKind.RecType)) {
     if (ty1.variable !== ty2.variable) {
       return false;
@@ -135,8 +143,8 @@ const typeEffectCheckPolarity = (
   teff2: TypeEffect,
 ): boolean => {
   if (
-    isKinded(teff1, TypeEffectKind.RecursiveVar) &&
-    isKinded(teff2, TypeEffectKind.RecursiveVar)
+    isKinded(teff1, TypeEffectKind.TypeVar) &&
+    isKinded(teff2, TypeEffectKind.TypeVar)
   ) {
     if (teff1.name !== teff2.name) {
       return false;

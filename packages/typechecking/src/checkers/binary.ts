@@ -4,13 +4,17 @@ import { Bool, Real } from '@gsoul-lang/core/utils/Type';
 import { Binary, NonLinearBinary } from '@gsoul-lang/parsing/lib/ast';
 import { Token, TokenType } from '@gsoul-lang/parsing/lib/lexing';
 import { expression } from '../checker';
+import { checkTypeEffConcreteness } from '../utils/auxiliaryCheckers';
 import { TypeCheckingError, TypeCheckingTypeError } from '../utils/errors';
 import { TypeCheckingResult, TypeCheckingRule } from '../utils/types';
 
 const checkSameTypeOperands =
   (operator: Token) =>
-  ([left, right]: [TypeCheckingResult, TypeCheckingResult]): Result<
-    [TypeCheckingResult, TypeCheckingResult],
+  ([left, right]: [
+    TypeCheckingResult<TypeEff>,
+    TypeCheckingResult<TypeEff>,
+  ]): Result<
+    [TypeCheckingResult<TypeEff>, TypeCheckingResult<TypeEff>],
     TypeCheckingError
   > => {
     if (left.typeEff.type !== right.typeEff.type) {
@@ -26,9 +30,19 @@ const checkSameTypeOperands =
   };
 
 export const binary: TypeCheckingRule<Binary> = (expr, ctx) => {
-  const lTC = expression(expr.left, ctx);
+  const lTC = expression(expr.left, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Left operand may not have the correct type',
+    ),
+  );
 
-  const rTC = expression(expr.right, ctx);
+  const rTC = expression(expr.right, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Right operand may not have the correct type',
+    ),
+  );
 
   return Result.all([lTC, rTC])
     .chain(checkSameTypeOperands(expr.operator))
@@ -40,8 +54,11 @@ export const binary: TypeCheckingRule<Binary> = (expr, ctx) => {
 
 const checkSameType =
   (operator: Token) =>
-  ([left, right]: [TypeCheckingResult, TypeCheckingResult]): Result<
-    [TypeCheckingResult, TypeCheckingResult],
+  ([left, right]: [
+    TypeCheckingResult<TypeEff>,
+    TypeCheckingResult<TypeEff>,
+  ]): Result<
+    [TypeCheckingResult<TypeEff>, TypeCheckingResult<TypeEff>],
     TypeCheckingError
   > => {
     if (left.typeEff.type !== right.typeEff.type) {
@@ -67,9 +84,19 @@ export const nonLinearBinary: TypeCheckingRule<NonLinearBinary> = (
   expr,
   ctx,
 ) => {
-  const lTC = expression(expr.left, ctx);
+  const lTC = expression(expr.left, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Left operand may not have the correct type',
+    ),
+  );
 
-  const rTC = expression(expr.right, ctx);
+  const rTC = expression(expr.right, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Right operand may not have the correct type',
+    ),
+  );
 
   const type = nonLinearOperatorsBool.includes(expr.operator.type)
     ? Bool()

@@ -13,20 +13,22 @@ import {
   Bool,
   ForallT,
   Nil,
+  PolyT,
   Real,
   RecType,
 } from '@gsoul-lang/core/utils/Type';
 import { factoryOf, isKinded } from '@gsoul-lang/core/utils/ADT';
 
 import { Evidence, EvidenceUtils, Store, StoreUtils } from '../utils';
-import { all } from 'ramda';
+import { all, identity } from 'ramda';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 
 /**
  * Expressions
  */
 
-export type Term<T, U extends TypeEff = TypeEff> = T & { typeEff: U };
+export type Term<T, U extends TypeEffect = TypeEff> = T & { typeEff: U };
 
 export enum ExprKind {
   RealLiteral = 'RealLiteral',
@@ -37,12 +39,15 @@ export enum ExprKind {
   NonLinearBinary = 'NonLinearBinary',
   Call = 'Call',
   SCall = 'SCall',
+  TCall = 'TCall',
   Grouping = 'Grouping',
   Variable = 'Variable',
   Fun = 'Fun',
   Closure = 'Closure',
   Forall = 'Forall',
+  Poly = 'Poly',
   SClosure = 'SClosure',
+  TClosure = 'TClosure',
   Tuple = 'Tuple',
   Projection = 'Projection',
   Untup = 'Untup',
@@ -141,22 +146,36 @@ export type SCall = Term<{
 }>;
 export const SCall = factoryOf<SCall>(ExprKind.SCall);
 
-export type Grouping = Term<{
-  kind: ExprKind.Grouping;
-  expression: Expression;
+export type TCall = Term<{
+  kind: ExprKind.TCall;
+  callee: Expression;
+  args: TypeEffect[];
+  bracket: Token;
 }>;
+export const TCall = factoryOf<TCall>(ExprKind.TCall);
+
+export type Grouping = Term<
+  {
+    kind: ExprKind.Grouping;
+    expression: Expression;
+  },
+  TypeEffect
+>;
 export const Grouping = factoryOf<Grouping>(ExprKind.Grouping);
 
-export type Variable = Term<{ kind: ExprKind.Variable; name: Token }>;
+export type Variable = Term<
+  { kind: ExprKind.Variable; name: Token },
+  TypeEffect
+>;
 export const Variable = factoryOf<Variable>(ExprKind.Variable);
 
 export type Fun = Term<
   {
     kind: ExprKind.Fun;
-    binders: Array<{ name: Token; type: TypeEff }>;
+    binders: Array<{ name: Token; type: TypeEffect }>;
     body: Expression;
   },
-  TypeEff<Arrow, Senv>
+  TypeEff<Arrow>
 >;
 export const Fun = factoryOf<Fun>(ExprKind.Fun);
 
@@ -166,9 +185,19 @@ export type Forall = Term<
     sensVars: Token[];
     expr: Expression;
   },
-  TypeEff<ForallT, Senv>
+  TypeEff<ForallT>
 >;
 export const Forall = factoryOf<Forall>(ExprKind.Forall);
+
+export type Poly = Term<
+  {
+    kind: ExprKind.Poly;
+    typeVars: Token[];
+    expr: Expression;
+  },
+  TypeEff<PolyT>
+>;
+export const Poly = factoryOf<Poly>(ExprKind.Poly);
 
 export type Closure = Term<{
   kind: ExprKind.Closure;
@@ -184,20 +213,33 @@ export type SClosure = Term<{
 }>;
 export const SClosure = factoryOf<SClosure>(ExprKind.SClosure);
 
-export type Ascription = Term<{
-  kind: ExprKind.Ascription;
-  evidence: Evidence;
-  expression: Expression;
-  typeEff: TypeEff;
+export type TClosure = Term<{
+  kind: ExprKind.TClosure;
+  poly: Poly;
+  store: Store;
 }>;
+export const TClosure = factoryOf<TClosure>(ExprKind.TClosure);
+
+export type Ascription = Term<
+  {
+    kind: ExprKind.Ascription;
+    evidence: Evidence;
+    expression: Expression;
+    typeEff: TypeEffect;
+  },
+  TypeEffect
+>;
 export const Ascription = factoryOf<Ascription>(ExprKind.Ascription);
 
-export type AscribedValue<T extends SimpleValue = SimpleValue> = Term<{
-  kind: ExprKind.Ascription;
-  evidence: Evidence;
-  expression: T;
-  typeEff: TypeEff;
-}>;
+export type AscribedValue<T extends SimpleValue = SimpleValue> = Term<
+  {
+    kind: ExprKind.Ascription;
+    evidence: Evidence;
+    expression: T;
+    typeEff: TypeEffect;
+  },
+  TypeEffect
+>;
 export const AscribedValue = <T extends SimpleValue>(
   params: Omit<AscribedValue<T>, 'kind'>,
 ): AscribedValue<T> => ({
@@ -269,11 +311,14 @@ export type ProjSnd = Term<{
 }>;
 export const ProjSnd = factoryOf<ProjSnd>(ExprKind.ProjSnd);
 
-export type Block = Term<{
-  kind: ExprKind.Block;
-  statements: Statement[];
-  resources: ResourcesSet;
-}>;
+export type Block = Term<
+  {
+    kind: ExprKind.Block;
+    statements: Statement[];
+    resources: ResourcesSet;
+  },
+  TypeEffect
+>;
 export const Block = factoryOf<Block>(ExprKind.Block);
 
 export type Fold = Term<{
@@ -307,6 +352,7 @@ export type SimpleValue =
   | AtomLiteral
   | Closure
   | SClosure
+  | TClosure
   | (Tuple & { expressions: Value[] })
   | (Pair & { first: Value; second: Value })
   | (Fold & { expression: Value })
@@ -333,6 +379,7 @@ export const isSimpleValue = (expr: Expression): expr is SimpleValue => {
     ExprKind.AtomLiteral,
     ExprKind.Closure,
     ExprKind.SClosure,
+    ExprKind.TClosure,
   ].some((kind) => kind === expr.kind);
 };
 
@@ -378,12 +425,15 @@ export type Expression =
   | NonLinearBinary
   | Call
   | SCall
+  | TCall
   | Grouping
   | Variable
   | Fun
   | Closure
   | Forall
   | SClosure
+  | Poly
+  | TClosure
   | Tuple
   | Projection
   // | Untup
@@ -401,7 +451,7 @@ export type Expression =
 type ExprMapFns = {
   senvFn: (senv: Senv) => Senv;
   typeFn: (ty: Type) => Type;
-  teffFn: (teff: TypeEff) => TypeEff;
+  teffFn: <T extends TypeEffect>(teff: T) => TypeEffect & { kind: T['kind'] };
   eviFn: (evi: Evidence) => Evidence;
   storeFn: (store: Store) => Store;
   stmtFn: (stmt: Statement) => Statement;
@@ -415,7 +465,6 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
     return { [key]: map(e[key], fns) };
   };
 
-  const typeEff = teffFn(expr.typeEff);
   switch (expr.kind) {
     case ExprKind.RealLiteral:
     case ExprKind.BoolLiteral:
@@ -428,32 +477,39 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
         ...expr,
         ...inductiveCall('left', expr),
         ...inductiveCall('right', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Call:
       return Call({
         ...expr,
         ...inductiveCall('callee', expr),
         args: expr.args.map((arg) => map(arg, fns)),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.SCall:
       return SCall({
         ...expr,
         ...inductiveCall('callee', expr),
         args: expr.args.map(senvFn),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
+      });
+    case ExprKind.TCall:
+      return TCall({
+        ...expr,
+        ...inductiveCall('callee', expr),
+        args: expr.args.map((arg) => teffFn(arg)),
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Grouping:
       return Grouping({
         ...expr,
         ...inductiveCall('expression', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Variable:
       return Variable({
         ...expr,
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Fun:
       return Fun({
@@ -463,14 +519,14 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
           ...binder,
           type: teffFn(binder.type),
         })),
-        typeEff: typeEff as TypeEff<Arrow, Senv>,
+        typeEff: teffFn(expr.typeEff) as TypeEff<Arrow, Senv>,
       });
     case ExprKind.Closure: {
       const clos = Closure({
         ...expr,
         ...inductiveCall('fun', expr),
         store: storeFn(expr.store),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
 
       return clos;
@@ -479,78 +535,83 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
       return Forall({
         ...expr,
         ...inductiveCall('expr', expr),
-        typeEff: typeEff as TypeEff<ForallT, Senv>,
+        typeEff: teffFn(expr.typeEff) as TypeEff<ForallT, Senv>,
       });
     case ExprKind.SClosure:
       return SClosure({
         ...expr,
         store: storeFn(expr.store),
         ...inductiveCall('forall', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
+      });
+    case ExprKind.Poly:
+      return Poly({
+        ...expr,
+        ...inductiveCall('expr', expr),
+        typeEff: teffFn(expr.typeEff) as TypeEff<PolyT, Senv>,
+      });
+    case ExprKind.TClosure:
+      return TClosure({
+        ...expr,
+        ...inductiveCall('poly', expr),
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Block:
       return Block({
         ...expr,
         statements: expr.statements.map((s) => stmtFn(s)),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Tuple:
       return Tuple({
         ...expr,
         expressions: expr.expressions.map((e) => map(e, fns)),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Projection:
       return Projection({
         ...expr,
         ...inductiveCall('tuple', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
-    // case ExprKind.Untup:
-    //   return Untup({
-    //     ...expr,
-    //     ...inductiveCall('tuple', expr),
-    //     ...inductiveCall('body', expr),
-    //     typeEff,
-    //   });
     case ExprKind.Pair:
       return Pair({
         ...expr,
         ...inductiveCall('first', expr),
         ...inductiveCall('second', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.ProjFst:
       return ProjFst({
         ...expr,
         ...inductiveCall('pair', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.ProjSnd:
       return ProjSnd({
         ...expr,
         ...inductiveCall('pair', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Ascription:
       return Ascription({
         ...expr,
         ...inductiveCall('expression', expr),
         evidence: eviFn(expr.evidence),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Fold:
       return Fold({
         ...expr,
         ...inductiveCall('expression', expr),
         recType: teffFn(expr.recType) as TypeEff<RecType, Senv>,
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Unfold:
       return Unfold({
         ...expr,
         ...inductiveCall('expression', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.If:
       return If({
@@ -558,13 +619,13 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
         ...inductiveCall('condition', expr),
         ...inductiveCall('then', expr),
         ...inductiveCall('else', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Inj:
       return Inj({
         ...expr,
         ...inductiveCall('expression', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
     case ExprKind.Case:
       return Case({
@@ -572,7 +633,7 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
         ...inductiveCall('sum', expr),
         ...inductiveCall('left', expr),
         ...inductiveCall('right', expr),
-        typeEff,
+        typeEff: teffFn(expr.typeEff),
       });
   }
 };
@@ -581,10 +642,25 @@ const subst = (expr: Expression, name: string, senv: Senv): Expression => {
   return map(expr, {
     senvFn: (s: Senv) => SenvUtils.subst(s, name, senv),
     typeFn: (ty: Type) => TypeUtils.subst(ty, name, senv),
-    teffFn: (teff: TypeEff) => TypeEffUtils.subst(teff, name, senv),
+    teffFn: (teff) => TypeEffUtils.subst(teff, name, senv),
     eviFn: (evi: Evidence) => EvidenceUtils.subst(evi, name, senv),
     storeFn: (store: Store) => StoreUtils.subst(store, name, senv),
     stmtFn: (stmt: Statement) => substStmt(stmt, name, senv),
+  });
+};
+
+const substTypevar = (
+  expr: Expression,
+  name: string,
+  teff: TypeEffect,
+): Expression => {
+  return map(expr, {
+    senvFn: identity,
+    typeFn: (ty: Type) => TypeUtils.substTypevar(name, teff)(ty),
+    teffFn: (target) => TypeEffUtils.substTypevar(name, teff)(target),
+    eviFn: (evi: Evidence) => EvidenceUtils.substTypevar(evi, name, teff),
+    storeFn: (store: Store) => StoreUtils.substTypevar(store, name, teff),
+    stmtFn: (stmt: Statement) => substTypevarStmt(stmt, name, teff),
   });
 };
 
@@ -595,7 +671,7 @@ const deleteResources = (
   return map(expr, {
     senvFn: (s: Senv) => SenvUtils.deleteResources(s, resources),
     typeFn: (ty: Type) => TypeUtils.deleteResources(ty, resources),
-    teffFn: (teff: TypeEff) => TypeEffUtils.deleteResources(teff, resources),
+    teffFn: (teff) => TypeEffUtils.deleteResources(teff, resources),
     eviFn: (evi: Evidence) => EvidenceUtils.deleteResources(evi, resources),
     storeFn: (store: Store) => StoreUtils.deleteResources(store, resources),
     stmtFn: (stmt: Statement) => deleteResourcesStmt(stmt, resources),
@@ -604,6 +680,7 @@ const deleteResources = (
 
 export const ExpressionUtils = {
   subst,
+  substTypevar,
   deleteResources,
 };
 
@@ -617,24 +694,33 @@ export enum StmtKind {
   VarStmt = 'VarStmt',
 }
 
-export type ExprStmt = Term<{
-  kind: StmtKind.ExprStmt;
-  expression: Expression;
-}>;
+export type ExprStmt = Term<
+  {
+    kind: StmtKind.ExprStmt;
+    expression: Expression;
+  },
+  TypeEffect
+>;
 export const ExprStmt = factoryOf<ExprStmt>(StmtKind.ExprStmt);
 
-export type VarStmt = Term<{
-  kind: StmtKind.VarStmt;
-  name: Token;
-  assignment: Expression;
-}>;
+export type VarStmt = Term<
+  {
+    kind: StmtKind.VarStmt;
+    name: Token;
+    assignment: Expression;
+  },
+  TypeEffect
+>;
 export const VarStmt = factoryOf<VarStmt>(StmtKind.VarStmt);
 
-export type PrintStmt = Term<{
-  kind: StmtKind.PrintStmt;
-  expression: Expression;
-  showEvidence: boolean;
-}>;
+export type PrintStmt = Term<
+  {
+    kind: StmtKind.PrintStmt;
+    expression: Expression;
+    showEvidence: boolean;
+  },
+  TypeEffect
+>;
 export const PrintStmt = factoryOf<PrintStmt>(StmtKind.PrintStmt);
 
 export type Statement = ExprStmt | VarStmt | PrintStmt;
@@ -659,6 +745,35 @@ const substStmt = (stmt: Statement, name: string, senv: Senv): Statement => {
       return VarStmt({
         ...stmt,
         assignment: ExpressionUtils.subst(stmt.assignment, name, senv),
+        typeEff,
+      });
+  }
+};
+
+const substTypevarStmt = (
+  stmt: Statement,
+  name: string,
+  teff: TypeEffect,
+): Statement => {
+  const typeEff = TypeEffUtils.substTypevar(name, teff)(stmt.typeEff);
+
+  switch (stmt.kind) {
+    case StmtKind.ExprStmt:
+      return ExprStmt({
+        ...stmt,
+        expression: ExpressionUtils.substTypevar(stmt.expression, name, teff),
+        typeEff,
+      });
+    case StmtKind.PrintStmt:
+      return PrintStmt({
+        ...stmt,
+        expression: ExpressionUtils.substTypevar(stmt.expression, name, teff),
+        typeEff,
+      });
+    case StmtKind.VarStmt:
+      return VarStmt({
+        ...stmt,
+        assignment: ExpressionUtils.substTypevar(stmt.assignment, name, teff),
         typeEff,
       });
   }

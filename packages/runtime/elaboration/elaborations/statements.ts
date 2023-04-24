@@ -12,12 +12,15 @@ import {
   ElaborationError,
   ElaborationDependencyError,
   ElaborationSubtypingError,
+  ElaborationTypeError,
 } from '../errors';
 import { ElaborationContext, Stateful } from '../types';
 import * as past from '@gsoul-lang/parsing/lib/ast';
 import { interior } from '../../utils/Evidence';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import * as ResourcesSetUtils from '@gsoul-lang/core/utils/ResourcesSet';
+import { isKinded } from '@gsoul-lang/core/utils/ADT';
+import { TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
 
 export const exprStmt = (
   stmt: past.ExprStmt,
@@ -107,9 +110,18 @@ export const varStmt = (
 
   let expr = exprElaboration.value;
 
-  const [tenv, rset] = ctx;
+  const [tenv, rset, ...rest] = ctx;
 
   if (stmt.resource) {
+    if (!isKinded(expr.typeEff, TypeEffectKind.TypeEff)) {
+      return Result.err(
+        new ElaborationTypeError({
+          reason: 'Resources must have concrete type-and-effects',
+          operator: stmt.name,
+        }),
+      );
+    }
+
     if (!SenvUtils.isEmpty(expr.typeEff.effect)) {
       return Result.err(
         new ElaborationDependencyError({
@@ -143,7 +155,7 @@ export const varStmt = (
         assignment: expr,
         typeEff: expr.typeEff,
       }),
-      [newTenv, newRset],
+      [newTenv, newRset, ...rest],
     ),
   );
 };

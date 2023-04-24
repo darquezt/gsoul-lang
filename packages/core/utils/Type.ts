@@ -10,7 +10,7 @@ import {
 } from './ADT';
 // import { BaseErr, Err, Ok, Result } from './Result';
 import { Identifier, Senv } from './Senv';
-import { TypeEff, TypeEffect } from './TypeEff';
+import { TypeEff, TypeEffect, TypeEffectKind } from './TypeEff';
 
 export enum TypeKind {
   Real = 'Real',
@@ -18,6 +18,7 @@ export enum TypeKind {
   Nil = 'Nil',
   Arrow = 'Arrow',
   ForallT = 'ForallT',
+  PolyT = 'PolyT',
   MProduct = 'MProduct',
   AProduct = 'AProduct',
   Product = 'Product',
@@ -59,6 +60,13 @@ export type ForallT = {
 export const ForallT: KindedFactory<ForallT> = factoryOf<ForallT>(
   TypeKind.ForallT,
 );
+
+export type PolyT = {
+  kind: TypeKind.PolyT;
+  typeVars: Identifier[];
+  codomain: TypeEffect;
+};
+export const PolyT: KindedFactory<PolyT> = factoryOf<PolyT>(TypeKind.PolyT);
 
 export type Product = {
   kind: TypeKind.Product;
@@ -109,6 +117,7 @@ export type Type = (
   | Atom
   | Arrow
   | ForallT
+  | PolyT
   | MProduct
   | AProduct
   | Product
@@ -125,6 +134,7 @@ type MatchFuns<R> = {
   atom: (ty: Atom) => R;
   arrow: (ty: Arrow) => R;
   forall: (ty: ForallT) => R;
+  poly: (ty: PolyT) => R;
   mprod: (ty: MProduct) => R;
   aprod: (ty: AProduct) => R;
   prod: (ty: Product) => R;
@@ -147,6 +157,8 @@ const match =
         return funs.arrow(ty);
       case TypeKind.ForallT:
         return funs.forall(ty);
+      case TypeKind.PolyT:
+        return funs.poly(ty);
       case TypeKind.MProduct:
         return funs.mprod(ty);
       case TypeKind.AProduct:
@@ -177,6 +189,11 @@ export const subst = (target: Type, name: Identifier, senv: Senv): Type => {
     forall: (ty) =>
       ForallT({
         sensVars: ty.sensVars,
+        codomain: typeEffFn(ty.codomain),
+      }),
+    poly: (ty) =>
+      PolyT({
+        typeVars: ty.typeVars,
         codomain: typeEffFn(ty.codomain),
       }),
     mprod: (ty) =>
@@ -225,6 +242,11 @@ export const deleteResources = (ty: Type, resources: Identifier[]): Type => {
         sensVars: ty.sensVars,
         codomain: typeEffFn(ty.codomain),
       }),
+    poly: (ty) =>
+      PolyT({
+        typeVars: ty.typeVars,
+        codomain: typeEffFn(ty.codomain),
+      }),
     mprod: (ty) =>
       MProduct({
         first: typeEffFn(ty.first),
@@ -256,7 +278,7 @@ export const substRecVar = (
   name: string,
   substitution: TypeEff,
 ): ((ty: Type) => Type) => {
-  const typeEffFn = TypeEffUtils.substRecVar(name, substitution);
+  const typeEffFn = TypeEffUtils.substTypevar(name, substitution);
 
   return match<Type>({
     real: identity,
@@ -273,6 +295,11 @@ export const substRecVar = (
         sensVars: ty.sensVars,
         codomain: typeEffFn(ty.codomain),
       }),
+    poly: (ty) =>
+      PolyT({
+        typeVars: ty.typeVars,
+        codomain: typeEffFn(ty.codomain),
+      }),
     mprod: (ty) =>
       MProduct({
         first: typeEffFn(ty.first),
@@ -287,6 +314,61 @@ export const substRecVar = (
       RecType({
         variable: ty.variable,
         body: ty.variable === name ? ty.body : typeEffFn(ty.body),
+      }),
+    prod: (ty) =>
+      Product({
+        typeEffects: ty.typeEffects.map(typeEffFn),
+      }),
+    sum: (ty) =>
+      Sum({
+        left: typeEffFn(ty.left),
+        right: typeEffFn(ty.right),
+      }),
+  });
+};
+
+export const substTypevar = (
+  name: string,
+  substitution: TypeEffect,
+): ((ty: Type) => Type) => {
+  const typeEffFn = TypeEffUtils.substTypevar(name, substitution);
+
+  return match<Type>({
+    real: identity,
+    bool: identity,
+    nil: identity,
+    atom: identity,
+    arrow: (ty) =>
+      Arrow({
+        domain: ty.domain.map(typeEffFn),
+        codomain: typeEffFn(ty.codomain),
+      }),
+    forall: (ty) =>
+      ForallT({
+        sensVars: ty.sensVars,
+        codomain: typeEffFn(ty.codomain),
+      }),
+    poly: (ty) =>
+      PolyT({
+        typeVars: ty.typeVars,
+        codomain: ty.typeVars.includes(name)
+          ? ty.codomain
+          : typeEffFn(ty.codomain),
+      }),
+    mprod: (ty) =>
+      MProduct({
+        first: typeEffFn(ty.first),
+        second: typeEffFn(ty.second),
+      }),
+    aprod: (ty) =>
+      AProduct({
+        first: typeEffFn(ty.first),
+        second: typeEffFn(ty.second),
+      }),
+    recursive: (ty) =>
+      RecType({
+        variable: ty.variable,
+        body: typeEffFn(ty.body),
       }),
     prod: (ty) =>
       Product({
@@ -318,6 +400,8 @@ export const format: (ty: Type) => string = (ty) => {
       chalk`forall {green ${ty.sensVars.join(' ')}} . ${TypeEffUtils.format(
         ty.codomain,
       )}`,
+    poly: (ty) =>
+      `<${ty.typeVars.join(', ')}>(${TypeEffUtils.format(ty.codomain)})`,
     mprod: (ty) =>
       chalk`${TypeEffUtils.format(ty.first)} ⊗ ${TypeEffUtils.format(
         ty.second,
@@ -335,8 +419,12 @@ export const format: (ty: Type) => string = (ty) => {
 };
 
 export const typeIsKinded = <K extends Type['kind']>(
-  teff: TypeEff,
+  teff: TypeEffect,
   kind: K,
 ): teff is TypeEff<Type & { kind: K }, Senv> => {
+  if (teff.kind !== TypeEffectKind.TypeEff) {
+    return false;
+  }
+
   return isKinded(teff.type, kind);
 };

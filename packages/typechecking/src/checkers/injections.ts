@@ -55,7 +55,7 @@ const checkCaseCalleeType =
   (token: Token) =>
   (
     sumTC: TypeCheckingResult,
-  ): Result<TypeCheckingResult<Sum>, TypeCheckingError> => {
+  ): Result<TypeCheckingResult<TypeEff<Sum, Senv>>, TypeCheckingError> => {
     if (!typeIsKinded(sumTC.typeEff, TypeKind.Sum)) {
       return Result.err(
         new TypeCheckingTypeError({
@@ -65,7 +65,7 @@ const checkCaseCalleeType =
       );
     }
 
-    return Result.ok(sumTC as TypeCheckingResult<Sum>);
+    return Result.ok(sumTC as TypeCheckingResult<TypeEff<Sum, Senv>>);
   };
 
 export const caseExpr: TypeCheckingRule<Case> = (expr, ctx) => {
@@ -73,7 +73,7 @@ export const caseExpr: TypeCheckingRule<Case> = (expr, ctx) => {
     checkCaseCalleeType(expr.caseToken),
   );
 
-  const [tenv, rset] = ctx;
+  const [tenv, rset, ...rest] = ctx;
 
   const leftTC = sumTC.chain((sumTC) =>
     expression(expr.left, [
@@ -83,6 +83,7 @@ export const caseExpr: TypeCheckingRule<Case> = (expr, ctx) => {
         TypeEffUtils.SumUtils.left(sumTC.typeEff),
       ),
       rset,
+      ...rest,
     ]),
   );
 
@@ -94,6 +95,7 @@ export const caseExpr: TypeCheckingRule<Case> = (expr, ctx) => {
         TypeEffUtils.SumUtils.right(sumTC.typeEff),
       ),
       rset,
+      ...rest,
     ]),
   );
 

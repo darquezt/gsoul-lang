@@ -79,8 +79,8 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
 
 export const isSubTypeEff = (te1: TypeEffect, te2: TypeEffect): boolean => {
   if (
-    te1.kind === TypeEffectKind.RecursiveVar &&
-    te2.kind === TypeEffectKind.RecursiveVar
+    te1.kind === TypeEffectKind.TypeVar &&
+    te2.kind === TypeEffectKind.TypeVar
   ) {
     return te1.name === te2.name;
   }

@@ -22,6 +22,8 @@ const typeFreeVars = (ty: Type): string[] => {
       return typeEffectFreeVars(ty.left).concat(typeEffectFreeVars(ty.right));
     case TypeKind.ForallT:
       return typeEffectFreeVars(ty.codomain);
+    case TypeKind.PolyT:
+      return typeEffectFreeVars(ty.codomain);
     case TypeKind.RecType: {
       const bodyFreeVars = typeEffectFreeVars(ty.body);
 
@@ -35,7 +37,7 @@ const typeFreeVars = (ty: Type): string[] => {
 
 const typeEffectFreeVars = (teff: TypeEffect): string[] => {
   switch (teff.kind) {
-    case TypeEffectKind.RecursiveVar:
+    case TypeEffectKind.TypeVar:
       return [teff.name];
     case TypeEffectKind.TypeEff:
       return typeFreeVars(teff.type);

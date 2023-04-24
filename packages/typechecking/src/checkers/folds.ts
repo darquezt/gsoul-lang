@@ -69,7 +69,7 @@ const checkUnfoldBodyType =
   (token: Token) =>
   (
     bodyTC: TypeCheckingResult,
-  ): Result<TypeCheckingResult<RecType>, TypeCheckingError> => {
+  ): Result<TypeCheckingResult<TypeEff<RecType>>, TypeCheckingError> => {
     if (!typeIsKinded(bodyTC.typeEff, TypeKind.RecType)) {
       return Result.err(
         new TypeCheckingTypeError({
@@ -79,7 +79,7 @@ const checkUnfoldBodyType =
       );
     }
 
-    return Result.ok(bodyTC as TypeCheckingResult<RecType>);
+    return Result.ok(bodyTC as TypeCheckingResult<TypeEff<RecType>>);
   };
 
 export const unfold: TypeCheckingRule<Unfold> = (expr, ctx) => {

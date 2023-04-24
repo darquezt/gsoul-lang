@@ -1,21 +1,27 @@
 import { Result } from '@badrap/result';
-import { Senv, Type, TypeEff, TypeEnv } from '@gsoul-lang/core/utils';
+import { TypeEnv } from '@gsoul-lang/core/utils';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
+import { TypevarsSet } from '@gsoul-lang/core/utils/TypevarsSet';
 import { Expression, Statement } from '@gsoul-lang/parsing/lib/ast';
 import { TypeCheckingError } from './errors';
 import { TypeAssoc } from './typingSeeker';
 
-export type TypeCheckingContext = [TypeEnv, ResourcesSet];
+export type TypeCheckingContext = [
+  typeEnvironment: TypeEnv,
+  resources: ResourcesSet,
+  typevars: TypevarsSet,
+];
 
 // Expression typechecking
 
-export type TypeCheckingResult<R extends Type = Type> = {
-  typeEff: TypeEff<R, Senv>;
+export type TypeCheckingResult<R extends TypeEffect = TypeEffect> = {
+  typeEff: R;
   typings: TypeAssoc[];
 };
 export type TypeCheckingRule<
   E extends Expression = Expression,
-  R extends Type = Type,
+  R extends TypeEffect = TypeEffect,
 > = (
   expr: E,
   ctx: TypeCheckingContext,

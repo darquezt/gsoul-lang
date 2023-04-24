@@ -247,8 +247,8 @@ export const interior = (
   te2: TypeEffect,
 ): Result<Evidence, EvidenceError> => {
   if (
-    isKinded(te1, TypeEffectKind.RecursiveVar) &&
-    isKinded(te2, TypeEffectKind.RecursiveVar)
+    isKinded(te1, TypeEffectKind.TypeVar) &&
+    isKinded(te2, TypeEffectKind.TypeVar)
   ) {
     if (te1.name === te1.name) {
       return Result.ok([te1, te2]);
@@ -360,10 +360,10 @@ export const trans = (
   [teff21, teff22]: Evidence,
 ): Result<Evidence, EvidenceError> => {
   if (
-    isKinded(teff11, TypeEffectKind.RecursiveVar) &&
-    isKinded(teff12, TypeEffectKind.RecursiveVar) &&
-    isKinded(teff21, TypeEffectKind.RecursiveVar) &&
-    isKinded(teff22, TypeEffectKind.RecursiveVar)
+    isKinded(teff11, TypeEffectKind.TypeVar) &&
+    isKinded(teff12, TypeEffectKind.TypeVar) &&
+    isKinded(teff21, TypeEffectKind.TypeVar) &&
+    isKinded(teff22, TypeEffectKind.TypeVar)
   ) {
     if (
       teff11.name === teff12.name &&
@@ -410,12 +410,12 @@ export const icod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute (i)codomain of a recusive type-and-effect',
+        'Cannot compute (i)codomain of a recusive variable',
       ),
     );
   }
@@ -441,12 +441,12 @@ export const idom = (ev: Evidence): Result<Evidence[], EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute (i)codomain of a recusive type-and-effect',
+        'Cannot compute (i)codomain of a recusive variable',
       ),
     );
   }
@@ -474,12 +474,12 @@ export const iscod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute (i)codomain of a recusive type-and-effect',
+        'Cannot compute (i)codomain of a recusive variable',
       ),
     );
   }
@@ -501,16 +501,50 @@ export const iscod = (ev: Evidence): Result<Evidence, EvidenceError> => {
   ]);
 };
 
+export const iinst = (
+  ev: Evidence,
+  args: TypeEffect[],
+): Result<Evidence, EvidenceError> => {
+  const [left, right] = ev;
+
+  if (
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive variable',
+      ),
+    );
+  }
+
+  if (
+    !typeIsKinded(left, TypeKind.PolyT) ||
+    !typeIsKinded(right, TypeKind.PolyT)
+  ) {
+    return Result.err(
+      new EvidenceTypeError(
+        'Operator iinst is not defined for types other than polymorphic types',
+      ),
+    );
+  }
+
+  return Result.ok([
+    TypeEffUtils.PolysUtils.instance(left, args),
+    TypeEffUtils.PolysUtils.instance(right, args),
+  ]);
+};
+
 export const ifirst = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute (i)codomain of a recusive type-and-effect',
+        'Cannot compute (i)codomain of a recusive variable',
       ),
     );
   }
@@ -536,12 +570,12 @@ export const isecond = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute (i)codomain of a recusive type-and-effect',
+        'Cannot compute (i)codomain of a recusive variable',
       ),
     );
   }
@@ -570,12 +604,12 @@ export const iproj = (
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute (i)codomain of a recusive type-and-effect',
+        'Cannot compute (i)codomain of a recusive variable',
       ),
     );
   }
@@ -601,13 +635,11 @@ export const ileft = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
-      new EvidenceTypeError(
-        'Cannot compute (i)left of a recusive type-and-effect',
-      ),
+      new EvidenceTypeError('Cannot compute (i)left of a recusive variable'),
     );
   }
 
@@ -629,13 +661,11 @@ export const iright = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
-      new EvidenceTypeError(
-        'Cannot compute (i)left of a recusive type-and-effect',
-      ),
+      new EvidenceTypeError('Cannot compute (i)left of a recusive variable'),
     );
   }
 
@@ -657,12 +687,12 @@ export const iunfold = (ev: Evidence): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
-    isKinded(left, TypeEffectKind.RecursiveVar) ||
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar) ||
+    isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute (i)codomain of a recusive type-and-effect',
+        'Cannot compute (i)codomain of a recusive variable',
       ),
     );
   }
@@ -694,13 +724,15 @@ export const sum = (
   const [teff21, teff22] = ev2;
 
   if (
-    isKinded(teff11, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff21, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff12, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff22, TypeEffectKind.RecursiveVar)
+    isKinded(teff11, TypeEffectKind.TypeVar) ||
+    isKinded(teff21, TypeEffectKind.TypeVar) ||
+    isKinded(teff12, TypeEffectKind.TypeVar) ||
+    isKinded(teff22, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
-      new EvidenceTypeError('Cannot compute sum of a recusive type-and-effect'),
+      new EvidenceTypeError(
+        'Cannot compute sum of an abstract type-and-effect',
+      ),
     );
   }
 
@@ -731,14 +763,14 @@ export const realComparison = (
   const [teff21, teff22] = ev2;
 
   if (
-    isKinded(teff11, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff21, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff12, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff22, TypeEffectKind.RecursiveVar)
+    isKinded(teff11, TypeEffectKind.TypeVar) ||
+    isKinded(teff21, TypeEffectKind.TypeVar) ||
+    isKinded(teff12, TypeEffectKind.TypeVar) ||
+    isKinded(teff22, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute comparison of a recusive type-and-effect',
+        'Cannot compute comparison of an abstract type-and-effect',
       ),
     );
   }
@@ -776,14 +808,14 @@ export const joinEffect = (
   const [teff21, teff22] = ev2;
 
   if (
-    isKinded(teff11, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff21, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff12, TypeEffectKind.RecursiveVar) ||
-    isKinded(teff22, TypeEffectKind.RecursiveVar)
+    isKinded(teff11, TypeEffectKind.TypeVar) ||
+    isKinded(teff21, TypeEffectKind.TypeVar) ||
+    isKinded(teff12, TypeEffectKind.TypeVar) ||
+    isKinded(teff22, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
       new EvidenceTypeError(
-        'Cannot compute comparison of a recusive type-and-effect',
+        'Cannot compute join of an abstract type-and-effect',
       ),
     );
   }
@@ -798,10 +830,10 @@ export const scale = (ev: Evidence, factor: number): Evidence => {
   const [left, right] = ev;
 
   return [
-    isKinded(left, TypeEffectKind.RecursiveVar)
+    isKinded(left, TypeEffectKind.TypeVar)
       ? left
       : TypeEff(left.type, SenvUtils.scale(left.effect, factor)),
-    isKinded(right, TypeEffectKind.RecursiveVar)
+    isKinded(right, TypeEffectKind.TypeVar)
       ? right
       : TypeEff(right.type, SenvUtils.scale(right.effect, factor)),
   ];
@@ -815,6 +847,17 @@ export const subst = (ev: Evidence, name: string, senv: Senv): Evidence => {
   return [
     TypeEffUtils.subst(ev[0], name, senv),
     TypeEffUtils.subst(ev[1], name, senv),
+  ];
+};
+
+export const substTypevar = (
+  ev: Evidence,
+  name: string,
+  teff: TypeEffect,
+): Evidence => {
+  return [
+    TypeEffUtils.substTypevar(name, teff)(ev[0]),
+    TypeEffUtils.substTypevar(name, teff)(ev[1]),
   ];
 };
 

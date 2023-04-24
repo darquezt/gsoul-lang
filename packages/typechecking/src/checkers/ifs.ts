@@ -13,7 +13,7 @@ const checkIfConditionType =
   (token: Token) =>
   (
     conditionTC: TypeCheckingResult,
-  ): Result<TypeCheckingResult<Bool>, TypeCheckingError> => {
+  ): Result<TypeCheckingResult<TypeEff<Bool>>, TypeCheckingError> => {
     if (!typeIsKinded(conditionTC.typeEff, TypeKind.Bool)) {
       return Result.err(
         new TypeCheckingTypeError({
@@ -23,7 +23,7 @@ const checkIfConditionType =
       );
     }
 
-    return Result.ok(conditionTC as TypeCheckingResult<Bool>);
+    return Result.ok(conditionTC as TypeCheckingResult<TypeEff<Bool>>);
   };
 
 export const ifExpr: TypeCheckingRule<If> = (expr, ctx) => {

@@ -28,7 +28,7 @@ const checkProjCalleeType =
   (token: Token) =>
   (
     pairTC: TypeCheckingResult,
-  ): Result<TypeCheckingResult<AProduct>, TypeCheckingError> => {
+  ): Result<TypeCheckingResult<TypeEff<AProduct>>, TypeCheckingError> => {
     if (!typeIsKinded(pairTC.typeEff, TypeKind.AProduct)) {
       return Result.err(
         new TypeCheckingTypeError({
@@ -38,7 +38,7 @@ const checkProjCalleeType =
       );
     }
 
-    return Result.ok(pairTC as TypeCheckingResult<AProduct>);
+    return Result.ok(pairTC as TypeCheckingResult<TypeEff<AProduct>>);
   };
 
 export const projFst: TypeCheckingRule<ProjFst> = (expr, ctx) => {

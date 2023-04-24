@@ -19,9 +19,10 @@ import {
 } from '../errors';
 import * as past from '@gsoul-lang/parsing/lib/ast';
 import { ElaborationContext } from '../types';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 
 const checkReturnSubtyping =
-  (colon?: Token, returnType?: TypeEff) =>
+  (colon?: Token, returnType?: TypeEffect) =>
   (expression: Expression): Result<Expression, ElaborationError> => {
     if (!returnType || !colon) {
       return Result.ok(expression);
@@ -49,7 +50,7 @@ const checkReturnSubtyping =
 
 export const fun = (
   expr: past.Fun,
-  [tenv, rset]: ElaborationContext,
+  [tenv, rset, ...rest]: ElaborationContext,
 ): Result<Ascription, ElaborationError> => {
   const extensions = expr.binders.map(
     (binder) => [binder.name.lexeme, binder.type] as [string, TypeEff],
@@ -58,6 +59,7 @@ export const fun = (
   const bodyElaboration = expression(expr.body, [
     TypeEnvUtils.extendAll(tenv, ...extensions),
     rset,
+    ...rest,
   ]).chain(checkReturnSubtyping(expr.colon, expr.returnType));
 
   return bodyElaboration.map((body) => {

@@ -1,6 +1,6 @@
 import { Identifier, Senv } from './Senv';
 import * as SenvUtils from './Senv';
-import { Type, Arrow, ForallT, AProduct, RecType, Sum } from './Type';
+import { Type, Arrow, ForallT, PolyT, AProduct, RecType, Sum } from './Type';
 import * as TypeUtils from './Type';
 import { factoryOf, KindedFactory } from './ADT';
 import { identity, zip } from 'ramda';
@@ -8,6 +8,7 @@ import { identity, zip } from 'ramda';
 export enum TypeEffectKind {
   TypeEff = 'TypeEff',
   RecursiveVar = 'RecursiveVar',
+  TypeVar = 'TypeVar',
 }
 
 export type TypeEff<T extends Type = Type, E extends Senv = Senv> = {
@@ -24,64 +25,32 @@ export const TypeEff = <T extends Type = Type, E extends Senv = Senv>(
   effect,
 });
 
-export type RecursiveVar = {
-  kind: TypeEffectKind.RecursiveVar;
+export type TypeVar = {
+  kind: TypeEffectKind.TypeVar;
   name: string;
 };
-export const RecursiveVar: KindedFactory<RecursiveVar> = factoryOf(
-  TypeEffectKind.RecursiveVar,
+export const TypeVar: KindedFactory<TypeVar> = factoryOf(
+  TypeEffectKind.TypeVar,
 );
 
 export type TypeEffect<T extends Type = Type, E extends Senv = Senv> =
   | TypeEff<T, E>
-  | RecursiveVar;
+  | TypeVar;
 
 type MapFuns<R> = {
   typeEff: (typeEff: TypeEff) => R;
-  recVar: (typeEff: RecursiveVar) => R;
+  typeVar: (typeEff: TypeVar) => R;
 };
 const match =
   <R>(funs: MapFuns<R>) =>
   (teff: TypeEffect) => {
     switch (teff.kind) {
-      case TypeEffectKind.RecursiveVar:
-        return funs.recVar(teff);
       case TypeEffectKind.TypeEff:
         return funs.typeEff(teff);
+      case TypeEffectKind.TypeVar:
+        return funs.typeVar(teff);
     }
   };
-
-// export const meet = (
-//   teff1: TypeEffect,
-//   teff2: TypeEffect,
-// ): Result<TypeEffect, UndefinedMeetError> => {
-//   if (
-//     isKinded(teff1, TypeEffectKind.RecursiveVar) &&
-//     isKinded(teff2, TypeEffectKind.RecursiveVar)
-//   ) {
-//     if (teff1.name !== teff2.name) {
-//       return Result.err(new UndefinedMeetError());
-//     }
-
-//     return Result.ok(teff1);
-//   }
-
-//   if (
-//     isKinded(teff1, TypeEffectKind.TypeEff) &&
-//     isKinded(teff2, TypeEffectKind.TypeEff)
-//   ) {
-//     const typeMeet = TypeUtils.meet(teff1.type, teff2.type);
-//     const senvMeet = SenvUtils.meet(teff1.effect, teff2.effect);
-
-//     return Result.all([typeMeet, senvMeet]).map(([type, senv]) =>
-//       TypeEff(type, senv),
-//     );
-//   }
-
-//   return Result.err(
-//     new UndefinedMeetError('Uncompatible type-and-effect constructors'),
-//   );
-// };
 
 export const subst = <TE extends TypeEffect>(
   typeEff: TE,
@@ -89,7 +58,7 @@ export const subst = <TE extends TypeEffect>(
   effect: Senv,
 ): TypeEffect & { kind: TE['kind'] } => {
   return match<TypeEffect & { kind: TE['kind'] }>({
-    recVar: identity,
+    typeVar: identity,
     typeEff: (teff) =>
       TypeEff(
         TypeUtils.subst(teff.type, name, effect),
@@ -103,7 +72,7 @@ export const deleteResources = <TE extends TypeEffect>(
   resources: Identifier[],
 ): TypeEffect & { kind: TE['kind'] } => {
   return match<TypeEffect & { kind: TE['kind'] }>({
-    recVar: identity,
+    typeVar: identity,
     typeEff: (teff) =>
       TypeEff(
         TypeUtils.deleteResources(teff.type, resources),
@@ -112,25 +81,25 @@ export const deleteResources = <TE extends TypeEffect>(
   })(teff);
 };
 
-export const substRecVar = (
+export const substTypevar = (
   name: Identifier,
-  substitution: TypeEff,
+  substitution: TypeEffect,
 ): ((teff: TypeEffect) => TypeEffect) =>
   match<TypeEffect>({
-    recVar: (teff) => (teff.name === name ? substitution : teff),
+    typeVar: (teff) => (teff.name === name ? substitution : teff),
     typeEff: (teff) =>
       TypeEff(
-        TypeUtils.substRecVar(name, substitution)(teff.type),
+        TypeUtils.substTypevar(name, substitution)(teff.type),
         teff.effect,
       ),
   });
 
 export const format = match<string>({
-  recVar: (teff) => teff.name,
+  typeVar: (teff) => teff.name,
   typeEff: (teff) => {
     return SenvUtils.isEmpty(teff.effect)
       ? TypeUtils.format(teff.type)
-      : `${TypeUtils.format(teff.type)}@[${SenvUtils.format(teff.effect)}]`;
+      : `${TypeUtils.format(teff.type)}![${SenvUtils.format(teff.effect)}]`;
   },
 });
 
@@ -181,6 +150,34 @@ export const ForallsUtils = {
     );
 
     return result;
+  },
+};
+
+/**
+ * Utilities for working with forall type-and-effects
+ */
+export const PolysUtils = {
+  tcod(teff: TypeEff<PolyT, Senv>): TypeEff {
+    const { codomain } = teff.type;
+
+    return TypeEff(
+      (codomain as TypeEff).type,
+      SenvUtils.add((codomain as TypeEff).effect, teff.effect),
+    );
+  },
+  instance(teff: TypeEff<PolyT, Senv>, args: TypeEffect[]): TypeEff {
+    const { typeVars } = teff.type;
+
+    const instantiations = zip(typeVars, args);
+
+    const payedCodomain = PolysUtils.tcod(teff);
+
+    const result = instantiations.reduce(
+      (acc, [svar, arg]) => substTypevar(svar, arg)(acc),
+      payedCodomain,
+    );
+
+    return result as TypeEff;
   },
 };
 
@@ -239,9 +236,9 @@ export const RecursiveUtils = {
 
     const substitution = TypeEff(teff.type, Senv());
 
-    if (body.kind === TypeEffectKind.RecursiveVar) {
+    if (body.kind !== TypeEffectKind.TypeEff) {
       throw new Error(
-        'PANIC: body of a recursive type should not be a recursive var itself',
+        'PANIC: body of a recursive type should be a type-and-effect tuple',
       );
     }
 

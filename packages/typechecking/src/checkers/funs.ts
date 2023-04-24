@@ -6,6 +6,7 @@ import {
   TypeEnvUtils,
 } from '@gsoul-lang/core/utils';
 import { Arrow, typeIsKinded, TypeKind } from '@gsoul-lang/core/utils/Type';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { Call, Fun } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import { expression } from '../checker';
@@ -18,7 +19,7 @@ import {
 import { TypeCheckingResult, TypeCheckingRule } from '../utils/types';
 
 const checkReturnSubtyping =
-  (colon?: Token, returnType?: TypeEff) =>
+  (colon?: Token, returnType?: TypeEffect) =>
   (
     exprTC: TypeCheckingResult,
   ): Result<TypeCheckingResult, TypeCheckingError> => {
@@ -38,7 +39,7 @@ const checkReturnSubtyping =
     return Result.ok(exprTC);
   };
 
-export const fun: TypeCheckingRule<Fun> = (expr, [tenv, rset]) => {
+export const fun: TypeCheckingRule<Fun> = (expr, [tenv, rset, ...rest]) => {
   const { binders, body } = expr;
 
   const extensions = binders.map(
@@ -48,6 +49,7 @@ export const fun: TypeCheckingRule<Fun> = (expr, [tenv, rset]) => {
   const bodyTC = expression(body, [
     TypeEnvUtils.extendAll(tenv, ...extensions),
     rset,
+    ...rest,
   ]).chain(checkReturnSubtyping(expr.colon, expr.returnType));
 
   return bodyTC.map((bodyTC) => ({
@@ -66,7 +68,7 @@ const checkApplicationCalleeType =
   (paren: Token) =>
   (
     calleeTC: TypeCheckingResult,
-  ): Result<TypeCheckingResult<Arrow>, TypeCheckingError> => {
+  ): Result<TypeCheckingResult<TypeEff<Arrow>>, TypeCheckingError> => {
     if (!typeIsKinded(calleeTC.typeEff, TypeKind.Arrow)) {
       return Result.err(
         new TypeCheckingTypeError({
@@ -76,13 +78,13 @@ const checkApplicationCalleeType =
       );
     }
 
-    return Result.ok(calleeTC as TypeCheckingResult<Arrow>);
+    return Result.ok(calleeTC as TypeCheckingResult<TypeEff<Arrow>>);
   };
 
 const checkCalleeNumberArgs =
   (argsLength: number, paren: Token) =>
   (
-    calleeTC: TypeCheckingResult<Arrow>,
+    calleeTC: TypeCheckingResult<TypeEff<Arrow>>,
   ): Result<TypeCheckingResult, TypeCheckingError> => {
     if (calleeTC.typeEff.type.domain.length !== argsLength) {
       return Result.err(
@@ -99,10 +101,10 @@ const checkCalleeNumberArgs =
 const checkCallSubtyping =
   (paren: Token) =>
   ([calleeTC, argsTC]: [
-    TypeCheckingResult<Arrow>,
+    TypeCheckingResult<TypeEff<Arrow>>,
     TypeCheckingResult[],
   ]): Result<
-    [TypeCheckingResult<Arrow>, TypeCheckingResult[]],
+    [TypeCheckingResult<TypeEff<Arrow>>, TypeCheckingResult[]],
     TypeCheckingError
   > => {
     const calleeTypeEff = calleeTC.typeEff;

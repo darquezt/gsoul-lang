@@ -180,8 +180,12 @@ export const reduceFunCall = (
     );
   }
 
-  const codomain = (ascrFun.typeEff.type as Arrow).codomain as TypeEff;
-  const bodyEffect = SenvUtils.add(ascrFun.typeEff.effect, codomain.effect);
+  // We can safely cast here because we know that the type of the function is an arrow
+  // Otherwise, the evidence would not be valid
+  const ascrFunTeff = ascrFun.typeEff as TypeEff<Arrow>;
+
+  const codomain = ascrFunTeff.type.codomain as TypeEff;
+  const bodyEffect = SenvUtils.add(ascrFunTeff.effect, codomain.effect);
 
   const body = Ascription({
     expression: closure.fun.body,

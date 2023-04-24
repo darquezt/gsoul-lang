@@ -19,26 +19,26 @@ import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterTypeError } from '../errors';
 import { zip } from 'ramda';
 
-export enum PolyKontKind {
+export enum ForallKontKind {
   ForallKont = 'ForallKont',
   ForallSubstKont = 'ForallSubstKont',
 }
 
 export type ForallKont = {
-  kind: PolyKontKind.ForallKont;
+  kind: ForallKontKind.ForallKont;
   state: State<{ args: Senv[] }>;
   bracket: Token;
 };
 export const ForallKont: KindedFactory<ForallKont> = factoryOf(
-  PolyKontKind.ForallKont,
+  ForallKontKind.ForallKont,
 );
 
 export type ForallSubstKont = {
-  kind: PolyKontKind.ForallSubstKont;
+  kind: ForallKontKind.ForallSubstKont;
   state: State<{ variables: string[]; args: Senv[] }>;
 };
 export const ForallSubstKont: KindedFactory<ForallSubstKont> = factoryOf(
-  PolyKontKind.ForallSubstKont,
+  ForallKontKind.ForallSubstKont,
 );
 
 export const reduceForallCallee = (

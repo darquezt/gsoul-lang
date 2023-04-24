@@ -7,14 +7,25 @@ import { Binary, NonLinearBinary } from '../ast';
 import { expression } from '../elaboration';
 import { ElaborationError, ElaborationTypeError } from '../errors';
 import { ElaborationContext } from '../types';
+import { checkTypeEffConcreteness } from '../utils/auxiliaryCheckers';
 
 export const binary = (
   expr: past.Binary,
   ctx: ElaborationContext,
 ): Result<Binary, ElaborationError> => {
-  const leftElaboration = expression(expr.left, ctx);
+  const leftElaboration = expression(expr.left, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Left operand may not have a correct type',
+    ),
+  );
 
-  const rightElaboration = expression(expr.right, ctx);
+  const rightElaboration = expression(expr.right, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Right operand may not have a correct type',
+    ),
+  );
 
   return Result.all([leftElaboration, rightElaboration]).chain(
     ([left, right]) => {
@@ -53,9 +64,19 @@ export const nonLinearBinary = (
   expr: past.NonLinearBinary,
   ctx: ElaborationContext,
 ): Result<NonLinearBinary, ElaborationError> => {
-  const leftElaboration = expression(expr.left, ctx);
+  const leftElaboration = expression(expr.left, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Left operand may not have a correct type',
+    ),
+  );
 
-  const rightElaboration = expression(expr.right, ctx);
+  const rightElaboration = expression(expr.right, ctx).chain(
+    checkTypeEffConcreteness(
+      expr.operator,
+      'Right operand may not have a correct type',
+    ),
+  );
 
   return Result.all([leftElaboration, rightElaboration]).chain(
     ([left, right]) => {

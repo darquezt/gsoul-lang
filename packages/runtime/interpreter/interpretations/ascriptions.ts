@@ -1,10 +1,10 @@
-import { TypeEff } from '@gsoul-lang/core/utils';
 import { factoryOf, KindedFactory } from '@gsoul-lang/core/utils/ADT';
 import { Ascription, SimpleValue, Value } from '../../elaboration/ast';
 import { Evidence, EvidenceUtils, Store } from '../../utils';
 import { Result } from '@badrap/result';
 import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError, InterpreterEvidenceError } from '../errors';
+import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 
 export enum AscrKontKind {
   AscrKont = 'AscrKont',
@@ -12,7 +12,7 @@ export enum AscrKontKind {
 
 export type AscrKont = {
   kind: AscrKontKind.AscrKont;
-  state: State<{ typeEff: TypeEff; evidence: Evidence }>;
+  state: State<{ typeEff: TypeEffect; evidence: Evidence }>;
 };
 export const AscrKont: KindedFactory<AscrKont> = factoryOf(
   AscrKontKind.AscrKont,
