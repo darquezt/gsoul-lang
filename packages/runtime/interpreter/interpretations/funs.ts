@@ -76,12 +76,31 @@ export const reduceFunArg = (
   }
 
   if (kont.state.expressions.length === 0) {
-    return Result.err(
-      new InterpreterTypeError({
-        reason: 'Not enough arguments',
-        operator: kont.paren,
-      }),
-    );
+    const bodyEviRes = EvidenceUtils.icod(term.evidence);
+
+    if (!bodyEviRes.isOk) {
+      return Result.err(
+        new InterpreterTypeError({
+          reason: bodyEviRes.error.message,
+          operator: kont.paren,
+        }),
+      );
+    }
+
+    // We can safely cast here because we know that the type of the function is an arrow
+    // Otherwise, the evidence would not be valid
+    const termTeff = term.typeEff as TypeEff<Arrow>;
+
+    const codomain = termTeff.type.codomain as TypeEff;
+    const bodyEffect = SenvUtils.add(termTeff.effect, codomain.effect);
+
+    const body = Ascription({
+      expression: term.expression.fun.body,
+      evidence: bodyEviRes.value,
+      typeEff: TypeEff(codomain.type, bodyEffect),
+    });
+
+    return OkState({ term: body }, term.expression.store, kont.state.kont);
   }
 
   const [nextArg, ...nextArgs] = kont.state.expressions;
