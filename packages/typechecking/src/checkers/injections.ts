@@ -13,16 +13,17 @@ import WellFormed, {
 import { Sum, typeIsKinded, TypeKind } from '@gsoul-lang/core/utils/Type';
 import { Inj, Case } from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
+import { all } from 'ramda';
 import { expression } from '../checker';
 import { TypeCheckingError, TypeCheckingTypeError } from '../utils/errors';
 import { TypeCheckingRule, TypeCheckingResult } from '../utils/types';
 
 const checkInjCalleeType =
-  (ctx: WellFormednessContext, type: Type, token: Token) =>
+  (ctx: WellFormednessContext, types: Type[], token: Token) =>
   (
     exprTC: TypeCheckingResult,
   ): Result<TypeCheckingResult, TypeCheckingError> => {
-    if (!WellFormed.Type(ctx, type)) {
+    if (!all((type) => WellFormed.Type(ctx, type), types)) {
       return Result.err(
         new TypeCheckingTypeError({
           reason: 'Type of the injection is not valid',
@@ -36,19 +37,28 @@ const checkInjCalleeType =
 
 export const inj: TypeCheckingRule<Inj> = (expr, ctx) => {
   const exprTC = expression(expr.expression, ctx).chain(
-    checkInjCalleeType([ctx[1]], expr.type, expr.injToken),
+    checkInjCalleeType([ctx[1]], expr.types, expr.injToken),
   );
 
-  return exprTC.map((exprTC) => ({
-    typeEff: TypeEff(
-      Sum({
-        left: expr.index === 0 ? exprTC.typeEff : TypeEff(expr.type, Senv()),
-        right: expr.index === 1 ? exprTC.typeEff : TypeEff(expr.type, Senv()),
-      }),
-      Senv(),
-    ),
-    typings: exprTC.typings,
-  }));
+  return exprTC.map((exprTC) => {
+    const typeEffects = expr.types.map((type) => TypeEff(type, Senv()));
+
+    const allTypeEffects = [
+      ...typeEffects.slice(0, expr.index),
+      exprTC.typeEff,
+      ...typeEffects.slice(expr.index + 1),
+    ];
+
+    return {
+      typeEff: TypeEff(
+        Sum({
+          typeEffects: allTypeEffects,
+        }),
+        Senv(),
+      ),
+      typings: exprTC.typings,
+    };
+  });
 };
 
 const checkCaseCalleeType =
@@ -75,32 +85,28 @@ export const caseExpr: TypeCheckingRule<Case> = (expr, ctx) => {
 
   const [tenv, rset, ...rest] = ctx;
 
-  const leftTC = sumTC.chain((sumTC) =>
-    expression(expr.left, [
-      TypeEnvUtils.extend(
-        tenv,
-        expr.leftIdentifier.lexeme,
-        TypeEffUtils.SumUtils.left(sumTC.typeEff),
+  const branchesTC = Result.all(
+    expr.branches.map((branch, index) =>
+      sumTC.chain((sumTC) =>
+        expression(branch.body, [
+          TypeEnvUtils.extend(
+            tenv,
+            branch.identifier.lexeme,
+            TypeEffUtils.SumUtils.projection(index, sumTC.typeEff),
+          ),
+          rset,
+          ...rest,
+        ]),
       ),
-      rset,
-      ...rest,
-    ]),
-  );
+    ),
+  ) as unknown as Result<TypeCheckingResult[], TypeCheckingError>;
 
-  const rightTC = sumTC.chain((sumTC) =>
-    expression(expr.right, [
-      TypeEnvUtils.extend(
-        tenv,
-        expr.rightIdentifier.lexeme,
-        TypeEffUtils.SumUtils.right(sumTC.typeEff),
-      ),
-      rset,
-      ...rest,
-    ]),
-  );
+  return Result.all([sumTC, branchesTC]).chain(([sum, branches]) => {
+    const [first, second, ...restBranches] = branches;
 
-  return Result.all([sumTC, leftTC, rightTC]).chain(([sum, left, right]) => {
-    const join = SJoin.TypeEffect(left.typeEff, right.typeEff);
+    const join = restBranches.reduce((acc, branch) => {
+      return acc.chain((typeEff) => SJoin.TypeEffect(typeEff, branch.typeEff));
+    }, SJoin.TypeEffect(first.typeEff, second.typeEff));
 
     if (join.isErr) {
       return Result.err(
@@ -117,7 +123,7 @@ export const caseExpr: TypeCheckingRule<Case> = (expr, ctx) => {
         SJoin.Senv,
         sum.typeEff.effect,
       ),
-      typings: sum.typings.concat(left.typings, right.typings),
+      typings: sum.typings.concat(...branches.map((branch) => branch.typings)),
     });
   });
 };

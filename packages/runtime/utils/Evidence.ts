@@ -175,13 +175,27 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
   }
 
   if (isKinded(t1, TypeKind.Sum) && isKinded(t2, TypeKind.Sum)) {
-    const leftInterior = interior(t1.left, t2.left);
-    const rightInterior = interior(t1.right, t2.right);
+    if (t1.typeEffects.length !== t2.typeEffects.length) {
+      return Result.err(
+        new EvidenceInteriorError('Wrong number of product components', t1, t2),
+      );
+    }
 
-    return Result.all([leftInterior, rightInterior]).map(([left, right]) => [
-      Sum({ left: left[0], right: right[0] }),
-      Sum({ left: left[1], right: right[1] }),
-    ]);
+    const componentInteriors = zip(t1.typeEffects, t2.typeEffects).map(
+      ([teff1, teff2]) => interior(teff1, teff2),
+    );
+
+    return (
+      Result.all(componentInteriors) as Result<Evi<TypeEff>[], EvidenceError>
+    ).map((interiors) => {
+      const leftInteriors = interiors.map((evi) => evi[0]);
+      const rightInteriors = interiors.map((evi) => evi[1]);
+
+      return [
+        Sum({ typeEffects: leftInteriors }),
+        Sum({ typeEffects: rightInteriors }),
+      ];
+    });
   }
 
   if (isKinded(t1, TypeKind.RecType) && isKinded(t2, TypeKind.RecType)) {
@@ -631,7 +645,10 @@ export const iproj = (
   ]);
 };
 
-export const ileft = (ev: Evidence): Result<Evidence, EvidenceError> => {
+export const isumproj = (
+  index: number,
+  ev: Evidence,
+): Result<Evidence, EvidenceError> => {
   const [left, right] = ev;
 
   if (
@@ -639,47 +656,23 @@ export const ileft = (ev: Evidence): Result<Evidence, EvidenceError> => {
     isKinded(right, TypeEffectKind.TypeVar)
   ) {
     return Result.err(
-      new EvidenceTypeError('Cannot compute (i)left of a recusive variable'),
+      new EvidenceTypeError(
+        'Cannot compute (i)codomain of a recusive variable',
+      ),
     );
   }
 
   if (!typeIsKinded(left, TypeKind.Sum) || !typeIsKinded(right, TypeKind.Sum)) {
     return Result.err(
       new EvidenceTypeError(
-        'Operator ifirst is not defined for types other than products',
+        'Operator iproj is not defined for types other than products',
       ),
     );
   }
 
   return Result.ok([
-    TypeEffUtils.SumUtils.left(left),
-    TypeEffUtils.SumUtils.left(right),
-  ]);
-};
-
-export const iright = (ev: Evidence): Result<Evidence, EvidenceError> => {
-  const [left, right] = ev;
-
-  if (
-    isKinded(left, TypeEffectKind.TypeVar) ||
-    isKinded(right, TypeEffectKind.TypeVar)
-  ) {
-    return Result.err(
-      new EvidenceTypeError('Cannot compute (i)left of a recusive variable'),
-    );
-  }
-
-  if (!typeIsKinded(left, TypeKind.Sum) || !typeIsKinded(right, TypeKind.Sum)) {
-    return Result.err(
-      new EvidenceTypeError(
-        'Operator ifirst is not defined for types other than products',
-      ),
-    );
-  }
-
-  return Result.ok([
-    TypeEffUtils.SumUtils.right(left),
-    TypeEffUtils.SumUtils.right(right),
+    TypeEffUtils.SumUtils.projection(index, left),
+    TypeEffUtils.SumUtils.projection(index, right),
   ]);
 };
 

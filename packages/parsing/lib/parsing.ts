@@ -1,4 +1,11 @@
-import { Sens, Senv, SenvUtils, Type, TypeEff } from '@gsoul-lang/core/utils';
+import {
+  Sens,
+  Senv,
+  SenvUtils,
+  Type,
+  TypeEff,
+  TypeEffUtils,
+} from '@gsoul-lang/core/utils';
 import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
@@ -47,6 +54,12 @@ import {
 } from './ast';
 import { Token, TokenType } from './lexing';
 import { errorMessage } from './utils/errors';
+import {
+  createDataConstructorFunction,
+  createDataConstructorProduct,
+  createDataconstructorSum,
+  createMatchBranchBody,
+} from './utils/sugar/datatypes';
 
 export type Failure = { token: Token; reason?: string };
 export const Failure = (token: Token, reason?: string): Failure => ({
@@ -231,6 +244,11 @@ class TypeEnvironment {
   }
 }
 
+type DataTypeConstructor = {
+  name: Token;
+  args: TypeEffect[];
+};
+
 class Parser {
   eof: Token;
   program: Statement[] = [];
@@ -252,14 +270,14 @@ class Parser {
       const stmt = this.statement();
 
       if (stmt) {
-        this.program.push(stmt);
+        this.program.push(...stmt);
       }
     }
 
     return Result(this.program, this.failures);
   }
 
-  private statement(): Statement | null {
+  private statement(): Statement[] | null {
     return this.synchronized(() => {
       if (this.check(TokenType.TYPE)) {
         /**
@@ -268,12 +286,19 @@ class Parser {
 
         return this.parseTypeDecl();
       }
+      if (this.check(TokenType.DATA)) {
+        /**
+         * @case data declaration
+         */
+
+        return this.parseDataDecl();
+      }
       if (this.check(TokenType.LET)) {
         /**
          * @case let declaration
          */
 
-        return this.parseLetStmt();
+        return [this.parseLetStmt()];
       }
 
       if (this.checkMany(TokenType.PRINT, TokenType.PRINTEV)) {
@@ -281,15 +306,135 @@ class Parser {
          * @case print statement
          */
 
-        return this.parsePrintStmt();
+        return [this.parsePrintStmt()];
       }
 
       /**
        * @case expression statement
        */
 
-      return this.parseExpressionStmt();
+      return [this.parseExpressionStmt()];
     });
+  }
+
+  private parseDataDecl(): Statement[] {
+    this.advance();
+
+    const name = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({ expected: 'data type name' }),
+    );
+
+    // No polymorphic data types for now
+    this.consume(
+      TokenType.EQUAL,
+      errorMessage({ expected: '=', after: 'data declaration' }),
+    );
+
+    const constructors = [this.parseDataConstructor()];
+
+    while (this.check(TokenType.PIPE) && !this.isAtEnd()) {
+      this.advance();
+
+      constructors.push(this.parseDataConstructor());
+    }
+
+    if (constructors.length < 2) {
+      throw this.makeSyntaxError(
+        name,
+        errorMessage({ expected: 'at least 2 constructors' }),
+      );
+    }
+
+    this.consume(
+      TokenType.SEMICOLON,
+      errorMessage({ expected: ';', end: 'data type declaration' }),
+    );
+
+    return this.desugarDataDecl(name, constructors);
+  }
+
+  private desugarDataDecl(
+    name: Token,
+    constructors: DataTypeConstructor[],
+  ): Statement[] {
+    // Define type alias
+
+    const products = constructors.map((c) =>
+      createDataConstructorProduct(name, c),
+    );
+
+    const sum = createDataconstructorSum(products);
+
+    const recType = RecType({
+      variable: name.lexeme,
+      body: sum,
+    });
+
+    const aliasedType = Object.assign({}, recType, { alias: name.lexeme });
+
+    this.typeEnvironment.define(name.lexeme, aliasedType);
+
+    // Define data constructors
+
+    const unfoldedConstructors = constructors.map((c) => ({
+      name: c.name,
+      args: c.args.map((a) =>
+        TypeEffUtils.substTypevar(name.lexeme, TypeEff(aliasedType, Senv()))(a),
+      ),
+    }));
+
+    const unfoldedProducts = products.map(
+      (p) =>
+        TypeEffUtils.substTypevar(
+          name.lexeme,
+          TypeEff(aliasedType, Senv()),
+        )(p) as TypeEff,
+    );
+
+    const constructorFunctions = unfoldedConstructors.map((c, index) =>
+      createDataConstructorFunction(
+        name,
+        aliasedType,
+        c,
+        unfoldedProducts,
+        index,
+      ),
+    );
+
+    return constructorFunctions;
+  }
+
+  private parseDataConstructor(): DataTypeConstructor {
+    const name = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({ expected: 'data constructor name' }),
+    );
+
+    const args: TypeEffect[] = [];
+
+    if (!this.check(TokenType.LEFT_PAREN)) {
+      return { name, args };
+    }
+
+    this.advance();
+
+    while (!this.check(TokenType.RIGHT_PAREN) && !this.isAtEnd()) {
+      const typeResult = normalizeTypeResult(this.type(0));
+
+      args.push(typeResult);
+
+      if (this.check(TokenType.COMMA)) {
+        this.advance();
+      }
+    }
+
+    this.consume(
+      TokenType.RIGHT_PAREN,
+      errorMessage({ expected: ')', end: 'data constructor' }),
+    );
+
+    return { name, args };
   }
 
   private parseTypeDecl(): null {
@@ -467,7 +612,7 @@ class Parser {
        * @case unfold
        */
       left = this.parseUnfoldExpr();
-    } else if (this.check(TokenType.INL) || this.check(TokenType.INR)) {
+    } else if (this.check(TokenType.INJ)) {
       /**
        * @case inl | inr
        */
@@ -477,6 +622,11 @@ class Parser {
        * @case case
        */
       left = this.parseCaseExpr();
+    } else if (this.check(TokenType.MATCH)) {
+      /**
+       * @case match
+       */
+      left = this.parseMatchExpr();
     } else if (this.check(TokenType.LEFT_BRACE)) {
       /**
        * @case block
@@ -839,7 +989,7 @@ class Parser {
         const stmt = this.statement();
 
         if (stmt) {
-          statements.push(stmt);
+          statements.push(...stmt);
         }
       }
 
@@ -900,12 +1050,30 @@ class Parser {
     const injToken = this.advance();
 
     this.consume(
+      TokenType.HASH,
+      errorMessage({
+        expected: '#',
+        after: `${injToken.lexeme} keyword`,
+      }),
+    );
+
+    const index = this.consume(
+      TokenType.NUMBERLIT,
+      errorMessage({
+        expected: 'an index',
+        after: `${injToken.lexeme} keyword`,
+      }),
+    );
+
+    this.consume(
       TokenType.LESS,
       errorMessage({
         expected: '<',
         after: `${injToken.lexeme} keyword`,
       }),
     );
+
+    const types: Type[] = [];
 
     const typeResult = this.type(0);
 
@@ -916,7 +1084,22 @@ class Parser {
       );
     }
 
-    const type = typeResult.result;
+    types.push(typeResult.result);
+
+    while (this.check(TokenType.COMMA) && !this.isAtEnd()) {
+      this.advance();
+
+      const typeResult = this.type(0);
+
+      if (typeResult.kind !== TypeParsingResultKind.Type) {
+        throw this.makeSyntaxError(
+          injToken,
+          'Injected type cannot have an effect',
+        );
+      }
+
+      types.push(typeResult.result);
+    }
 
     this.consume(
       TokenType.GREATER,
@@ -945,8 +1128,8 @@ class Parser {
     );
 
     return Inj({
-      index: injToken.type === TokenType.INL ? 0 : 1,
-      type,
+      index: index.literal as number,
+      types,
       expression,
       injToken,
     });
@@ -955,23 +1138,7 @@ class Parser {
   private parseCaseExpr(): Case {
     const caseToken = this.advance();
 
-    this.consume(
-      TokenType.LEFT_PAREN,
-      errorMessage({
-        expected: '(',
-        after: 'case keyword',
-      }),
-    );
-
     const sum = this.expression(0);
-
-    this.consume(
-      TokenType.RIGHT_PAREN,
-      errorMessage({
-        expected: ')',
-        after: 'sum expression',
-      }),
-    );
 
     this.consume(
       TokenType.OF,
@@ -985,109 +1152,15 @@ class Parser {
       TokenType.LEFT_BRACE,
       errorMessage({
         expected: '{',
-        before: 'first branch',
+        before: 'case branches',
       }),
     );
 
-    this.consume(
-      TokenType.INL,
-      errorMessage({
-        expected: 'inl',
-        beginning: 'first branch',
-      }),
-    );
+    const branches = [this.parseCaseBranch()];
 
-    this.consume(
-      TokenType.LEFT_PAREN,
-      errorMessage({
-        expected: '(',
-        after: 'inl keyword',
-      }),
-    );
-
-    const leftIdentifier = this.consume(
-      TokenType.IDENTIFIER,
-      errorMessage({
-        expected: 'an identifier',
-        after: 'inl keyword',
-      }),
-    );
-
-    this.consume(
-      TokenType.RIGHT_PAREN,
-      errorMessage({
-        expected: ')',
-        after: 'left identifier',
-      }),
-    );
-
-    this.consume(
-      TokenType.FAT_ARROW,
-      errorMessage({
-        expected: '=>',
-        after: 'left identifier',
-      }),
-    );
-
-    const leftExpression = this.expression(0);
-
-    this.consume(
-      TokenType.RIGHT_BRACE,
-      errorMessage({
-        expected: '}',
-        after: 'left branch',
-      }),
-    );
-
-    this.consume(
-      TokenType.LEFT_BRACE,
-      errorMessage({
-        expected: '{',
-        before: 'second branch',
-      }),
-    );
-
-    this.consume(
-      TokenType.INR,
-      errorMessage({
-        expected: 'inr',
-        beginning: 'second branch',
-      }),
-    );
-
-    this.consume(
-      TokenType.LEFT_PAREN,
-      errorMessage({
-        expected: '(',
-        after: 'inr keyword',
-      }),
-    );
-
-    const rightIdentifier = this.consume(
-      TokenType.IDENTIFIER,
-      errorMessage({
-        expected: 'an identifier',
-        after: 'inr keyword',
-      }),
-    );
-
-    this.consume(
-      TokenType.RIGHT_PAREN,
-      errorMessage({
-        expected: ')',
-        after: 'right identifier',
-      }),
-    );
-
-    this.consume(
-      TokenType.FAT_ARROW,
-      errorMessage({
-        expected: '=>',
-        after: 'right identifier',
-      }),
-    );
-
-    const rightExpression = this.expression(0);
+    while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+      branches.push(this.parseCaseBranch());
+    }
 
     this.consume(
       TokenType.RIGHT_BRACE,
@@ -1099,12 +1172,181 @@ class Parser {
 
     return Case({
       sum,
-      leftIdentifier,
-      left: leftExpression,
-      rightIdentifier,
-      right: rightExpression,
+      branches,
       caseToken,
     });
+  }
+
+  private parseCaseBranch(): Case['branches'][number] {
+    const identifier = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({
+        expected: 'an identifier',
+        after: 'case branch',
+      }),
+    );
+
+    this.consume(
+      TokenType.FAT_ARROW,
+      errorMessage({
+        expected: '=>',
+        after: 'identifier',
+      }),
+    );
+
+    const expression = this.expression(0);
+
+    this.consume(
+      TokenType.SEMICOLON,
+      errorMessage({
+        expected: ';',
+        after: 'case branch',
+      }),
+    );
+
+    return {
+      identifier,
+      body: expression,
+    };
+  }
+
+  private parseMatchExpr(): Case {
+    const matchToken = this.advance();
+
+    const fold = this.expression(0);
+
+    this.consume(
+      TokenType.WITH,
+      errorMessage({
+        expected: 'with',
+        after: 'sum expression',
+      }),
+    );
+
+    this.consume(
+      TokenType.LEFT_BRACE,
+      errorMessage({
+        expected: '{',
+        before: 'match branches',
+      }),
+    );
+
+    const branches = [this.parseMatchBranch()];
+
+    while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+      branches.push(this.parseMatchBranch());
+    }
+
+    this.consume(
+      TokenType.RIGHT_BRACE,
+      errorMessage({
+        expected: '}',
+        after: 'right branch',
+      }),
+    );
+
+    return Case({
+      sum: Unfold({
+        expression: fold,
+        unfoldToken: matchToken,
+      }),
+      branches,
+      caseToken: matchToken,
+    });
+  }
+
+  private parseMatchBranch(): Case['branches'][number] {
+    const pattern = this.parseMatchPattern();
+
+    this.consume(
+      TokenType.FAT_ARROW,
+      errorMessage({
+        expected: '=>',
+        after: 'pattern',
+      }),
+    );
+
+    const identifier = new Token(
+      TokenType.IDENTIFIER,
+      `x${pattern.constructorName.lexeme}`,
+      null,
+      pattern.constructorName.line,
+      pattern.constructorName.col,
+    );
+
+    const expression = this.expression(0);
+
+    const body = createMatchBranchBody(
+      expression,
+      identifier,
+      pattern.variables,
+    );
+
+    this.consume(
+      TokenType.SEMICOLON,
+      errorMessage({
+        expected: ';',
+        after: 'match branch',
+      }),
+    );
+
+    return {
+      name: pattern.constructorName,
+      identifier,
+      body,
+    };
+  }
+
+  private parseMatchPattern(): {
+    constructorName: Token;
+    variables: Token[];
+  } {
+    const constructorName = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({
+        expected: 'a constructor name',
+        after: 'match branch',
+      }),
+    );
+
+    const variables: Token[] = [];
+
+    this.consume(
+      TokenType.LEFT_PAREN,
+      errorMessage({
+        expected: '(',
+        after: 'constructor name',
+      }),
+    );
+
+    while (!this.check(TokenType.RIGHT_PAREN) && !this.isAtEnd()) {
+      variables.push(
+        this.consume(
+          TokenType.IDENTIFIER,
+          errorMessage({
+            expected: 'an identifier',
+            after: 'comma',
+          }),
+        ),
+      );
+
+      if (this.check(TokenType.COMMA)) {
+        this.advance();
+      }
+    }
+
+    this.consume(
+      TokenType.RIGHT_PAREN,
+      errorMessage({
+        expected: ')',
+        after: 'pattern',
+      }),
+    );
+
+    return {
+      constructorName,
+      variables,
+    };
   }
 
   private parseUnfoldExpr(): Unfold {
@@ -1449,7 +1691,7 @@ class Parser {
       /**
        * @case atom type
        */
-      const name = this.advance().literal as unknown as string;
+      const name = this.advance().lexeme;
 
       left = typeResult(Atom({ name }));
     } else if (this.check(TokenType.BOOL)) {
@@ -1659,10 +1901,26 @@ class Parser {
         if (op.type === TokenType.PLUS) {
           const right = this.type(infixPower[1]);
 
+          if (
+            left.kind === TypeParsingResultKind.Type &&
+            left.result.kind === TypeKind.Sum
+          ) {
+            left = typeResult(
+              Sum({
+                typeEffects: [
+                  ...left.result.typeEffects,
+                  normalizeTypeResult(right),
+                ],
+              }),
+            );
+          }
+
           left = typeResult(
             Sum({
-              left: normalizeTypeResult(left),
-              right: normalizeTypeResult(right),
+              typeEffects: [
+                normalizeTypeResult(left),
+                normalizeTypeResult(right),
+              ],
             }),
           );
         }

@@ -68,13 +68,16 @@ const typeCheckPolarity = (
   }
 
   if (isKinded(ty1, TypeKind.Sum) && isKinded(ty2, TypeKind.Sum)) {
-    const { left: left1, right: right1 } = ty1;
-    const { left: left2, right: right2 } = ty2;
+    if (ty1.typeEffects.length !== ty2.typeEffects.length) {
+      return false;
+    }
 
-    const leftMeet = typeEffectCheckPolarity(variable, mode, left1, left2);
-    const rightMeet = typeEffectCheckPolarity(variable, mode, right1, right2);
+    const inductiveChecks = zip(ty1.typeEffects, ty2.typeEffects).map(
+      ([tyEff1, tyEff2]) =>
+        typeEffectCheckPolarity(variable, mode, tyEff1, tyEff2),
+    );
 
-    return leftMeet && rightMeet;
+    return !inductiveChecks.includes(false);
   }
 
   if (isKinded(ty1, TypeKind.ForallT) && isKinded(ty2, TypeKind.ForallT)) {

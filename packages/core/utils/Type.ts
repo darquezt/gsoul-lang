@@ -96,8 +96,7 @@ export const AProduct: KindedFactory<AProduct> = factoryOf<AProduct>(
 
 export type Sum = {
   kind: TypeKind.Sum;
-  left: TypeEffect;
-  right: TypeEffect;
+  typeEffects: TypeEffect[];
 };
 export const Sum: KindedFactory<Sum> = factoryOf<Sum>(TypeKind.Sum);
 
@@ -217,8 +216,7 @@ export const subst = (target: Type, name: Identifier, senv: Senv): Type => {
       }),
     sum: (ty) =>
       Sum({
-        left: typeEffFn(ty.left),
-        right: typeEffFn(ty.right),
+        typeEffects: ty.typeEffects.map(typeEffFn),
       }),
   })(target);
 };
@@ -268,8 +266,7 @@ export const deleteResources = (ty: Type, resources: Identifier[]): Type => {
       }),
     sum: (ty) =>
       Sum({
-        left: typeEffFn(ty.left),
-        right: typeEffFn(ty.right),
+        typeEffects: ty.typeEffects.map(typeEffFn),
       }),
   })(ty);
 };
@@ -321,8 +318,7 @@ export const substRecVar = (
       }),
     sum: (ty) =>
       Sum({
-        left: typeEffFn(ty.left),
-        right: typeEffFn(ty.right),
+        typeEffects: ty.typeEffects.map(typeEffFn),
       }),
   });
 };
@@ -376,8 +372,7 @@ export const substTypevar = (
       }),
     sum: (ty) =>
       Sum({
-        left: typeEffFn(ty.left),
-        right: typeEffFn(ty.right),
+        typeEffects: ty.typeEffects.map(typeEffFn),
       }),
   });
 };
@@ -413,8 +408,7 @@ export const format: (ty: Type) => string = (ty) => {
     recursive: (ty) =>
       `rectype ${ty.variable} . ${TypeEffUtils.format(ty.body)}`,
     prod: (ty) => `(${ty.typeEffects.map(TypeEffUtils.format).join(', ')})`,
-    sum: (ty) =>
-      `(${TypeEffUtils.format(ty.left)} + ${TypeEffUtils.format(ty.right)})`,
+    sum: (ty) => `(${ty.typeEffects.map(TypeEffUtils.format).join(' + ')})`,
   })(ty);
 };
 

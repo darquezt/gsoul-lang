@@ -30,11 +30,13 @@ const keywords: Record<string, TokenType> = {
   if: TokenType.IF,
   then: TokenType.THEN,
   else: TokenType.ELSE,
-  inl: TokenType.INL,
-  inr: TokenType.INR,
+  inj: TokenType.INJ,
   case: TokenType.CASE,
   of: TokenType.OF,
+  match: TokenType.MATCH,
+  with: TokenType.WITH,
   type: TokenType.TYPE,
+  data: TokenType.DATA,
 };
 
 /**
@@ -110,8 +112,14 @@ export const scanTokens = (source: string): Token[] => {
       case '@':
         addToken(TokenType.AT);
         break;
+      case '#':
+        addToken(TokenType.HASH);
+        break;
       case '*':
         addToken(TokenType.STAR);
+        break;
+      case '|':
+        addToken(TokenType.PIPE);
         break;
       case '+': {
         addToken(match('+') ? TokenType.PLUS_PLUS : TokenType.PLUS);

@@ -33,9 +33,7 @@ export const UnfoldKont: KindedFactory<UnfoldKont> = factoryOf(
 export type FoldKont = {
   kind: RecursiveKontKind.FoldKont;
   state: State<{
-    foldToken: Token;
-    foldRecType: TypeEff<RecType, Senv>;
-    foldTypeEff: TypeEff;
+    foldMeta: Omit<Fold, 'expression'>;
   }>;
 };
 export const FoldKont: KindedFactory<FoldKont> = factoryOf(
@@ -47,15 +45,15 @@ export const reduceFoldedExpression = (
   store: Store,
   kont: Kont,
 ): Result<StepState, InterpreterError> => {
+  const { expression, ...foldMeta } = term;
+
   return OkState(
-    { term: term.expression },
+    { term: expression },
     store,
     FoldKont({
       state: State(
         {
-          foldToken: term.foldToken,
-          foldRecType: term.recType,
-          foldTypeEff: term.typeEff,
+          foldMeta,
         },
         store,
         kont,
@@ -73,9 +71,7 @@ export const reduceFold = (
     {
       term: Fold({
         expression: term,
-        foldToken: kont.state.foldToken,
-        recType: kont.state.foldRecType,
-        typeEff: kont.state.foldTypeEff,
+        ...kont.state.foldMeta,
       }),
     },
     kont.state.store,

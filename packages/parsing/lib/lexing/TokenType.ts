@@ -51,10 +51,14 @@ enum TokenType {
   NIL = 'NIL',
   BOOL = 'BOOL',
 
-  INL = 'INL',
-  INR = 'INR',
+  //INL = 'INL',
+  //INR = 'INR',
+  INJ = 'INJ',
+  HASH = 'HASH',
   CASE = 'CASE',
   OF = 'OF',
+  MATCH = 'MATCH',
+  WITH = 'WITH',
 
   AND = 'AND',
   CLASS = 'CLASS',
@@ -99,6 +103,8 @@ enum TokenType {
   INVALID = 'INVALID',
 
   TYPE = 'TYPE',
+  DATA = 'DATA',
+  PIPE = 'PIPE',
 
   SENSITIVE = 'SENSITIVE',
 

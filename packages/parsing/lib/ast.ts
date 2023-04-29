@@ -170,6 +170,7 @@ export type Fold = {
   kind: ExprKind.Fold;
   expression: Expression;
   recType: TypeEff<RecType, Senv>;
+  dataTypeAlias?: string;
   foldToken: Token;
 };
 export const Fold = factoryOf<Fold>(ExprKind.Fold);
@@ -192,8 +193,8 @@ export const If = factoryOf<If>(ExprKind.If);
 
 export type Inj = {
   kind: ExprKind.Inj;
-  index: 0 | 1;
-  type: Type;
+  index: number;
+  types: Type[];
   expression: Expression;
   injToken: Token;
 };
@@ -202,10 +203,11 @@ export const Inj = factoryOf<Inj>(ExprKind.Inj);
 export type Case = {
   kind: ExprKind.Case;
   sum: Expression;
-  leftIdentifier: Token;
-  left: Expression;
-  rightIdentifier: Token;
-  right: Expression;
+  branches: Array<{
+    identifier: Token;
+    body: Expression;
+    name?: Token;
+  }>;
   caseToken: Token;
 };
 export const Case = factoryOf<Case>(ExprKind.Case);

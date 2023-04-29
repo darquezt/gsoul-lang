@@ -203,16 +203,10 @@ export const AdditiveProductsUtils = {
  * Utilities for working with additive product type-and-effects
  */
 export const SumUtils = {
-  left(teff: TypeEff<Sum, Senv>): TypeEff {
-    const { type: leftType, effect: leftEffect } = teff.type.left as TypeEff;
+  projection(index: number, teff: TypeEff<Sum, Senv>): TypeEff {
+    const { type, effect } = teff.type.typeEffects[index] as TypeEff;
 
-    return TypeEff(leftType, SenvUtils.add(leftEffect, teff.effect));
-  },
-
-  right(teff: TypeEff<Sum, Senv>): TypeEff {
-    const { type: rightType, effect: rightEffect } = teff.type.right as TypeEff;
-
-    return TypeEff(rightType, SenvUtils.add(rightEffect, teff.effect));
+    return TypeEff(type, SenvUtils.add(effect, teff.effect));
   },
 };
 

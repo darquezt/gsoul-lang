@@ -167,18 +167,27 @@ const typeSJoin = (ty1: Type, ty2: Type): Result<Type, UndefinedSJoinError> => {
   }
 
   if (isKinded(ty1, TypeKind.Sum) && isKinded(ty2, TypeKind.Sum)) {
-    const { left: left1, right: right1 } = ty1;
-    const { left: left2, right: right2 } = ty2;
+    const { typeEffects: teffs1 } = ty1;
+    const { typeEffects: teffs2 } = ty2;
 
-    const leftMeet = typeEffectSJoin(left1, left2);
-    const rightMeet = typeEffectSJoin(right1, right2);
+    if (teffs1.length !== teffs2.length) {
+      return Result.err(new UndefinedSJoinError());
+    }
+
+    const allMeets: Result<TypeEffect, UndefinedSJoinError>[] = zip(
+      teffs1,
+      teffs2,
+    ).map(([teff1, teff2]) => typeEffectSJoin(teff1, teff2));
 
     // Bypass to the shitty typing of Result.all
+    const allMeetsResult = Result.all(allMeets) as unknown as Result<
+      TypeEffect[],
+      UndefinedSJoinError
+    >;
 
-    const result = Result.all([leftMeet, rightMeet]).map(([left, right]) => {
+    const result = allMeetsResult.map((teffs) => {
       return Sum({
-        left,
-        right,
+        typeEffects: teffs,
       });
     });
 

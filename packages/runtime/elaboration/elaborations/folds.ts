@@ -75,6 +75,7 @@ export const fold = (
             expression: body,
             typeEff: bodyTypeEff,
           }),
+          dataTypeAlias: expr.dataTypeAlias,
           recType: expr.recType,
           typeEff,
         }),

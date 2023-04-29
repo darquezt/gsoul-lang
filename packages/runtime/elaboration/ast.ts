@@ -105,10 +105,7 @@ export const AtomLiteral = (
   params: Omit<AtomLiteral, 'kind' | 'typeEff'>,
 ): AtomLiteral => ({
   kind: ExprKind.AtomLiteral,
-  typeEff: TypeEff(
-    Atom({ name: params.name.literal as unknown as string }),
-    Senv(),
-  ),
+  typeEff: TypeEff(Atom({ name: params.name.lexeme }), Senv()),
   ...params,
 });
 
@@ -263,8 +260,8 @@ export const Projection = factoryOf<Projection>(ExprKind.Projection);
 
 export type Inj = Term<{
   kind: ExprKind.Inj;
-  index: 0 | 1;
-  type: Type;
+  index: number;
+  types: Type[];
   expression: Expression;
   injToken: Token;
 }>;
@@ -273,10 +270,11 @@ export const Inj = factoryOf<Inj>(ExprKind.Inj);
 export type Case = Term<{
   kind: ExprKind.Case;
   sum: Expression;
-  leftIdentifier: Token;
-  left: Expression;
-  rightIdentifier: Token;
-  right: Expression;
+  branches: Array<{
+    identifier: Token;
+    body: Expression;
+    name?: Token;
+  }>;
   caseToken: Token;
 }>;
 export const Case = factoryOf<Case>(ExprKind.Case);
@@ -326,6 +324,7 @@ export type Fold = Term<{
   expression: Expression;
   recType: TypeEff<RecType, Senv>;
   foldToken: Token;
+  dataTypeAlias?: string;
 }>;
 export const Fold = factoryOf<Fold>(ExprKind.Fold);
 
@@ -353,7 +352,7 @@ export type SimpleValue =
   | Closure
   | SClosure
   | TClosure
-  | (Tuple & { expressions: Value[] })
+  | ({ expressions: Value[] } & Tuple)
   | (Pair & { first: Value; second: Value })
   | (Fold & { expression: Value })
   | (Inj & { expression: Value });
@@ -631,8 +630,10 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
       return Case({
         ...expr,
         ...inductiveCall('sum', expr),
-        ...inductiveCall('left', expr),
-        ...inductiveCall('right', expr),
+        branches: expr.branches.map((branch) => ({
+          ...branch,
+          body: map(branch.body, fns),
+        })),
         typeEff: teffFn(expr.typeEff),
       });
   }

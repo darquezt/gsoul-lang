@@ -34,9 +34,8 @@ const typeWellFormed = (ctx: WellFormednessContext, type: Type): boolean => {
       );
 
     case TypeKind.Sum:
-      return (
-        typeEffectWellFormed(ctx, type.left) &&
-        typeEffectWellFormed(ctx, type.right)
+      return type.typeEffects.every((typeEffect) =>
+        typeEffectWellFormed(ctx, typeEffect),
       );
 
     case TypeKind.ForallT:

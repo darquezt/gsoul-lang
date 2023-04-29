@@ -19,7 +19,9 @@ const typeFreeVars = (ty: Type): string[] => {
         ty.typeEffects.map((typeEffect) => typeEffectFreeVars(typeEffect)),
       );
     case TypeKind.Sum:
-      return typeEffectFreeVars(ty.left).concat(typeEffectFreeVars(ty.right));
+      return flatten(
+        ty.typeEffects.map((typeEffect) => typeEffectFreeVars(typeEffect)),
+      );
     case TypeKind.ForallT:
       return typeEffectFreeVars(ty.codomain);
     case TypeKind.PolyT:
