@@ -23,6 +23,7 @@ import { Evidence, EvidenceUtils, Store, StoreUtils } from '../utils';
 import { all, identity } from 'ramda';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
+import { Directive } from '@gsoul-lang/core/utils/lib/TypeDirectives';
 
 /**
  * Expressions
@@ -189,7 +190,10 @@ export const Forall = factoryOf<Forall>(ExprKind.Forall);
 export type Poly = Term<
   {
     kind: ExprKind.Poly;
-    typeVars: Token[];
+    typeVars: Array<{
+      identifier: Token;
+      directives?: Directive[];
+    }>;
     expr: Expression;
   },
   TypeEff<PolyT>

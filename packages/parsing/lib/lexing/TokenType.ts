@@ -73,6 +73,8 @@ enum TokenType {
   NILLIT = 'NILLIT',
   OR = 'OR',
 
+  PURE = 'PURE',
+
   AS = 'AS',
 
   PRINT = 'PRINT',

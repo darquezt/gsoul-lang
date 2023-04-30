@@ -13,6 +13,12 @@ import WellFormed, {
   WellFormednessContext,
 } from '@gsoul-lang/core/utils/lib/WellFormed';
 import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
+import {
+  Directive,
+  PureDirective,
+} from '@gsoul-lang/core/utils/lib/TypeDirectives';
+import { zip } from 'ramda';
+import { ConcreteTypeEff } from '../utils/auxiliaryCheckers';
 
 export const poly = (
   expr: past.Poly,
@@ -21,7 +27,10 @@ export const poly = (
   const bodyElaboration = expression(expr.expr, [
     tenv,
     rset,
-    TypevarsSetUtils.extendAll(tvars, ...expr.typeVars.map((v) => v.lexeme)),
+    TypevarsSetUtils.extendAll(
+      tvars,
+      ...expr.typeVars.map((v) => v.identifier.lexeme),
+    ),
   ]);
 
   return bodyElaboration.map((body) => {
@@ -30,7 +39,10 @@ export const poly = (
       expr: body,
       typeEff: TypeEff(
         PolyT({
-          typeVars: expr.typeVars.map((v) => v.lexeme),
+          typeVars: expr.typeVars.map((v) => ({
+            identifier: v.identifier.lexeme,
+            directives: v.directives,
+          })),
           codomain: body.typeEff,
         }),
         Senv(),
@@ -61,9 +73,12 @@ const checkTappArgWellFormedness =
 
     return Result.ok(callee);
   };
+
 const checkTypeApplicationCalleeType =
   (operator: Token) =>
-  (callee: Expression): Result<Expression, ElaborationError> => {
+  (
+    callee: Expression,
+  ): Result<Expression & ConcreteTypeEff<TypeEff<PolyT>>, ElaborationError> => {
     if (!typeIsKinded(callee.typeEff, TypeKind.PolyT)) {
       return Result.err(
         new ElaborationTypeError({
@@ -71,6 +86,50 @@ const checkTypeApplicationCalleeType =
           operator,
         }),
       );
+    }
+
+    return Result.ok(callee as Expression & ConcreteTypeEff<TypeEff<PolyT>>);
+  };
+
+const checkTappArgumentsNumber =
+  (operator: Token, argsNumber: number) =>
+  (
+    callee: Expression & ConcreteTypeEff<TypeEff<PolyT>>,
+  ): Result<Expression & ConcreteTypeEff<TypeEff<PolyT>>, ElaborationError> => {
+    if (callee.typeEff.type.typeVars.length !== argsNumber) {
+      return Result.err(
+        new ElaborationTypeError({
+          reason: 'Wrong number of type arguments',
+          operator,
+        }),
+      );
+    }
+
+    return Result.ok(callee);
+  };
+
+const checkTappDirectives =
+  (token: Token, args: TypeEffect[]) =>
+  (
+    callee: Expression & ConcreteTypeEff<TypeEff<PolyT>>,
+  ): Result<Expression, ElaborationError> => {
+    for (const [tvar, arg] of zip(callee.typeEff.type.typeVars, args)) {
+      const { directives } = tvar;
+
+      if (!directives) {
+        continue;
+      }
+
+      for (const dir of directives) {
+        if (dir === Directive.Pure && !PureDirective.TypeEff(arg)) {
+          return Result.err(
+            new ElaborationTypeError({
+              reason: 'Type argument is not pure',
+              operator: token,
+            }),
+          );
+        }
+      }
     }
 
     return Result.ok(callee);
@@ -82,7 +141,9 @@ export const tapp = (
 ): Result<TCall, ElaborationError> => {
   const calleeElaboration = expression(expr.callee, ctx)
     .chain(checkTappArgWellFormedness([ctx[1]], expr.args, expr.bracket))
-    .chain(checkTypeApplicationCalleeType(expr.bracket));
+    .chain(checkTypeApplicationCalleeType(expr.bracket))
+    .chain(checkTappArgumentsNumber(expr.bracket, expr.args.length))
+    .chain(checkTappDirectives(expr.bracket, expr.args));
 
   return calleeElaboration.map((callee) => {
     const typeEff = TypeEffUtils.PolysUtils.instance(

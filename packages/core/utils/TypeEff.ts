@@ -173,7 +173,7 @@ export const PolysUtils = {
     const payedCodomain = PolysUtils.tcod(teff);
 
     const result = instantiations.reduce(
-      (acc, [svar, arg]) => substTypevar(svar, arg)(acc),
+      (acc, [tvar, arg]) => substTypevar(tvar.identifier, arg)(acc),
       payedCodomain,
     );
 

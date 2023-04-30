@@ -8,6 +8,7 @@ import {
   singletonFactoryOf,
   SingletonKindedFactory,
 } from './ADT';
+import { Directive } from './lib/TypeDirectives';
 // import { BaseErr, Err, Ok, Result } from './Result';
 import { Identifier, Senv } from './Senv';
 import { TypeEff, TypeEffect, TypeEffectKind } from './TypeEff';
@@ -63,7 +64,10 @@ export const ForallT: KindedFactory<ForallT> = factoryOf<ForallT>(
 
 export type PolyT = {
   kind: TypeKind.PolyT;
-  typeVars: Identifier[];
+  typeVars: Array<{
+    identifier: Identifier;
+    directives?: Directive[];
+  }>;
   codomain: TypeEffect;
 };
 export const PolyT: KindedFactory<PolyT> = factoryOf<PolyT>(TypeKind.PolyT);
@@ -347,7 +351,7 @@ export const substTypevar = (
     poly: (ty) =>
       PolyT({
         typeVars: ty.typeVars,
-        codomain: ty.typeVars.includes(name)
+        codomain: ty.typeVars.map((tvar) => tvar.identifier).includes(name)
           ? ty.codomain
           : typeEffFn(ty.codomain),
       }),

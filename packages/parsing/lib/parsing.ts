@@ -6,6 +6,7 @@ import {
   TypeEff,
   TypeEffUtils,
 } from '@gsoul-lang/core/utils';
+import { Directive } from '@gsoul-lang/core/utils/lib/TypeDirectives';
 import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
@@ -1586,7 +1587,7 @@ class Parser {
     return args;
   }
 
-  private parseTypeParameters(): Token[] {
+  private parseTypeParameters(): Poly['typeVars'] {
     this.consume(
       TokenType.LESS,
       errorMessage({
@@ -1595,7 +1596,7 @@ class Parser {
       }),
     );
 
-    const params: Token[] = [];
+    const params: Poly['typeVars'] = [];
 
     while (!this.isAtEnd() && !this.check(TokenType.GREATER)) {
       const name = this.consume(
@@ -1605,7 +1606,12 @@ class Parser {
         }),
       );
 
-      params.push(name);
+      const directives = this.parseTypeDirectives();
+
+      params.push({
+        identifier: name,
+        directives,
+      });
 
       if (this.check(TokenType.COMMA)) {
         this.advance();
@@ -1621,6 +1627,16 @@ class Parser {
     );
 
     return params;
+  }
+
+  private parseTypeDirectives(): Directive[] {
+    const directives: Directive[] = [];
+
+    while (this.match(TokenType.PURE)) {
+      directives.push(Directive.Pure);
+    }
+
+    return directives;
   }
 
   private functionParameters(): Array<{

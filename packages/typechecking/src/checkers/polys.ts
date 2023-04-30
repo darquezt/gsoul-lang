@@ -20,13 +20,19 @@ export const poly: TypeCheckingRule<Poly> = (expr, ctx) => {
   const bodyTC = expression(inner, [
     tenv,
     rset,
-    TypevarsSetUtils.extendAll(typevarsSet, ...typeVars.map((v) => v.lexeme)),
+    TypevarsSetUtils.extendAll(
+      typevarsSet,
+      ...typeVars.map((v) => v.identifier.lexeme),
+    ),
   ]);
 
   return bodyTC.map((bodyTC) => ({
     typeEff: TypeEff(
       PolyT({
-        typeVars: typeVars.map((v) => v.lexeme),
+        typeVars: typeVars.map((v) => ({
+          identifier: v.identifier.lexeme,
+          directives: v.directives,
+        })),
         codomain: bodyTC.typeEff,
       }),
       Senv(),

@@ -83,7 +83,7 @@ export const reducePolyBody = (
 
   const body = zip(typeVars, kont.state.args).reduce(
     (acc, [tvar, effect]) =>
-      ExpressionUtils.substTypevar(acc, tvar.lexeme, effect),
+      ExpressionUtils.substTypevar(acc, tvar.identifier.lexeme, effect),
     expr,
   );
 

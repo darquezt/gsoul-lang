@@ -3,6 +3,7 @@ import { TypeEff, TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { factoryOf } from '@gsoul-lang/core/utils/ADT';
 import { Senv, Type } from '@gsoul-lang/core/utils';
 import { RecType } from '@gsoul-lang/core/utils/Type';
+import { Directive } from '@gsoul-lang/core/utils/lib/TypeDirectives';
 
 // ===================
 // EXPRESSIONS
@@ -116,7 +117,10 @@ export const Forall = factoryOf<Forall>(ExprKind.Forall);
 
 export type Poly = {
   kind: ExprKind.Poly;
-  typeVars: Token[];
+  typeVars: Array<{
+    identifier: Token;
+    directives?: Directive[];
+  }>;
   expr: Expression;
 };
 export const Poly = factoryOf<Poly>(ExprKind.Poly);
