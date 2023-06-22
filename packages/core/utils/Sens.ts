@@ -70,18 +70,22 @@ export class Sens {
   }
 
   format(): string {
-    const lowerString = this[0] === MAX_SENS ? '∞' : String(this[0]);
-    const upperString = this[1] === MAX_SENS ? '∞' : String(this[1]);
+    const lowerString = this[0] === MAX_SENS ? '*' : String(this[0]);
+    const upperString = this[1] === MAX_SENS ? '*' : String(this[1]);
 
     if (lowerString === upperString) {
+      if (lowerString === '1') {
+        return '';
+      }
+
       return lowerString;
     }
 
     if (this[0] === 0 && this[1] === MAX_SENS) {
-      return chalk.magenta('?');
+      return '?';
     }
 
-    return `[${lowerString},${upperString}]`;
+    return `${lowerString}..${upperString}`;
   }
 }
 

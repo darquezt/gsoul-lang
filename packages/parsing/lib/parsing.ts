@@ -7,7 +7,7 @@ import {
   TypeEffUtils,
 } from '@gsoul-lang/core/utils';
 import { Directive } from '@gsoul-lang/core/utils/lib/TypeDirectives';
-import { UnknownSens } from '@gsoul-lang/core/utils/Sens';
+import { MAX_SENS, UnknownSens } from '@gsoul-lang/core/utils/Sens';
 import {
   Arrow,
   Atom,
@@ -123,7 +123,7 @@ type TypePrefixOpsType = typeof typePrefixOps[number];
 const typeInfixOps = [TokenType.ARROW, TokenType.PLUS] as const;
 type TypeInfixOpsType = typeof typeInfixOps[number];
 
-const typePostfixOps = [TokenType.BANG] as const;
+const typePostfixOps = [TokenType.LEFT_BRACKET] as const;
 type TypePostfixOpsType = typeof typePostfixOps[number];
 
 enum TypeParsingResultKind {
@@ -178,7 +178,7 @@ const BindingPower = {
     },
     postfix(op: TypePostfixOpsType): [number, null] {
       switch (op) {
-        case TokenType.BANG:
+        case TokenType.LEFT_BRACKET:
           return [19, null];
       }
     },
@@ -508,7 +508,7 @@ class Parser {
   private parseLetStmt(): VarStmt {
     this.advance();
 
-    const resource = this.check(TokenType.SENSITIVE);
+    const resource = this.check(TokenType.RES);
 
     if (resource) {
       this.advance();
@@ -1860,18 +1860,13 @@ class Parser {
 
         this.advance();
 
-        if (op.type === TokenType.BANG) {
+        if (op.type === TokenType.LEFT_BRACKET) {
           if (left.kind === TypeParsingResultKind.TypeAndEffect) {
-            throw this.makeSyntaxError(op, 'Cannot bang a type-and-effect');
+            throw this.makeSyntaxError(
+              op,
+              'Cannot give an effect to a type-and-effect',
+            );
           }
-
-          this.consume(
-            TokenType.LEFT_BRACKET,
-            errorMessage({
-              expected: '[',
-              after: 'a bang modality',
-            }),
-          );
 
           const effect = this.check(TokenType.RIGHT_BRACKET)
             ? Senv()
@@ -1989,12 +1984,54 @@ class Parser {
       this.advance();
 
       return UnknownSens();
-    } else if (this.check(TokenType.NUMBERLIT)) {
+    } else if (this.check(TokenType.STAR)) {
       /**
-       * @case fully-static sensitivity
+       * @case infinite sensitivity
        */
 
-      return new Sens(this.advance().literal as number);
+      this.advance();
+
+      return new Sens(MAX_SENS);
+    } else if (this.check(TokenType.NUMBERLIT)) {
+      /**
+       * @case literal sensitivity
+       */
+
+      const startToken = this.advance();
+
+      if (this.check(TokenType.DOT_DOT)) {
+        const token = this.advance();
+
+        if (!this.checkMany(TokenType.NUMBERLIT, TokenType.STAR)) {
+          throw this.makeSyntaxError(
+            this.peek(),
+            errorMessage({
+              expected: 'a number literal or `*`',
+              after: '`..`',
+            }),
+          );
+        }
+
+        const start = startToken.literal as number;
+
+        const end = this.match(TokenType.STAR)
+          ? MAX_SENS
+          : (this.advance().literal as number);
+
+        if (start > end) {
+          throw this.makeSyntaxError(
+            token,
+            errorMessage({
+              expected: 'a number literal greater than the previous one',
+              after: '`..`',
+            }),
+          );
+        }
+
+        return new Sens(start, end);
+      }
+
+      return new Sens(startToken.literal as number);
     } else {
       /**
        * @case implicit unitary sensitivity

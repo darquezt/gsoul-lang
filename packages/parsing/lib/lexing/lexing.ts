@@ -10,7 +10,7 @@ const keywords: Record<string, TokenType> = {
   nil: TokenType.NILLIT,
   Nil: TokenType.NIL,
   let: TokenType.LET,
-  sens: TokenType.SENSITIVE,
+  res: TokenType.RES,
   as: TokenType.AS,
   print: TokenType.PRINT,
   printEv: TokenType.PRINTEV,
@@ -87,9 +87,14 @@ export const scanTokens = (source: string): Token[] => {
       case ',':
         addToken(TokenType.COMMA);
         break;
-      case '.':
-        addToken(TokenType.DOT);
+      case '.': {
+        if (match('.')) {
+          addToken(TokenType.DOT_DOT);
+        } else {
+          addToken(TokenType.DOT);
+        }
         break;
+      }
       case '-':
         addToken(match('>') ? TokenType.ARROW : TokenType.MINUS);
         break;

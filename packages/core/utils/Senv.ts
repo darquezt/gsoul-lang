@@ -117,7 +117,7 @@ export const format = (senv: Senv): string => {
   }
 
   const senvString = Object.entries(senv)
-    .map(([variable, sens]) => `${SensUtils.format(sens)}${variable}`)
+    .map(([variable, sens]) => `${sens.format()}${variable}`)
     .join(' + ');
 
   return chalk.green(senvString);

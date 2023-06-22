@@ -10,6 +10,7 @@ enum TokenType {
   AT = 'AT',
   COMMA = 'COMMA',
   DOT = 'DOT',
+  DOT_DOT = 'DOT_DOT',
   MINUS = 'MINUS',
   PLUS = 'PLUS',
   PLUS_PLUS = 'PLUS_PUS',
@@ -108,7 +109,7 @@ enum TokenType {
   DATA = 'DATA',
   PIPE = 'PIPE',
 
-  SENSITIVE = 'SENSITIVE',
+  RES = 'RES',
 
   EOF = 'EOF',
 }
