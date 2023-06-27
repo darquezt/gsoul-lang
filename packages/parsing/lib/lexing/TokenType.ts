@@ -85,7 +85,7 @@ enum TokenType {
   // THIS = 'THIS',
   TRUE = 'TRUE',
   LET = 'LET',
-  SLET = 'SLET',
+  DEF = 'DEF',
   // WHILE = 'WHILE',
 
   // Multiplicative pairs

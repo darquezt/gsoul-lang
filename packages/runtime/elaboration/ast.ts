@@ -62,6 +62,7 @@ export enum ExprKind {
   If = 'If',
   Inj = 'Inj',
   Case = 'Case',
+  FixPoint = 'FixPoint',
 }
 
 export type RealLiteral = Term<
@@ -348,6 +349,13 @@ export type If = Term<{
 }>;
 export const If = factoryOf<If>(ExprKind.If);
 
+export type FixPoint = Term<{
+  kind: ExprKind.FixPoint;
+  name: Token;
+  body: Expression;
+}>;
+export const FixPoint = factoryOf<FixPoint>(ExprKind.FixPoint);
+
 export type SimpleValue =
   | RealLiteral
   | BoolLiteral
@@ -439,7 +447,6 @@ export type Expression =
   | TClosure
   | Tuple
   | Projection
-  // | Untup
   | Pair
   | ProjFst
   | ProjSnd
@@ -449,7 +456,8 @@ export type Expression =
   | Unfold
   | If
   | Inj
-  | Case;
+  | Case
+  | FixPoint;
 
 type ExprMapFns = {
   senvFn: (senv: Senv) => Senv;
@@ -640,6 +648,12 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
         })),
         typeEff: teffFn(expr.typeEff),
       });
+    case ExprKind.FixPoint:
+      return FixPoint({
+        ...expr,
+        ...inductiveCall('body', expr),
+        typeEff: teffFn(expr.typeEff),
+      });
   }
 };
 
@@ -697,6 +711,7 @@ export enum StmtKind {
   ExprStmt = 'ExprStmt',
   PrintStmt = 'PrintStmt',
   VarStmt = 'VarStmt',
+  DefStmt = 'DefStmt',
 }
 
 export type ExprStmt = Term<
@@ -707,6 +722,24 @@ export type ExprStmt = Term<
   TypeEffect
 >;
 export const ExprStmt = factoryOf<ExprStmt>(StmtKind.ExprStmt);
+
+// export type DefStmt = Term<
+//   {
+//     kind: StmtKind.DefStmt;
+//     name: Token;
+//     resourceParams?: Token[];
+//     typeParams?: Array<{
+//       identifier: Token;
+//       directives?: Directive[];
+//     }>;
+//     binders: Array<{ name: Token; type: TypeEffect }>;
+//     body: Expression;
+//     colon: Token;
+//     returnType: TypeEffect;
+//   },
+//   TypeEffect
+// >;
+// export const DefStmt = factoryOf<DefStmt>(StmtKind.DefStmt);
 
 export type VarStmt = Term<
   {
@@ -752,6 +785,22 @@ const substStmt = (stmt: Statement, name: string, senv: Senv): Statement => {
         assignment: ExpressionUtils.subst(stmt.assignment, name, senv),
         typeEff,
       });
+    // case StmtKind.DefStmt: {
+    //   if (stmt.resourceParams?.some((p) => p.lexeme === name)) {
+    //     return stmt;
+    //   }
+
+    //   return DefStmt({
+    //     ...stmt,
+    //     binders: stmt.binders.map((binder) => ({
+    //       ...binder,
+    //       type: TypeEffUtils.subst(binder.type, name, senv),
+    //     })),
+    //     body: ExpressionUtils.subst(stmt.body, name, senv),
+    //     returnType: TypeEffUtils.subst(stmt.returnType, name, senv),
+    //     typeEff,
+    //   });
+    // }
   }
 };
 
@@ -781,6 +830,22 @@ const substTypevarStmt = (
         assignment: ExpressionUtils.substTypevar(stmt.assignment, name, teff),
         typeEff,
       });
+    // case StmtKind.DefStmt: {
+    //   if (stmt.typeParams?.some((p) => p.identifier.lexeme === name)) {
+    //     return stmt;
+    //   }
+
+    //   return DefStmt({
+    //     ...stmt,
+    //     binders: stmt.binders.map((binder) => ({
+    //       ...binder,
+    //       type: TypeEffUtils.substTypevar(name, teff)(binder.type),
+    //     })),
+    //     body: ExpressionUtils.substTypevar(stmt.body, name, teff),
+    //     returnType: TypeEffUtils.substTypevar(name, teff)(stmt.returnType),
+    //     typeEff,
+    //   });
+    // }
   }
 };
 
@@ -809,5 +874,21 @@ const deleteResourcesStmt = (
         assignment: ExpressionUtils.deleteResources(stmt.assignment, resources),
         typeEff,
       });
+    // case StmtKind.DefStmt: {
+    //   if (stmt.resourceParams?.some((p) => resources.includes(p.lexeme))) {
+    //     return stmt;
+    //   }
+
+    //   return DefStmt({
+    //     ...stmt,
+    //     binders: stmt.binders.map((binder) => ({
+    //       ...binder,
+    //       type: TypeEffUtils.deleteResources(binder.type, resources),
+    //     })),
+    //     body: ExpressionUtils.deleteResources(stmt.body, resources),
+    //     returnType: TypeEffUtils.deleteResources(stmt.returnType, resources),
+    //     typeEff,
+    //   });
+    // }
   }
 };

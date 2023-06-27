@@ -167,9 +167,10 @@ describe('Lexing', () => {
     });
 
     test('A sensitive var declaration', () => {
-      expect(scanTokens('slet x = 2;')).toStrictEqual<Token[]>(
+      expect(scanTokens('let res x = 2;')).toStrictEqual<Token[]>(
         withEOF([
-          new Token(TokenType.SLET, 'slet', null, 1, 1),
+          new Token(TokenType.LET, 'let', null, 1, 1),
+          new Token(TokenType.RES, 'res', null, 1, 1),
           new Token(TokenType.IDENTIFIER, 'x', null, 1, 6),
           new Token(TokenType.EQUAL, '=', null, 1, 8),
           new Token(TokenType.NUMBERLIT, '2', 2, 1, 10),

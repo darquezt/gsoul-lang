@@ -253,10 +253,26 @@ export enum StmtKind {
   ExprStmt = 'ExprStmt',
   PrintStmt = 'PrintStmt',
   VarStmt = 'VarStmt',
+  DefStmt = 'DefStmt',
 }
 
 export type ExprStmt = { kind: StmtKind.ExprStmt; expression: Expression };
 export const ExprStmt = factoryOf<ExprStmt>(StmtKind.ExprStmt);
+
+export type DefStmt = {
+  kind: StmtKind.DefStmt;
+  name: Token;
+  resourceParams?: Token[];
+  typeParams?: Array<{
+    identifier: Token;
+    directives?: Directive[];
+  }>;
+  binders: Array<{ name: Token; type: TypeEffect }>;
+  body: Expression;
+  colon: Token;
+  returnType: TypeEffect;
+};
+export const DefStmt = factoryOf<DefStmt>(StmtKind.DefStmt);
 
 export type VarStmt = {
   kind: StmtKind.VarStmt;
@@ -276,7 +292,7 @@ export type PrintStmt = {
 };
 export const PrintStmt = factoryOf<PrintStmt>(StmtKind.PrintStmt);
 
-export type Statement = ExprStmt | PrintStmt | VarStmt;
+export type Statement = ExprStmt | PrintStmt | VarStmt | DefStmt;
 
 export type Program = Statement[];
 

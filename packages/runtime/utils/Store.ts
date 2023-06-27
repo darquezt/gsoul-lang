@@ -1,13 +1,17 @@
 import { Senv } from '@gsoul-lang/core/utils';
 import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
-import { ExpressionUtils, Value } from '../elaboration/ast';
+import { Expression, ExpressionUtils } from '../elaboration/ast';
 
 export type Identifier = string;
 
-export type Store = Record<Identifier, Value>;
-export const Store = (map: Record<Identifier, Value> = {}): Store => map;
+export type Store = Record<Identifier, Expression>;
+export const Store = (map: Record<Identifier, Expression> = {}): Store => map;
 
-export const extend = (store: Store, name: string, value: Value): Store => ({
+export const extend = (
+  store: Store,
+  name: string,
+  value: Expression,
+): Store => ({
   ...store,
   [name]: value,
 });
@@ -15,7 +19,7 @@ export const extend = (store: Store, name: string, value: Value): Store => ({
 export const extendMany = (
   store: Store,
   names: string[],
-  values: Value[],
+  values: Expression[],
 ): Store => {
   return names.reduce(
     (storep, name, i) => extend(storep, name, values[i]),
@@ -29,7 +33,11 @@ export const subst = (store: Store, name: string, senv: Senv): Store => {
       extend(
         storep,
         id,
-        ExpressionUtils.subst(get(store, id) as Value, name, senv) as Value,
+        ExpressionUtils.subst(
+          get(store, id) as Expression,
+          name,
+          senv,
+        ) as Expression,
       ),
     {},
   );
@@ -46,10 +54,10 @@ export const substTypevar = (
         storep,
         id,
         ExpressionUtils.substTypevar(
-          get(store, id) as Value,
+          get(store, id) as Expression,
           name,
           teff,
-        ) as Value,
+        ) as Expression,
       ),
     {},
   );
@@ -62,9 +70,9 @@ export const deleteResources = (store: Store, resources: string[]): Store => {
         storep,
         id,
         ExpressionUtils.deleteResources(
-          get(store, id) as Value,
+          get(store, id) as Expression,
           resources,
-        ) as Value,
+        ) as Expression,
       ),
     {},
   );
@@ -82,15 +90,15 @@ export const deleteResources = (store: Store, resources: string[]): Store => {
 //         storep,
 //         id,
 //         ExpressionUtils.substTup(
-//           get(store, id) as Value,
+//           get(store, id) as Expression,
 //           names,
 //           latents,
 //           senv,
-//         ) as Value,
+//         ) as Expression,
 //       ),
 //     {},
 //   );
 // };
 
-export const get = (store: Store, name: string): Value | undefined =>
+export const get = (store: Store, name: string): Expression | undefined =>
   store[name];

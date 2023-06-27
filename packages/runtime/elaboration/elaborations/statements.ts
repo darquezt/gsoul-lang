@@ -6,7 +6,17 @@ import {
   Sens,
   TypeEnvUtils,
 } from '@gsoul-lang/core/utils';
-import { ExprStmt, PrintStmt, VarStmt, Ascription, Expression } from '../ast';
+import {
+  ExprStmt,
+  PrintStmt,
+  VarStmt,
+  Ascription,
+  Expression,
+  FixPoint,
+  Fun,
+  Poly,
+  Forall,
+} from '../ast';
 import { expression } from '../elaboration';
 import {
   ElaborationError,
@@ -16,11 +26,13 @@ import {
 } from '../errors';
 import { ElaborationContext, Stateful } from '../types';
 import * as past from '@gsoul-lang/parsing/lib/ast';
-import { interior } from '../../utils/Evidence';
+import { initialEvidence, interior } from '../../utils/Evidence';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import * as ResourcesSetUtils from '@gsoul-lang/core/utils/ResourcesSet';
 import { isKinded } from '@gsoul-lang/core/utils/ADT';
-import { TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
+import { TypeEffect, TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
+import { Arrow, ForallT, PolyT } from '@gsoul-lang/core/utils/Type';
+import * as TypevarsSetUtils from '@gsoul-lang/core/utils/TypevarsSet';
 
 export const exprStmt = (
   stmt: past.ExprStmt,
@@ -156,6 +168,125 @@ export const varStmt = (
         typeEff: expr.typeEff,
       }),
       [newTenv, newRset, ...rest],
+    ),
+  );
+};
+
+export const defStmt = (
+  stmt: past.DefStmt,
+  ctx: ElaborationContext,
+): Result<Stateful<VarStmt>, ElaborationError> => {
+  const resourceParams = stmt.resourceParams?.map((rp) => rp.lexeme);
+  const typeParams = stmt.typeParams?.map((tp) => ({
+    identifier: tp.identifier.lexeme,
+    directives: tp.directives,
+  }));
+
+  const arrowTypeEff = TypeEff(
+    Arrow({
+      domain: stmt.binders.map((b) => b.type),
+      codomain: stmt.returnType,
+    }),
+    Senv(),
+  );
+
+  const polyTypeEff = typeParams
+    ? TypeEff(
+        PolyT({
+          typeVars: typeParams,
+          codomain: arrowTypeEff,
+        }),
+        Senv(),
+      )
+    : arrowTypeEff;
+
+  const forallTypeEff = resourceParams
+    ? TypeEff(
+        ForallT({
+          sensVars: resourceParams,
+          codomain: polyTypeEff,
+        }),
+        Senv(),
+      )
+    : polyTypeEff;
+
+  const bodyElaboration = expression(stmt.body, [
+    // TypeEnvUtils.extend(ctx[0], stmt.name.lexeme, forallTypeEff),
+    TypeEnvUtils.extendAll(
+      ctx[0],
+      [stmt.name.lexeme, forallTypeEff],
+      ...stmt.binders.map<[string, TypeEffect]>((b) => [b.name.lexeme, b.type]),
+    ),
+    ResourcesSetUtils.extendAll(ctx[1], ...(resourceParams ?? [])),
+    TypevarsSetUtils.extendAll(
+      ctx[2],
+      ...(typeParams ?? []).map((tp) => tp.identifier),
+    ),
+  ]);
+
+  const assignment = bodyElaboration.map((expr) => {
+    const lambdaEvidence = initialEvidence(arrowTypeEff);
+    const lambda = Ascription({
+      evidence: lambdaEvidence,
+      expression: Fun({
+        binders: stmt.binders,
+        body: expr,
+        typeEff: arrowTypeEff,
+      }),
+      typeEff: arrowTypeEff,
+    });
+
+    let poly = lambda;
+
+    if (stmt.typeParams) {
+      poly = Ascription({
+        evidence: initialEvidence(polyTypeEff),
+        expression: Poly({
+          typeVars: stmt.typeParams,
+          expr: lambda,
+          typeEff: polyTypeEff as TypeEff<PolyT>,
+        }),
+        typeEff: polyTypeEff,
+      });
+    }
+
+    let forall = poly;
+
+    if (stmt.resourceParams) {
+      forall = Ascription({
+        evidence: initialEvidence(forallTypeEff),
+        expression: Forall({
+          sensVars: stmt.resourceParams,
+          expr: poly,
+          typeEff: forallTypeEff as TypeEff<ForallT>,
+        }),
+        typeEff: forallTypeEff,
+      });
+    }
+
+    return Ascription({
+      evidence: initialEvidence(forallTypeEff),
+      expression: FixPoint({
+        body: forall,
+        typeEff: forallTypeEff,
+        name: stmt.name,
+      }),
+      typeEff: forallTypeEff,
+    });
+  });
+
+  return assignment.map((assignment) =>
+    Stateful(
+      VarStmt({
+        name: stmt.name,
+        assignment,
+        typeEff: assignment.typeEff,
+      }),
+      [
+        TypeEnvUtils.extend(ctx[0], stmt.name.lexeme, forallTypeEff),
+        ctx[1],
+        ctx[2],
+      ],
     ),
   );
 };

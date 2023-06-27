@@ -8,7 +8,12 @@ import {
 } from '@gsoul-lang/core/utils';
 import * as ResourcesSetUtils from '@gsoul-lang/core/utils/ResourcesSet';
 import { TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
-import { ExprStmt, PrintStmt, VarStmt } from '@gsoul-lang/parsing/lib/ast';
+import {
+  DefStmt,
+  ExprStmt,
+  PrintStmt,
+  VarStmt,
+} from '@gsoul-lang/parsing/lib/ast';
 import { Token } from '@gsoul-lang/parsing/lib/lexing';
 import { expression } from '../checker';
 import { isSubTypeEff } from '../subtyping';
@@ -130,5 +135,14 @@ export const varStmt: StatefulTypeCheckingRule<VarStmt> = (stmt, ctx) => {
       ),
       ctx: [newTenv, newRset, ...rest],
     };
+  });
+};
+
+// TODO: Implement
+export const defStmt: StatefulTypeCheckingRule<DefStmt> = (stmt, ctx) => {
+  return Result.ok({
+    typeEff: stmt.returnType,
+    typings: [],
+    ctx,
   });
 };

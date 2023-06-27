@@ -1,4 +1,4 @@
-import { ascribedValueToExpr, Variable } from '../../elaboration/ast';
+import { Variable } from '../../elaboration/ast';
 import { Store, StoreUtils } from '../../utils';
 import { Result } from '@badrap/result';
 import { Kont, OkState, StepState } from '../cek';
@@ -20,5 +20,5 @@ export const reduceVariable = (
     );
   }
 
-  return OkState({ term: ascribedValueToExpr(value) }, store, kont);
+  return OkState({ term: value }, store, kont);
 };

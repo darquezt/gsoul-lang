@@ -22,7 +22,12 @@ import { tuple, projection } from './elaborations/tuples';
 import { variable } from './elaborations/variables';
 import { atomLiteral } from './elaborations/atoms';
 import { ElaborationContext, Stateful } from './types';
-import { exprStmt, varStmt, printStmt } from './elaborations/statements';
+import {
+  exprStmt,
+  varStmt,
+  printStmt,
+  defStmt,
+} from './elaborations/statements';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 import { TypevarsSet } from '@gsoul-lang/core/utils/TypevarsSet';
 import { poly, tapp } from './elaborations/polys';
@@ -106,6 +111,8 @@ export const statement = (
       return varStmt(stmt, ctx);
     case past.StmtKind.PrintStmt:
       return printStmt(stmt, ctx);
+    case past.StmtKind.DefStmt:
+      return defStmt(stmt, ctx);
   }
 };
 

@@ -32,6 +32,7 @@ import {
   Block,
   Call,
   Case,
+  DefStmt,
   Expression,
   ExprStmt,
   Fold,
@@ -294,6 +295,13 @@ class Parser {
 
         return this.parseDataDecl();
       }
+      if (this.check(TokenType.DEF)) {
+        /**
+         * @case function declaration
+         */
+
+        return [this.parseDefDecl()];
+      }
       if (this.check(TokenType.LET)) {
         /**
          * @case let declaration
@@ -315,6 +323,53 @@ class Parser {
        */
 
       return [this.parseExpressionStmt()];
+    });
+  }
+
+  private parseDefDecl(): Statement {
+    this.advance();
+
+    const name = this.consume(
+      TokenType.IDENTIFIER,
+      errorMessage({ expected: 'function name' }),
+    );
+
+    let typeParams;
+    if (this.check(TokenType.LESS)) {
+      typeParams = this.parseTypeParameters();
+    }
+
+    let resourceParams;
+    if (this.check(TokenType.LEFT_BRACKET)) {
+      resourceParams = this.parseResourceParameters();
+    }
+
+    const binders = this.functionParameters();
+
+    const colon = this.consume(
+      TokenType.COLON,
+      errorMessage({ expected: ':' }),
+    );
+
+    const returnType = normalizeTypeResult(this.type(0));
+
+    this.consume(
+      TokenType.EQUAL,
+      errorMessage({ expected: '=', after: 'function declaration' }),
+    );
+
+    const body = this.expression(0);
+
+    this.consume(TokenType.SEMICOLON, errorMessage({ expected: ';' }));
+
+    return DefStmt({
+      name,
+      resourceParams,
+      typeParams,
+      binders,
+      colon,
+      returnType,
+      body,
     });
   }
 
@@ -1587,6 +1642,43 @@ class Parser {
     return args;
   }
 
+  private parseResourceParameters(): DefStmt['resourceParams'] {
+    this.consume(
+      TokenType.LEFT_BRACKET,
+      errorMessage({
+        expected: '[',
+        beginning: 'resource parameters',
+      }),
+    );
+
+    const params: DefStmt['resourceParams'] = [];
+
+    while (!this.isAtEnd() && !this.check(TokenType.RIGHT_BRACKET)) {
+      const name = this.consume(
+        TokenType.IDENTIFIER,
+        errorMessage({
+          expected: 'a resource parameter name',
+        }),
+      );
+
+      params.push(name);
+
+      if (this.check(TokenType.COMMA)) {
+        this.advance();
+      }
+    }
+
+    this.consume(
+      TokenType.RIGHT_BRACKET,
+      errorMessage({
+        expected: ']',
+        end: 'resource parameters',
+      }),
+    );
+
+    return params;
+  }
+
   private parseTypeParameters(): Poly['typeVars'] {
     this.consume(
       TokenType.LESS,
@@ -2072,7 +2164,6 @@ class Parser {
 
       switch (this.peek().type) {
         case TokenType.LET:
-        case TokenType.SLET:
         case TokenType.PRINT:
         case TokenType.PRINTEV:
           return;

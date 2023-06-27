@@ -26,7 +26,7 @@ import { inj, caseExpr } from './checkers/injections';
 import { pair, projFst, projSnd } from './checkers/pairs';
 import { tuple, projection } from './checkers/tuples';
 import { variable } from './checkers/variables';
-import { exprStmt, varStmt, printStmt } from './checkers/statements';
+import { exprStmt, varStmt, printStmt, defStmt } from './checkers/statements';
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 import { atomLit } from './checkers/atoms';
 import { TypevarsSet } from '@gsoul-lang/core/utils/TypevarsSet';
@@ -104,6 +104,8 @@ export const statement: StatefulTypeCheckingRule = (stmt, ctx) => {
       return varStmt(stmt, ctx);
     case StmtKind.PrintStmt:
       return printStmt(stmt, ctx);
+    case StmtKind.DefStmt:
+      return defStmt(stmt, ctx);
   }
 };
 

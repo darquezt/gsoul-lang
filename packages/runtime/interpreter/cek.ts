@@ -127,6 +127,12 @@ import {
   reducePolyBody,
   reducePolyCallee,
 } from './interpretations/polys';
+import {
+  FixPointKont,
+  FixPointKontKind,
+  reduceFixPoint,
+  restoreStoreAndKont,
+} from './interpretations/fixpoints';
 
 enum KontKind {
   EmptyKont = 'EmptyKont',
@@ -164,7 +170,8 @@ export type Kont =
   | FoldKont
   | IfBranchesKont
   | InjKont
-  | CaseBranchesKont;
+  | CaseBranchesKont
+  | FixPointKont;
 
 export type State<T> = T & {
   store: Store;
@@ -308,6 +315,10 @@ const step = ({
       case InjKontKind.CaseBranchesKont: {
         return reduceCaseBranch(term, store, kont);
       }
+
+      case FixPointKontKind.FixPointKont: {
+        return restoreStoreAndKont(term, store, kont);
+      }
     }
   }
 
@@ -390,6 +401,10 @@ const step = ({
 
     case StmtKind.VarStmt: {
       return reduceVarDeclInnerExpression(term, store, kont);
+    }
+
+    case ExprKind.FixPoint: {
+      return reduceFixPoint(term, store, kont);
     }
 
     case ExprKind.Ascription: {
