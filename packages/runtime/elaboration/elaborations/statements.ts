@@ -190,31 +190,31 @@ export const defStmt = (
     Senv(),
   );
 
-  const polyTypeEff = typeParams
+  const forallTypeEff = resourceParams
     ? TypeEff(
-        PolyT({
-          typeVars: typeParams,
+        ForallT({
+          sensVars: resourceParams,
           codomain: arrowTypeEff,
         }),
         Senv(),
       )
     : arrowTypeEff;
 
-  const forallTypeEff = resourceParams
+  const polyTypeEff = typeParams
     ? TypeEff(
-        ForallT({
-          sensVars: resourceParams,
-          codomain: polyTypeEff,
+        PolyT({
+          typeVars: typeParams,
+          codomain: forallTypeEff,
         }),
         Senv(),
       )
-    : polyTypeEff;
+    : forallTypeEff;
 
   const bodyElaboration = expression(stmt.body, [
     // TypeEnvUtils.extend(ctx[0], stmt.name.lexeme, forallTypeEff),
     TypeEnvUtils.extendAll(
       ctx[0],
-      [stmt.name.lexeme, forallTypeEff],
+      [stmt.name.lexeme, polyTypeEff],
       ...stmt.binders.map<[string, TypeEffect]>((b) => [b.name.lexeme, b.type]),
     ),
     ResourcesSetUtils.extendAll(ctx[1], ...(resourceParams ?? [])),
@@ -236,42 +236,42 @@ export const defStmt = (
       typeEff: arrowTypeEff,
     });
 
-    let poly = lambda;
-
-    if (stmt.typeParams) {
-      poly = Ascription({
-        evidence: initialEvidence(polyTypeEff),
-        expression: Poly({
-          typeVars: stmt.typeParams,
-          expr: lambda,
-          typeEff: polyTypeEff as TypeEff<PolyT>,
-        }),
-        typeEff: polyTypeEff,
-      });
-    }
-
-    let forall = poly;
+    let forall = lambda;
 
     if (stmt.resourceParams) {
       forall = Ascription({
         evidence: initialEvidence(forallTypeEff),
         expression: Forall({
           sensVars: stmt.resourceParams,
-          expr: poly,
+          expr: lambda,
           typeEff: forallTypeEff as TypeEff<ForallT>,
         }),
         typeEff: forallTypeEff,
       });
     }
 
+    let poly = forall;
+
+    if (stmt.typeParams) {
+      poly = Ascription({
+        evidence: initialEvidence(polyTypeEff),
+        expression: Poly({
+          typeVars: stmt.typeParams,
+          expr: forall,
+          typeEff: polyTypeEff as TypeEff<PolyT>,
+        }),
+        typeEff: polyTypeEff,
+      });
+    }
+
     return Ascription({
-      evidence: initialEvidence(forallTypeEff),
+      evidence: initialEvidence(polyTypeEff),
       expression: FixPoint({
-        body: forall,
-        typeEff: forallTypeEff,
+        body: poly,
+        typeEff: polyTypeEff,
         name: stmt.name,
       }),
-      typeEff: forallTypeEff,
+      typeEff: polyTypeEff,
     });
   });
 
@@ -283,7 +283,7 @@ export const defStmt = (
         typeEff: assignment.typeEff,
       }),
       [
-        TypeEnvUtils.extend(ctx[0], stmt.name.lexeme, forallTypeEff),
+        TypeEnvUtils.extend(ctx[0], stmt.name.lexeme, polyTypeEff),
         ctx[1],
         ctx[2],
       ],
