@@ -33,11 +33,7 @@ export const subst = (store: Store, name: string, senv: Senv): Store => {
       extend(
         storep,
         id,
-        ExpressionUtils.subst(
-          get(store, id) as Expression,
-          name,
-          senv,
-        ) as Expression,
+        ExpressionUtils.subst(get(store, id) as Expression, name, senv),
       ),
     {},
   );
