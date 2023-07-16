@@ -12,6 +12,6 @@ export default class Token {
   ) {}
 
   toString(): string {
-    return `code = ${this.type}, lexeme = '${this.lexeme}', value = ${this.literal}`;
+    return `pos = (${this.line},${this.col}),code = ${this.type}, lexeme = '${this.lexeme}', value = ${this.literal}`;
   }
 }
