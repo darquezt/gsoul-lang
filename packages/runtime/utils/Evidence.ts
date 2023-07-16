@@ -10,7 +10,9 @@ import {
 import {
   Arrow,
   Bool,
+  ForallT,
   Nil,
+  PolyT,
   Product,
   Real,
   RecType,
@@ -198,6 +200,69 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
     });
   }
 
+  if (isKinded(t1, TypeKind.ForallT) && isKinded(t2, TypeKind.ForallT)) {
+    if (t1.sensVars.length !== t2.sensVars.length) {
+      return Result.err(
+        new EvidenceInteriorError(
+          'Wrong number of sensitivity variables',
+          t1,
+          t2,
+        ),
+      );
+    }
+
+    if (zip(t1.sensVars, t2.sensVars).some(([s1, s2]) => s1 !== s2)) {
+      return Result.err(
+        new EvidenceInteriorError(
+          'Sensitivity variables names do not match',
+          t1,
+          t2,
+        ),
+      );
+    }
+
+    const eviT1Res = interior(t1.codomain, t2.codomain);
+
+    return eviT1Res.map(([eviT1, eviT2]) => [
+      ForallT({
+        sensVars: t1.sensVars,
+        codomain: eviT1,
+      }),
+      ForallT({
+        sensVars: t2.sensVars,
+        codomain: eviT2,
+      }),
+    ]);
+  }
+
+  if (isKinded(t1, TypeKind.PolyT) && isKinded(t2, TypeKind.PolyT)) {
+    if (t1.typeVars.length !== t2.typeVars.length) {
+      return Result.err(
+        new EvidenceInteriorError('Wrong number of type variables', t1, t2),
+      );
+    }
+
+    if (zip(t1.typeVars, t2.typeVars).some(([s1, s2]) => s1 !== s2)) {
+      return Result.err(
+        new EvidenceInteriorError('Type variables names do not match', t1, t2),
+      );
+    }
+
+    // TODO: Check this
+    const eviT1Res = interior(t1.codomain, t2.codomain);
+
+    return eviT1Res.map(([eviT1, eviT2]) => [
+      PolyT({
+        typeVars: t1.typeVars,
+        codomain: eviT1,
+      }),
+      PolyT({
+        typeVars: t2.typeVars,
+        codomain: eviT2,
+      }),
+    ]);
+  }
+
   if (isKinded(t1, TypeKind.RecType) && isKinded(t2, TypeKind.RecType)) {
     if (t1.variable !== t2.variable) {
       return Result.err(
@@ -249,7 +314,7 @@ const interiorType = (t1: Type, t2: Type): Result<Evi<Type>, EvidenceError> => {
 
   return Result.err(
     new EvidenceInteriorError(
-      `Unsopported types: ${t1.kind}, ${t2.kind}`,
+      `Unsupported types: ${t1.kind}, ${t2.kind}`,
       t1,
       t2,
     ),
