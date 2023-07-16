@@ -114,6 +114,7 @@ const postfixOps = [
   TokenType.AT,
   TokenType.LEFT_BRACKET,
   TokenType.COLON_COLON_LESS,
+  TokenType.COLON_COLON_LEFT_BRACKET,
   TokenType.AS,
 ] as const;
 type PostfixOpType = typeof postfixOps[number];
@@ -215,6 +216,7 @@ const BindingPower = {
         case TokenType.LEFT_PAREN:
         case TokenType.LEFT_BRACKET:
         case TokenType.COLON_COLON_LESS:
+        case TokenType.COLON_COLON_LEFT_BRACKET:
         case TokenType.AT:
           return [33, null];
         case TokenType.AS:
@@ -747,7 +749,7 @@ class Parser {
             break;
           }
 
-          case TokenType.AT: {
+          case TokenType.COLON_COLON_LEFT_BRACKET: {
             /**
              * @case sensitivity function call
              */
@@ -1592,14 +1594,6 @@ class Parser {
   }
 
   private sensitivityCallArguments(): Senv[] {
-    this.consume(
-      TokenType.LEFT_BRACKET,
-      errorMessage({
-        expected: '[',
-        beginning: 'sensitivity effect instantiation',
-      }),
-    );
-
     if (this.check(TokenType.RIGHT_BRACKET)) {
       throw this.makeSyntaxError(
         this.peek(),

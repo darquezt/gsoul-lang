@@ -103,6 +103,8 @@ export const scanTokens = (source: string): Token[] => {
         if (match(':')) {
           if (match('<')) {
             addToken(TokenType.COLON_COLON_LESS);
+          } else if (match('[')) {
+            addToken(TokenType.COLON_COLON_LEFT_BRACKET);
           } else {
             addToken(TokenType.COLON_COLON);
           }
@@ -291,7 +293,9 @@ export const scanTokens = (source: string): Token[] => {
   function addToken(type: TokenType, literal: TokenLiteral | null = null) {
     const lexeme = getLexeme();
 
-    tokens.push(new Token(type, lexeme, literal, line, col));
+    const token = new Token(type, lexeme, literal, line, col);
+
+    tokens.push(token);
 
     col += lexeme.length;
   }
