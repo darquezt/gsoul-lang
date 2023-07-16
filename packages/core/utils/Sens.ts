@@ -38,6 +38,13 @@ export class Sens {
     );
   }
 
+  join(another: Sens): Sens {
+    return new Sens(
+      Math.min(this[0], another[0]),
+      Math.max(this[1], another[1]),
+    );
+  }
+
   meet(another: Sens): Result<Sens, UndefinedMeetError> {
     if (another[0] > this[1] || this[0] > another[1]) {
       return Result.err(new UndefinedMeetError());
@@ -201,6 +208,7 @@ export const mult = (a: Sens, b: Sens): Sens => {
 };
 
 export class UndefinedMeetError extends Error {}
+export class UndefinedJoinError extends Error {}
 
 /**
  * @deprecated
