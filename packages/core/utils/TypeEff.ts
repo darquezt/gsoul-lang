@@ -99,7 +99,7 @@ export const format = match<string>({
   typeEff: (teff) => {
     return SenvUtils.isEmpty(teff.effect)
       ? TypeUtils.format(teff.type)
-      : `${TypeUtils.format(teff.type)}![${SenvUtils.format(teff.effect)}]`;
+      : `${TypeUtils.format(teff.type)}[${SenvUtils.format(teff.effect)}]`;
   },
 });
 
