@@ -396,11 +396,13 @@ export const format: (ty: Type) => string = (ty) => {
         .map((d) => `${TypeEffUtils.format(d)}`)
         .join(', ')}) -> ${TypeEffUtils.format(ty.codomain)}`,
     forall: (ty) =>
-      chalk`forall {green ${ty.sensVars.join(' ')}} . ${TypeEffUtils.format(
+      chalk`[{green ${ty.sensVars.join(' ')}}](${TypeEffUtils.format(
         ty.codomain,
-      )}`,
+      )})`,
     poly: (ty) =>
-      `<${ty.typeVars.join(', ')}>(${TypeEffUtils.format(ty.codomain)})`,
+      `<${ty.typeVars
+        .map((tv) => tv.identifier)
+        .join(', ')}>(${TypeEffUtils.format(ty.codomain)})`,
     mprod: (ty) =>
       chalk`${TypeEffUtils.format(ty.first)} ⊗ ${TypeEffUtils.format(
         ty.second,
