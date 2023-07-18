@@ -1,5 +1,11 @@
 # @gsoul-lang/core
 
+## 0.0.4
+
+### Patch Changes
+
+- Add tslib in runtime
+
 ## 0.0.3
 
 ### Patch Changes

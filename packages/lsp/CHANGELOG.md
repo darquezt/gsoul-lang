@@ -1,5 +1,15 @@
 # @gsoul-lang/lsp
 
+## 0.0.4
+
+### Patch Changes
+
+- Add tslib in runtime
+- Updated dependencies
+  - @gsoul-lang/core@0.0.4
+  - @gsoul-lang/parsing@0.0.7
+  - @gsoul-lang/typechecking@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes

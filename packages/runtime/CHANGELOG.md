@@ -1,5 +1,14 @@
 # @gsoul-lang/runtime
 
+## 0.0.4
+
+### Patch Changes
+
+- Add tslib in runtime
+- Updated dependencies
+  - @gsoul-lang/core@0.0.4
+  - @gsoul-lang/parsing@0.0.7
+
 ## 0.0.3
 
 ### Patch Changes
