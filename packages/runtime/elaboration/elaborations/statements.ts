@@ -224,13 +224,28 @@ export const defStmt = (
     ),
   ]);
 
-  const assignment = bodyElaboration.map((expr) => {
+  const assignment = bodyElaboration.chain((expr) => {
+    const bodyEvidence = interior(expr.typeEff, stmt.returnType);
+
+    if (bodyEvidence.isErr) {
+      return Result.err(
+        new ElaborationSubtypingError({
+          reason: 'Body type is not a subtype of the declared return type',
+          operator: stmt.colon,
+        }),
+      );
+    }
+
     const lambdaEvidence = initialEvidence(arrowTypeEff);
     const lambda = Ascription({
       evidence: lambdaEvidence,
       expression: Fun({
         binders: stmt.binders,
-        body: expr,
+        body: Ascription({
+          evidence: bodyEvidence.value,
+          expression: expr,
+          typeEff: stmt.returnType,
+        }),
         typeEff: arrowTypeEff,
       }),
       typeEff: arrowTypeEff,
@@ -264,15 +279,17 @@ export const defStmt = (
       });
     }
 
-    return Ascription({
-      evidence: initialEvidence(polyTypeEff),
-      expression: FixPoint({
-        body: poly,
+    return Result.ok(
+      Ascription({
+        evidence: initialEvidence(polyTypeEff),
+        expression: FixPoint({
+          body: poly,
+          typeEff: polyTypeEff,
+          name: stmt.name,
+        }),
         typeEff: polyTypeEff,
-        name: stmt.name,
       }),
-      typeEff: polyTypeEff,
-    });
+    );
   });
 
   return assignment.map((assignment) =>
