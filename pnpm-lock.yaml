@@ -106,11 +106,13 @@ importers:
       '@gsoul-lang/core': workspace:^
       '@gsoul-lang/parsing': workspace:^
       chalk: ^4.1.2
+      tslib: ^2.1.0
     dependencies:
       '@badrap/result': 0.2.13
       '@gsoul-lang/core': link:../core
       '@gsoul-lang/parsing': link:../parsing
       chalk: 4.1.2
+      tslib: 2.4.1
 
   packages/typechecking:
     specifiers:
