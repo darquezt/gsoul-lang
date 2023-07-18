@@ -59,11 +59,13 @@ importers:
       '@gsoul-lang/runtime': workspace:^
       '@types/yargs': ^17.0.13
       chalk: ^4.1.2
+      tslib: ^2.1.0
       yargs: ^17.2.1
     dependencies:
       '@gsoul-lang/parsing': link:../parsing
       '@gsoul-lang/runtime': link:../runtime
       chalk: 4.1.2
+      tslib: 2.4.1
       yargs: 17.6.1
     devDependencies:
       '@types/yargs': 17.0.13

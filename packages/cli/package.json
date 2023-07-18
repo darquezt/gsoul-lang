@@ -20,6 +20,7 @@
     "@gsoul-lang/parsing": "workspace:^",
     "@gsoul-lang/runtime": "workspace:^",
     "chalk": "^4.1.2",
+    "tslib": "^2.1.0",
     "yargs": "^17.2.1"
   },
   "repository": {
