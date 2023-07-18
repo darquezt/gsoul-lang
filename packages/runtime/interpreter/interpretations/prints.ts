@@ -4,7 +4,7 @@ import { PrintStmt, Value } from '../../elaboration/ast';
 import { EvidenceUtils, Store } from '../../utils';
 import { formatValue } from '../../utils/format';
 import { Result } from '@badrap/result';
-import { Kont, OkState, StepState } from '../cek';
+import { Kont, OkState, State, StepState } from '../cek';
 import { InterpreterError } from '../errors';
 
 export enum PrintKontKind {
@@ -13,8 +13,9 @@ export enum PrintKontKind {
 
 export type PrintKont = {
   kind: PrintKontKind.PrintKont;
-  kont: Kont;
-  showEvidence: boolean;
+  state: State<{
+    showEvidence: boolean;
+  }>;
 };
 export const PrintKont: KindedFactory<PrintKont> = factoryOf(
   PrintKontKind.PrintKont,
@@ -28,16 +29,18 @@ export const reducePrintInnerExpression = (
   return OkState(
     { term: term.expression },
     store,
-    PrintKont({ kont, showEvidence: term.showEvidence }),
+    PrintKont({
+      state: State({ showEvidence: term.showEvidence }, store, kont),
+    }),
   );
 };
 
 export const printValueAndContinue = (
   term: Value,
-  store: Store,
+  _store: Store,
   kont: PrintKont,
 ): Result<StepState, InterpreterError> => {
-  if (kont.showEvidence) {
+  if (kont.state.showEvidence) {
     console.log(
       `${EvidenceUtils.format(term.evidence)} ${formatValue(
         term.expression,
@@ -47,5 +50,5 @@ export const printValueAndContinue = (
     console.log(formatValue(term.expression));
   }
 
-  return OkState({ term }, store, kont.kont);
+  return OkState({ term }, kont.state.store, kont.state.kont);
 };

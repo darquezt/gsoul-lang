@@ -39,12 +39,12 @@ export const reduceVarDeclInnerExpression = (
 
 export const extendStoreAndContinue = (
   term: Value,
-  store: Store,
+  _store: Store,
   kont: VarDeclKont,
 ): Result<StepState, InterpreterError> => {
   return OkState(
     { term },
-    StoreUtils.extend(store, kont.state.variable, term as Value),
+    StoreUtils.extend(kont.state.store, kont.state.variable, term as Value),
     kont.state.kont,
   );
 };

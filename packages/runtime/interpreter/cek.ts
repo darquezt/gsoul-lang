@@ -133,6 +133,12 @@ import {
   reduceFixPoint,
   restoreStoreAndKont,
 } from './interpretations/fixpoints';
+import {
+  ExprKont,
+  ExprKontKind,
+  reduceExprInnerExpression,
+  restoreState,
+} from './interpretations/expressions';
 
 enum KontKind {
   EmptyKont = 'EmptyKont',
@@ -171,7 +177,8 @@ export type Kont =
   | IfBranchesKont
   | InjKont
   | CaseBranchesKont
-  | FixPointKont;
+  | FixPointKont
+  | ExprKont;
 
 export type State<T> = T & {
   store: Store;
@@ -266,6 +273,10 @@ const step = ({
 
       case PrintKontKind.PrintKont: {
         return printValueAndContinue(term, store, kont);
+      }
+
+      case ExprKontKind.ExprKont: {
+        return restoreState(term, store, kont);
       }
 
       case PairKontKind.PairSecondKont: {
@@ -380,7 +391,7 @@ const step = ({
     }
 
     case StmtKind.ExprStmt: {
-      return OkState({ term: term.expression }, store, kont);
+      return reduceExprInnerExpression(term, store, kont);
     }
 
     case StmtKind.PrintStmt: {
