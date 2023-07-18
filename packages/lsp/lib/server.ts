@@ -26,7 +26,7 @@ const documents = new TextDocuments(TextDocument);
 const typings: Map<string, TypingSeeker> = new Map();
 
 connection.onInitialize(() => {
-  connection.console.info('Initializing GSens language server');
+  connection.console.info('Initializing GSoul language server');
 
   return {
     capabilities: {

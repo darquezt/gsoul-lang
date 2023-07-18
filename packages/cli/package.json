@@ -6,7 +6,7 @@
   "main": "index.ts",
   "license": "MIT",
   "bin": {
-    "gsens": "build/index.js"
+    "gsoul": "build/index.js"
   },
   "scripts": {
     "test": "echo \"Error: run tests from root\" && exit 1",
@@ -24,11 +24,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/darquezt/gsens-lang/tree/master/packages/cli"
+    "url": "https://github.com/darquezt/gsoul-lang/tree/master/packages/cli"
   },
-  "homepage": "https://github.com/darquezt/gsens-lang#readme",
+  "homepage": "https://github.com/darquezt/gsoul-lang#readme",
   "bugs": {
-    "url": "https://github.com/darquezt/gsens-lang/issues"
+    "url": "https://github.com/darquezt/gsoul-lang/issues"
   },
   "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8",
   "devDependencies": {

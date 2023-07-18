@@ -12,4 +12,4 @@ _Note: You probably do not need to install this package alone. This package shou
 
 ## Documentation
 
-[The documentation](https://github.com/darquezt/gsens-lang#readme)
+[The documentation](https://github.com/darquezt/gsoul-lang#readme)

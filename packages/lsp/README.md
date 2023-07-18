@@ -1,6 +1,6 @@
 # @gsoul-lang/lsp
 
-A [language server](https://microsoft.github.io/language-server-protocol/) for GSens.
+A [language server](https://microsoft.github.io/language-server-protocol/) for GSoul.
 
 ## Instalation
 
@@ -14,4 +14,4 @@ This module is a work in progress.
 
 ## Documentation
 
-[The documentation](https://github.com/darquezt/gsens-lang#readme)
+[The documentation](https://github.com/darquezt/gsoul-lang#readme)

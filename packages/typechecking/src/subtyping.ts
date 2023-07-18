@@ -73,7 +73,7 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
   }
 
   throw new UnsupportedSubtypingError(
-    `We are sorry, gsens does not support subtyping between these types yet (${type1.kind}, ${type2.kind})`,
+    `We are sorry, GSoul does not support subtyping between these types yet (${type1.kind}, ${type2.kind})`,
   );
 };
 

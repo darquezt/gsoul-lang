@@ -437,7 +437,7 @@ const step = ({
     default:
       return Result.err(
         new InterpreterUnsupportedExpression({
-          reason: `We're sorry. GSens does not support this kinds of expressions yet (${term.kind})`,
+          reason: `We're sorry. GSoul does not support this kinds of expressions yet (${term.kind})`,
         }),
       );
   }

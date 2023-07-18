@@ -1,6 +1,6 @@
 # @gsoul-lang/cli
 
-This package allows you to execute GSens files from the command line
+This package allows you to execute GSoul files from the command line
 
 ## Instalation
 
@@ -10,4 +10,4 @@ npm i -g @gsoul-lang/cli
 
 ## Documentation
 
-[The documentation](https://github.com/darquezt/gsens-lang#readme)
+[The documentation](https://github.com/darquezt/gsoul-lang#readme)

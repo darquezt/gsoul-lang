@@ -20,13 +20,13 @@
     "@gsoul-lang/parsing": "workspace:^",
     "chalk": "^4.1.2"
   },
-  "homepage": "https://github.com/darquezt/gsens-lang#readme",
+  "homepage": "https://github.com/darquezt/gsoul-lang#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/darquezt/gsens-lang/tree/master/packages/runtime"
+    "url": "https://github.com/darquezt/gsoul-lang/tree/master/packages/runtime"
   },
   "bugs": {
-    "url": "https://github.com/darquezt/gsens-lang/issues"
+    "url": "https://github.com/darquezt/gsoul-lang/issues"
   },
   "gitHead": "d78b8cfbf935fbeea1221b52c9597c449ad43ef8"
 }

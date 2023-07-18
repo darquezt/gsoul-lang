@@ -45,12 +45,12 @@ const runHandler = (file: string) => {
 
 const run: CommandModule = {
   command: ['run <file>', '$0 <file>'],
-  describe: 'Run a gsens file',
+  describe: 'Run a gsoul file',
   builder: {
     file: {
       describe: 'Name of the file to run',
       type: 'string',
-      default: 'index.gsens',
+      default: 'index.gsoul',
     },
   },
   handler: (argv) => runHandler(argv.file as string),

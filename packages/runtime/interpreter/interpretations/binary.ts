@@ -159,7 +159,7 @@ export const reduceBinaryOperation = (
 
   return Result.err(
     new InterpreterUnsupportedOperator({
-      reason: `We're sorry. GSens does not support the ${kont.op.lexeme} operator yet`,
+      reason: `We're sorry. GSoul does not support the ${kont.op.lexeme} operator yet`,
       operator: kont.op,
     }),
   );
@@ -358,7 +358,7 @@ export const reduceNLBinaryOperation = (
 
   return Result.err(
     new InterpreterUnsupportedOperator({
-      reason: `We're sorry. GSens does not support the ${kont.op.lexeme} operator yet`,
+      reason: `We're sorry. GSoul does not support the ${kont.op.lexeme} operator yet`,
       operator: kont.op,
     }),
   );
