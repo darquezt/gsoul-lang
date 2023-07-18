@@ -1,5 +1,15 @@
 # @gsoul-lang/lsp
 
+## 0.0.3
+
+### Patch Changes
+
+- Fix minor issues and tslib dependency
+- Updated dependencies
+  - @gsoul-lang/core@0.0.3
+  - @gsoul-lang/parsing@0.0.6
+  - @gsoul-lang/typechecking@0.0.3
+
 ## 0.0.2
 
 ### Patch Changes

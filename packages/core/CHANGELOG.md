@@ -1,5 +1,11 @@
 # @gsoul-lang/core
 
+## 0.0.3
+
+### Patch Changes
+
+- Fix minor issues and tslib dependency
+
 ## 0.0.2
 
 ### Patch Changes

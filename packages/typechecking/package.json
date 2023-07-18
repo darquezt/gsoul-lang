@@ -1,6 +1,6 @@
 {
   "name": "@gsoul-lang/typechecking",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Typechecking module",
   "main": "index.ts",
   "license": "MIT",

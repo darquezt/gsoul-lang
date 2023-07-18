@@ -1,5 +1,13 @@
 # @gsoul-lang/parsing
 
+## 0.0.6
+
+### Patch Changes
+
+- Fix minor issues and tslib dependency
+- Updated dependencies
+  - @gsoul-lang/core@0.0.3
+
 ## 0.0.5
 
 ### Patch Changes

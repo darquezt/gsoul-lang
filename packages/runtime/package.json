@@ -1,6 +1,6 @@
 {
   "name": "@gsoul-lang/runtime",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Runtime (elaboration + interpreter) module",
   "main": "build/index.js",
   "license": "MIT",

@@ -1,5 +1,14 @@
 # @gsoul-lang/cli
 
+## 0.0.3
+
+### Patch Changes
+
+- Fix minor issues and tslib dependency
+- Updated dependencies
+  - @gsoul-lang/parsing@0.0.6
+  - @gsoul-lang/runtime@0.0.3
+
 ## 0.0.2
 
 ### Patch Changes
