@@ -1,6 +1,6 @@
 {
   "name": "@gsoul-lang/core",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Core utility module",
   "main": "index.ts",
   "license": "MIT",
