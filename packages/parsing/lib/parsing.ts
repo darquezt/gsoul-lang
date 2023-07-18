@@ -584,10 +584,10 @@ class Parser {
 
       const typeRes = this.type(0);
 
-      if (typeRes.kind === TypeParsingResultKind.TypeAndEffect) {
+      if (resource && typeRes.kind === TypeParsingResultKind.TypeAndEffect) {
         throw this.makeSyntaxError(
           colon,
-          'Cannot assign an effect to a sensitive resource',
+          'Cannot assign an effect to a resource',
         );
       }
 
