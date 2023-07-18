@@ -1,5 +1,0 @@
-let f = forall x. fn (x: Number![1x]) => {
-  (x + x) :: Number![?x] :: Number![1x];
-};
-
-f @[\] (1);

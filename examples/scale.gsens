@@ -1,28 +1,30 @@
+// Implementation of scale using Y-combinator
+
 printEv (forall x . {
-  let Y = fn (f : ((Number, Number![1x]) -> Number![?x]) -> (Number, Number![1x]) -> Number![?x]) => {
+  let Y = fn (f : ((Number, Number[1x]) -> Number[?x]) -> (Number, Number[1x]) -> Number[?x]) => {
     let A =
-      fn (x : rec alpha . alpha -> (Number, Number![1x]) -> Number![?x]) =>
-      fn (n1: Number, a : Number![1x]) => {
+      fn (x : rec alpha . alpha -> (Number, Number[1x]) -> Number[?x]) =>
+      fn (n1: Number, a : Number[1x]) => {
         f(unfold(x)(x))(n1, a);
       };
 
     let B =
-      fn (y : rec alpha . alpha -> (Number, Number![1x]) -> Number![?x]) =>
-      fn (n2: Number, b : Number![1x]) => {
+      fn (y : rec alpha . alpha -> (Number, Number[1x]) -> Number[?x]) =>
+      fn (n2: Number, b : Number[1x]) => {
         f(unfold(y)(y))(n2, b);
       };
 
-    A(fold<rec alpha . alpha -> (Number, Number![1x]) -> Number![?x]>(B));
+    A(fold<rec alpha . alpha -> (Number, Number[1x]) -> Number[?x]>(B));
   };
 
   let scale = Y(
-    fn (scaleFn: (Number, Number![1x]) -> Number![?x]) =>
-    fn (n: Number, x: Number![1x]) => {
+    fn (scaleFn: (Number, Number[1x]) -> Number[?x]) =>
+    fn (n: Number, x: Number[1x]) => {
       n == 0
         ? 0
-        : (scaleFn(n - 1, x) + x) :: Number![?x];
+        : (scaleFn(n - 1, x) + x) as Number[?x];
     }
   );
 
   printEv scale(21, 3);
-}) @[\];
+}) ::[\];

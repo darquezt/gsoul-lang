@@ -1,3 +1,0 @@
-let id = fn <T>(x: T) => x;
-
-id::<Number>(1); // 1

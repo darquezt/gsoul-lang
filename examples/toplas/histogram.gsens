@@ -1,0 +1,22 @@
+// NOTE:
+// We are still working to get all the necessary features (Set and List) in place for this example to work.
+// The following code is not valid yet.
+
+type DB = Set<Number>;
+
+let res s: DB = Set(8, 10, 12, 30, 30, 32, 40, 41, 42, 43);
+
+def histAux(c: Number, res db: DB): List<DB[db]> {
+  if (c >= 101) { List(db); }
+  else {
+    let y, next = db.split(fn (age: Number) => c >= age);
+
+    y :: histAux(c + 10, next);
+  }
+}
+
+let hist = fn (res db: DB): List<Number[db]> => histAux(0, db).map(
+  fn (res bin: DB) => bin.size()
+);
+
+hist(s);

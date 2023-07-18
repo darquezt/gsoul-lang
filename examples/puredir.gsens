@@ -1,0 +1,7 @@
+let f = fn <T pure>(x: T): T => x;
+
+let sens a = 1;
+
+let g = fn (x: Number![a]): Number![a] => x + 1;
+
+f::<Number![a] -> Number![a]>(g)(1);

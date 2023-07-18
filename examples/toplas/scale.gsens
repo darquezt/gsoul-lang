@@ -1,0 +1,18 @@
+def scale[q](n: Number, v: Number[q]): Number[?q] =
+  n == 0
+    ? 0
+    : (v + scale::[q](n - 1, v)) as Number[?q];
+
+let res x = 5;
+
+let f = fn (x: Number[10x]) => x + 1;
+
+let x10 = scale::[x](10, x); // type on runtime: Number[10..*x]
+let x11 = scale::[x](11, x); // type on runtime: Number[11..*x]
+
+// We can print the evidence:
+printEv x10;
+printEv x11;
+
+f(x10); // typechecks, runs successfully
+f(x11); // typechecks, fails at runtime

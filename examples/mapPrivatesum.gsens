@@ -1,0 +1,50 @@
+// Conceptual implementation of the Laplace mechanism
+
+// BEGIN PREAMBLE
+
+let epsilon = 0.1;
+
+// id, age, grade
+type DB = Set<(Number, Number, Number)>;
+let sens db: DB = Set::<(Number, Number, Number)>(
+  (1, 18, 6),
+  (2, 18, 5.2),
+  (3, 19, 5.5),
+  (4, 18, 4),
+  (5, 35, 4.2),
+  (6, 31, 7),
+  (7, 21, 2.2),
+  (8, 22, 6.3),
+  (9, 20, 4),
+  (10, 19, 3),
+);
+
+type Column = :age | :grade;
+
+let sumsMap = Map::<Column, DB[db] -> Number[?db]>(
+  :age => sumAge,
+  :grade => sumGrades,
+);
+
+data List<T> = Empty | Cons(T, List<T>);
+
+def map<A, B>(f: A -> B, xs: List<A>): List<B> = match xs {
+  Empty => Empty,
+  Cons(x, xs) => Cons(f(x), map::<A, B>(f, xs)),
+};
+
+// Cons(:age, Cons(:grade, Empty));
+let countableCols = [:age, :grade];
+
+// END PREAMBLE
+
+let privateSum =
+  fn [db](f: DB![db] -> Number![10db]) =>
+  fn (x: DB![db]) =>
+    f(x) + laplace(10 / epsilon);
+
+
+map::<Column, (Column, Number)>(
+  fn (col: Column) => privateSum(sumsMap[col])(db),
+  countableCols
+);

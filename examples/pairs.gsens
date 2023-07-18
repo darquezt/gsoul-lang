@@ -1,3 +1,0 @@
-let p = pair(1 + 2, 2 :: Number![2x]);
-
-printEv fst(p) + snd(p);

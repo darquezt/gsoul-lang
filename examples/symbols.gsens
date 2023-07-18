@@ -1,0 +1,6 @@
+let s = :a_symbol;
+let hw = :hello_world;
+
+// Symbols, as any other value in GSoul, can be declared as resources:
+
+let res s = :resource_symbol;

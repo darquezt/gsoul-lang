@@ -1,0 +1,9 @@
+// Conceptual example of lists
+
+let l = List(2, 3, 4);
+
+l.map(fn (x: Number) => x + x);
+l.size();
+l.filter(fn (x: Number) => x > 0);
+
+5 :: l;
