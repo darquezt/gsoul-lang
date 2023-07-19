@@ -1,0 +1,136 @@
+// ****************** //
+// * GSoul tutorial * //
+// ****************** //
+
+
+// All statements must end with a semicolon
+
+// We can declare a variable with the `let` keyword
+let aNumber = 0;
+let aBoolean = true;
+let aSymbol = :symbol;
+let aNil = nil;
+let aTuple = (1, :symbol, true);
+
+// We can group multiple statements in a block expression
+// The value (and type) of the block is that of the last statement
+let aBlock = {
+  let a = 1;
+  let b = 2;
+  a + b;
+};
+
+// We can declare a type for a variable
+let anotherNumber: Number = 0;
+
+// To declare resources we use the `res` modifier:
+// This declares a variable and also a resource that can be used in effects
+let res r = 0;
+let res r1 = 2;
+let res r2 = 3;
+
+// We can declare a type for a resource
+let anotherNumberResource: Number = 0;
+
+// For normal variables we can specify an effect when declaring the type
+let aNumberWithEffect: Number[2r] = r + r;
+
+// Effects have the form of `sr + ... + sr`, where:
+// - `s` is either zero, a positive number, infinity `*`, a well-formed interlval `s..s`, or the unknown sensitivity `?`.
+//    Note: an interval cannot contain `?`. For instance, 1..? is not a valid interval.
+// - `r` is the name of a resource in scope
+let aNumberWithEffect: Number[2r + ?r1 + 1..*r2] = r + r + r1 + r2;
+
+// For resources, only the type can be specified, as the effect is fixed
+let q: Number = 0; // type: Number[q]
+
+// All parameters for lambdas must have their types annotated
+let aLambda = fn (a: Number): Number => a + 1;
+
+// Function application is simply done with `()`
+aLambda(1);
+
+// Types in lambdas can have effects as well
+let aLambdaWithEffect = fn (a: Number[r]): Number[2r] => a + a;
+
+// Lambdas can also be polymorphic on resources
+let aPolymorphicLambda = fn [q](a: Number[q]): Number[2q] => a + a;
+
+// To apply a polymorphic lambda we use _::[_]
+aPolymorphicLambda::[2r](r + r);
+
+// Lambdas can also be polymorphic on types
+let aPolymorphicLambdaOnTypes = fn <T>(a: T): T => a;
+
+// To apply a polymorphic lambda on types we use _::<_>
+aPolymorphicLambdaOnTypes::<Number>(1);
+
+// Polymorphic types go before polymorphic resources
+let aPolymorphicLambdaOnTypesAndResources =
+  fn <T>[q](a: T, b: Number[q]): (T, Number[2q]) => (a, b + b);
+
+// Similarly type application goes before resource application
+aPolymorphicLambdaOnTypesAndResources::<Number>::[2r](1, r + r);
+
+// For more complex functions we can use blocks in lambdas
+let aLambdaWithBlock = fn (a: Number): Number => {
+  let b = a + 1;
+  b + 1;
+};
+
+// For recursive functions we use de `def` declaration
+// In contrast to lambdas, `def` functions **must** have their return type annotated
+// `def` declarations have the form `def <name>(<parameters>): <return type> = <body>;`
+def aRecursiveFunction(a: Number): Number =
+  (a == 0)
+    ? 0
+    : aRecursiveFunction(a - 1);
+
+// Similar to lambdas, `def` functions can be polymorphic on resources and types
+def aPolymorphicRecursiveFunction<T>[q](a: T, b: Number[q]): (T, Number[2q]) = (a, b + b);
+
+// ***********************
+// * Begin miscellaneous *
+// ***********************
+
+// For debugging purposes we can use the `print` statement
+print aNumber;
+
+// For advanced debugging purposes we can use the `printEv` statement,
+// which also prints the evidence of the value
+printEv aNumber;
+
+// types can be aliased using the `type` keyword
+
+type MyType = Number;
+
+// basic datatypes can be declared using the `data` keyword
+
+data NumList = Empty | Cons(Number, NumList);
+
+printEv Empty;
+
+// This creates a type `NumList` with two constructors:
+// - `Empty` which takes no arguments
+// - `Cons` which takes a `Number` and a `NumList`
+
+let aList = Cons(
+  1,
+  Cons(
+    2,
+    Cons(
+      3,
+      Empty() // Notice that the `Empty` constructor takes no arguments, but we still need to use `()`
+    )
+  )
+);
+
+// We can pattern match on datatypes using the `match` keyword
+// Note: pattern matching is very basic at the moment, and only works on datatypes
+
+let res r = match aList with {
+  Empty() => 0;
+  Cons(head, rest) => head + 1;
+};
+
+print aList;
