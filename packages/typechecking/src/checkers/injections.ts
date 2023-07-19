@@ -46,7 +46,7 @@ export const inj: TypeCheckingRule<Inj> = (expr, ctx) => {
     const allTypeEffects = [
       ...typeEffects.slice(0, expr.index),
       exprTC.typeEff,
-      ...typeEffects.slice(expr.index + 1),
+      ...typeEffects.slice(expr.index),
     ];
 
     return {

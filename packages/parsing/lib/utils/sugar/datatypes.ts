@@ -111,7 +111,7 @@ export function createDataConstructorFunction(
       body: Fold({
         dataTypeAlias: dataConstructor.name.lexeme,
         recType: TypeEff(recType, Senv()),
-        foldToken: name,
+        foldToken: dataConstructor.name,
         expression: foldBody,
       }),
     }),

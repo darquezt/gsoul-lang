@@ -17,7 +17,7 @@ const checkSameTypeOperands =
     [TypeCheckingResult<TypeEff>, TypeCheckingResult<TypeEff>],
     TypeCheckingError
   > => {
-    if (left.typeEff.type !== right.typeEff.type) {
+    if (left.typeEff.type.kind !== right.typeEff.type.kind) {
       return Result.err(
         new TypeCheckingTypeError({
           reason: 'Operands of binary operation must be of the same type',
@@ -47,7 +47,10 @@ export const binary: TypeCheckingRule<Binary> = (expr, ctx) => {
   return Result.all([lTC, rTC])
     .chain(checkSameTypeOperands(expr.operator))
     .map(([left, right]) => ({
-      typeEff: left.typeEff,
+      typeEff: TypeEff(
+        left.typeEff.type,
+        SenvUtils.add(left.typeEff.effect, right.typeEff.effect),
+      ),
       typings: [...left.typings, ...right.typings],
     }));
 };
@@ -61,7 +64,7 @@ const checkSameType =
     [TypeCheckingResult<TypeEff>, TypeCheckingResult<TypeEff>],
     TypeCheckingError
   > => {
-    if (left.typeEff.type !== right.typeEff.type) {
+    if (left.typeEff.type.kind !== right.typeEff.type.kind) {
       return Result.err(
         new TypeCheckingTypeError({
           reason: 'Operands of binary operation must be of the same type',

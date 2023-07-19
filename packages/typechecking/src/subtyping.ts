@@ -1,7 +1,9 @@
 import { Sens, Senv, SenvUtils, Type } from '@gsoul-lang/core/utils';
+import Meet from '@gsoul-lang/core/utils/lib/Meet';
 import RecursivePolarityCheck, {
   RecursivePolarityMode,
 } from '@gsoul-lang/core/utils/lib/RecursivePolarityCheck';
+import { TypeKind } from '@gsoul-lang/core/utils/Type';
 import { TypeEffect, TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
 import { zip } from 'ramda';
 
@@ -19,25 +21,23 @@ export const isSubSenv = (senv1: Senv, senv2: Senv): boolean => {
   );
 };
 
-/**
- * @deprecated
- */
-class UnsupportedSubtypingError extends Error {}
-
 export const isSubType = (type1: Type, type2: Type): boolean => {
-  if (type1.kind !== type2.kind) {
-    return false;
-  }
-  if (type1.kind === 'Real' && type2.kind === 'Real') {
+  if (type1.kind === TypeKind.Real && type2.kind === TypeKind.Real) {
     return true;
   }
-  if (type1.kind === 'Bool' && type2.kind === 'Bool') {
+  if (type1.kind === TypeKind.Bool && type2.kind === TypeKind.Bool) {
     return true;
   }
-  if (type1.kind === 'Nil' && type2.kind === 'Nil') {
+  if (type1.kind === TypeKind.Nil && type2.kind === TypeKind.Nil) {
     return true;
   }
-  if (type1.kind === 'Arrow' && type2.kind === 'Arrow') {
+
+  // Atoms
+  if (type1.kind === TypeKind.Atom && type2.kind === TypeKind.Atom) {
+    return type1.name === type2.name;
+  }
+
+  if (type1.kind === TypeKind.Arrow && type2.kind === TypeKind.Arrow) {
     if (type1.domain.length !== type2.domain.length) {
       return false;
     }
@@ -49,17 +49,43 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
 
     return argSubtyping && bodySubtyping;
   }
-  if (type1.kind === 'ForallT' && type2.kind === 'ForallT') {
+  if (type1.kind === TypeKind.ForallT && type2.kind === TypeKind.ForallT) {
     return isSubTypeEff(type1.codomain, type2.codomain);
   }
-  if (type1.kind === 'MProduct' && type2.kind === 'MProduct') {
+  if (type1.kind === TypeKind.MProduct && type2.kind === TypeKind.MProduct) {
     const firstSubtyping = isSubTypeEff(type2.first, type1.first);
     const secondSubtyping = isSubTypeEff(type1.second, type2.second);
 
     return firstSubtyping && secondSubtyping;
   }
 
-  if (type1.kind === 'RecType' && type2.kind === 'RecType') {
+  // Products
+  if (type1.kind === TypeKind.Product && type2.kind === TypeKind.Product) {
+    if (type1.typeEffects.length !== type2.typeEffects.length) {
+      return false;
+    }
+
+    const typeEffectsSubtyping = !zip(type1.typeEffects, type2.typeEffects)
+      .map(([f1, f2]) => isSubTypeEff(f1, f2))
+      .includes(false);
+
+    return typeEffectsSubtyping;
+  }
+
+  // Sums
+  if (type1.kind === TypeKind.Sum && type2.kind === TypeKind.Sum) {
+    if (type1.typeEffects.length !== type2.typeEffects.length) {
+      return false;
+    }
+
+    const typeEffectsSubtyping = !zip(type1.typeEffects, type2.typeEffects)
+      .map(([f1, f2]) => isSubTypeEff(f1, f2))
+      .includes(false);
+
+    return typeEffectsSubtyping;
+  }
+
+  if (type1.kind === TypeKind.RecType && type2.kind === TypeKind.RecType) {
     if (
       RecursivePolarityCheck.TypeEffect(
         type1.variable,
@@ -70,11 +96,13 @@ export const isSubType = (type1: Type, type2: Type): boolean => {
     ) {
       return isSubTypeEff(type1.body, type2.body);
     }
+
+    const bodyMeet = Meet.TypeEffect(type1.body, type2.body);
+
+    return bodyMeet.isOk;
   }
 
-  throw new UnsupportedSubtypingError(
-    `We are sorry, GSoul does not support subtyping between these types yet (${type1.kind}, ${type2.kind})`,
-  );
+  return false;
 };
 
 export const isSubTypeEff = (te1: TypeEffect, te2: TypeEffect): boolean => {

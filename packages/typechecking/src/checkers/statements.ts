@@ -7,7 +7,7 @@ import {
   TypeEnvUtils,
 } from '@gsoul-lang/core/utils';
 import * as ResourcesSetUtils from '@gsoul-lang/core/utils/ResourcesSet';
-import { TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
+import { TypeEffect, TypeEffectKind } from '@gsoul-lang/core/utils/TypeEff';
 import {
   DefStmt,
   ExprStmt,
@@ -29,6 +29,8 @@ import {
   StatefulTypeCheckingRule,
 } from '../utils/types';
 import { TypeAssoc } from '../utils/typingSeeker';
+import { Arrow, ForallT, PolyT } from '@gsoul-lang/core/utils/Type';
+import * as TypevarsSetUtils from '@gsoul-lang/core/utils/TypevarsSet';
 
 const toStateful = (
   result: Result<TypeCheckingResult, TypeCheckingError>,
@@ -72,7 +74,10 @@ const checkAssignmentType =
       );
     }
 
-    return Result.ok(exprTC);
+    return Result.ok({
+      typeEff: type,
+      typings: exprTC.typings,
+    });
   };
 
 const resourcifyIfNecessary =
@@ -130,7 +135,7 @@ export const varStmt: StatefulTypeCheckingRule<VarStmt> = (stmt, ctx) => {
 
     return {
       typeEff: exprTC.typeEff,
-      typings: [[stmt.name, exprTC.typeEff] as TypeAssoc].concat(
+      typings: [[stmt.name, stmt.type ?? exprTC.typeEff] as TypeAssoc].concat(
         exprTC.typings,
       ),
       ctx: [newTenv, newRset, ...rest],
@@ -138,11 +143,80 @@ export const varStmt: StatefulTypeCheckingRule<VarStmt> = (stmt, ctx) => {
   });
 };
 
-// TODO: Implement
+const checkReturnSubtyping =
+  (returnType: TypeEffect, colon: Token) =>
+  (
+    bodyTC: TypeCheckingResult<TypeEffect>,
+  ): Result<TypeCheckingResult, TypeCheckingError> => {
+    if (!isSubTypeEff(bodyTC.typeEff, returnType)) {
+      return Result.err(
+        new TypeCheckingSubtypingError({
+          reason: 'Body type is not a subtype of the declared return type',
+          operator: colon,
+        }),
+      );
+    }
+
+    return Result.ok(bodyTC);
+  };
+
 export const defStmt: StatefulTypeCheckingRule<DefStmt> = (stmt, ctx) => {
-  return Result.ok({
-    typeEff: stmt.returnType,
-    typings: [],
-    ctx,
+  const resourceParams = stmt.resourceParams?.map((param) => param.lexeme);
+  const typeParams = stmt.typeParams?.map((param) => ({
+    identifier: param.identifier.lexeme,
+    directives: param.directives,
+  }));
+
+  const arrowTypeEff = TypeEff(
+    Arrow({
+      domain: stmt.binders.map((b) => b.type),
+      codomain: stmt.returnType,
+    }),
+    Senv(),
+  );
+
+  const forallTypeEff = resourceParams
+    ? TypeEff(
+        ForallT({
+          sensVars: resourceParams,
+          codomain: arrowTypeEff,
+        }),
+        Senv(),
+      )
+    : arrowTypeEff;
+
+  const polyTypeEff = typeParams
+    ? TypeEff(
+        PolyT({
+          typeVars: typeParams,
+          codomain: forallTypeEff,
+        }),
+        Senv(),
+      )
+    : forallTypeEff;
+
+  const bodyTC = expression(stmt.body, [
+    TypeEnvUtils.extendAll(
+      ctx[0],
+      [stmt.name.lexeme, polyTypeEff],
+      ...stmt.binders.map<[string, TypeEffect]>((b) => [b.name.lexeme, b.type]),
+    ),
+    ResourcesSetUtils.extendAll(ctx[1], ...(resourceParams ?? [])),
+    TypevarsSetUtils.extendAll(
+      ctx[2],
+      ...(typeParams ?? []).map((tp) => tp.identifier),
+    ),
+  ]).chain(checkReturnSubtyping(stmt.returnType, stmt.colon));
+
+  return bodyTC.map((bodyTC) => {
+    const [tenv, ...rest] = ctx;
+
+    const newTenv = TypeEnvUtils.extend(tenv, stmt.name.lexeme, polyTypeEff);
+
+    return {
+      typeEff: polyTypeEff,
+      typings: [[stmt.name, polyTypeEff] as TypeAssoc].concat(bodyTC.typings),
+      ctx: [newTenv, ...rest],
+    };
   });
 };

@@ -1064,11 +1064,16 @@ class Parser {
     }
   }
 
-  private parseFunExpr(_op: Token, power: [null, number]): Fun | Poly {
+  private parseFunExpr(_op: Token, power: [null, number]): Fun | Poly | Forall {
     let typeParameters = null;
 
     if (this.check(TokenType.LESS)) {
       typeParameters = this.parseTypeParameters();
+    }
+
+    let resourceParams;
+    if (this.check(TokenType.LEFT_BRACKET)) {
+      resourceParams = this.parseResourceParameters();
     }
 
     const arg = this.functionParameters();
@@ -1101,7 +1106,15 @@ class Parser {
       body,
     });
 
-    return typeParameters ? Poly({ typeVars: typeParameters, expr: fun }) : fun;
+    const forall = resourceParams
+      ? Forall({ sensVars: resourceParams, expr: fun })
+      : fun;
+
+    const poly = typeParameters
+      ? Poly({ typeVars: typeParameters, expr: forall })
+      : forall;
+
+    return poly;
   }
 
   private parseInjExpr(): Inj {
