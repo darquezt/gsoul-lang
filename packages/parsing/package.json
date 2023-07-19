@@ -1,6 +1,6 @@
 {
   "name": "@gsoul-lang/parsing",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Parsing and lexing module",
   "main": "build/index.js",
   "license": "MIT",

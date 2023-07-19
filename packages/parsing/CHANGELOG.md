@@ -1,5 +1,11 @@
 # @gsoul-lang/parsing
 
+## 0.0.8
+
+### Patch Changes
+
+- Fix parsing and typechecking issues (LSP works again)
+
 ## 0.0.7
 
 ### Patch Changes

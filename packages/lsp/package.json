@@ -1,6 +1,6 @@
 {
   "name": "@gsoul-lang/lsp",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Language server protocol module",
   "author": "Damian Arquez <damian.arquez.t@gmail.com>",
   "main": "lib/lsp.js",
