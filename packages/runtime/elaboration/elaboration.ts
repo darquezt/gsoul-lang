@@ -97,6 +97,8 @@ export const expression = (
       return inj(expr, ctx);
     case past.ExprKind.Case:
       return caseExpr(expr, ctx);
+    case past.ExprKind.Negate:
+      throw new Error('Not implemented');
   }
 };
 
