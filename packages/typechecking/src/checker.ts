@@ -32,6 +32,7 @@ import { atomLit } from './checkers/atoms';
 import { TypevarsSet } from '@gsoul-lang/core/utils/TypevarsSet';
 import { TypeEffect } from '@gsoul-lang/core/utils/TypeEff';
 import { poly, tapp } from './checkers/polys';
+import { negate } from './checkers/unary';
 
 export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
   switch (expr.kind) {
@@ -93,6 +94,8 @@ export const expression: TypeCheckingRule<Expression> = (expr, ctx) => {
       return inj(expr, ctx);
     case ExprKind.Case:
       return caseExpr(expr, ctx);
+    case ExprKind.Negate:
+      return negate(expr, ctx);
   }
 };
 
