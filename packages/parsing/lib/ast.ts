@@ -36,6 +36,7 @@ export enum ExprKind {
   If = 'If',
   Inj = 'Inj',
   Case = 'Case',
+  Negate = 'Negate',
 }
 
 export type Literal = {
@@ -219,6 +220,13 @@ export const Case = factoryOf<Case>(ExprKind.Case);
 export type Block = { kind: ExprKind.Block; statements: Statement[] };
 export const Block = factoryOf<Block>(ExprKind.Block);
 
+export type Negate = {
+  kind: ExprKind.Negate;
+  token: Token;
+  expression: Expression;
+};
+export const Negate = factoryOf<Negate>(ExprKind.Negate);
+
 export type Expression =
   | Literal
   | AtomLiteral
@@ -243,7 +251,8 @@ export type Expression =
   | Unfold
   | If
   | Inj
-  | Case;
+  | Case
+  | Negate;
 
 // ===================
 // STATEMENTS
