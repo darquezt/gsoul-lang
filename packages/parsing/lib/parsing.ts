@@ -42,6 +42,7 @@ import {
   If,
   Inj,
   Literal,
+  Negate,
   NonLinearBinary,
   Poly,
   PrintStmt,
@@ -89,7 +90,7 @@ export class ParsingError extends Error {
   }
 }
 
-const prefixOps = [TokenType.FUN, TokenType.FORALL] as const;
+const prefixOps = [TokenType.FUN, TokenType.FORALL, TokenType.BANG] as const;
 type PrefixOpType = typeof prefixOps[number];
 
 const linearInfixOps = [TokenType.PLUS, TokenType.MINUS] as const;
@@ -191,6 +192,8 @@ const BindingPower = {
         case TokenType.FUN:
         case TokenType.FORALL:
           return [null, 1];
+        case TokenType.BANG:
+          return [null, 27];
       }
     },
     infix(op: InfixOpType): [number, number] {
@@ -714,6 +717,14 @@ class Parser {
           left = this.parseForallExpr(op, prefixPower);
           break;
         }
+
+        case TokenType.BANG: {
+          /**
+           * @case boolean negation
+           */
+          left = this.parseNegateExpr(op, prefixPower);
+          break;
+        }
       }
     } else {
       /**
@@ -840,6 +851,15 @@ class Parser {
     }
 
     return left;
+  }
+
+  private parseNegateExpr(op: Token, prefixPower: [null, number]): Expression {
+    const expr = this.expression(prefixPower[1]);
+
+    return Negate({
+      expression: expr,
+      token: op,
+    });
   }
 
   private parsePolyCallExpr(
