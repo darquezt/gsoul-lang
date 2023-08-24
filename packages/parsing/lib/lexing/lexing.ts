@@ -39,6 +39,7 @@ const keywords: Record<string, TokenType> = {
   data: TokenType.DATA,
   pure: TokenType.PURE,
   def: TokenType.DEF,
+  hello_world: TokenType.HELLOWORLD,
 };
 
 /**

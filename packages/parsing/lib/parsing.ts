@@ -39,6 +39,7 @@ import {
   Forall,
   Fun,
   Grouping,
+  HelloWorldStmt,
   If,
   Inj,
   Literal,
@@ -320,6 +321,13 @@ class Parser {
         return [this.parsePrintStmt()];
       }
 
+      if (this.check(TokenType.HELLOWORLD)) {
+        /**
+         * @case helloworld statement
+         */
+        return [this.parseHelloWorldStmt()];
+      }
+
       /**
        * @case expression statement
        */
@@ -560,6 +568,15 @@ class Parser {
       expression: expr,
       showEvidence: token.type === TokenType.PRINTEV,
     });
+  }
+
+  private parseHelloWorldStmt(): HelloWorldStmt {
+    this.consume(
+      TokenType.SEMICOLON,
+      errorMessage({ expected: ';', end: 'hello world statement' }),
+    );
+
+    return HelloWorldStmt({});
   }
 
   private parseLetStmt(): VarStmt {

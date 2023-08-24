@@ -113,6 +113,8 @@ enum TokenType {
   RES = 'RES',
 
   EOF = 'EOF',
+
+  HELLOWORLD = 'HELLOWORLD',
 }
 
 export default TokenType;

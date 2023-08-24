@@ -254,6 +254,7 @@ export enum StmtKind {
   PrintStmt = 'PrintStmt',
   VarStmt = 'VarStmt',
   DefStmt = 'DefStmt',
+  HelloWorldStmt = 'HelloWorldStmt',
 }
 
 export type ExprStmt = { kind: StmtKind.ExprStmt; expression: Expression };
@@ -292,7 +293,19 @@ export type PrintStmt = {
 };
 export const PrintStmt = factoryOf<PrintStmt>(StmtKind.PrintStmt);
 
-export type Statement = ExprStmt | PrintStmt | VarStmt | DefStmt;
+export type HelloWorldStmt = {
+  kind: StmtKind.HelloWorldStmt;
+};
+export const HelloWorldStmt = factoryOf<HelloWorldStmt>(
+  StmtKind.HelloWorldStmt,
+);
+
+export type Statement =
+  | ExprStmt
+  | PrintStmt
+  | VarStmt
+  | DefStmt
+  | HelloWorldStmt;
 
 export type Program = Statement[];
 
