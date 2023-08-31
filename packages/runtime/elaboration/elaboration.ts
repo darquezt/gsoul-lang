@@ -31,6 +31,7 @@ import {
 import { ResourcesSet } from '@gsoul-lang/core/utils/ResourcesSet';
 import { TypevarsSet } from '@gsoul-lang/core/utils/TypevarsSet';
 import { poly, tapp } from './elaborations/polys';
+import { negate } from './elaborations/unary';
 
 export const expression = (
   expr: past.Expression,
@@ -98,7 +99,7 @@ export const expression = (
     case past.ExprKind.Case:
       return caseExpr(expr, ctx);
     case past.ExprKind.Negate:
-      throw new Error('Not implemented');
+      return negate(expr, ctx);
   }
 };
 
