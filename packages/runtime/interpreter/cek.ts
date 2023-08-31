@@ -139,6 +139,12 @@ import {
   reduceExprInnerExpression,
   restoreState,
 } from './interpretations/expressions';
+import {
+  computeNegation,
+  NegateKont,
+  reduceNegateInnerTerm,
+  UnaryKontKind,
+} from './interpretations/unary';
 
 enum KontKind {
   EmptyKont = 'EmptyKont',
@@ -178,7 +184,8 @@ export type Kont =
   | InjKont
   | CaseBranchesKont
   | FixPointKont
-  | ExprKont;
+  | ExprKont
+  | NegateKont;
 
 export type State<T> = T & {
   store: Store;
@@ -330,6 +337,10 @@ const step = ({
       case FixPointKontKind.FixPointKont: {
         return restoreStoreAndKont(term, store, kont);
       }
+
+      case UnaryKontKind.NegateKont: {
+        return computeNegation(term, store, kont);
+      }
     }
   }
 
@@ -432,6 +443,10 @@ const step = ({
       }
 
       return reduceAscrInnerExpression(term, store, kont);
+    }
+
+    case ExprKind.Negate: {
+      return reduceNegateInnerTerm(term, store, kont);
     }
 
     default:
