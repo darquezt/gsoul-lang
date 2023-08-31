@@ -63,6 +63,7 @@ export enum ExprKind {
   Inj = 'Inj',
   Case = 'Case',
   FixPoint = 'FixPoint',
+  Negate = 'Negate',
 }
 
 export type RealLiteral = Term<
@@ -356,6 +357,13 @@ export type FixPoint = Term<{
 }>;
 export const FixPoint = factoryOf<FixPoint>(ExprKind.FixPoint);
 
+export type Negate = Term<{
+  kind: ExprKind.Negate;
+  expression: Expression;
+  token: Token;
+}>;
+export const Negate = factoryOf<Negate>(ExprKind.Negate);
+
 export type SimpleValue =
   | RealLiteral
   | BoolLiteral
@@ -457,7 +465,8 @@ export type Expression =
   | If
   | Inj
   | Case
-  | FixPoint;
+  | FixPoint
+  | Negate;
 
 type ExprMapFns = {
   senvFn: (senv: Senv) => Senv;
@@ -482,6 +491,12 @@ const map = (expr: Expression, fns: ExprMapFns): Expression => {
     case ExprKind.NilLiteral:
     case ExprKind.AtomLiteral:
       return expr;
+    case ExprKind.Negate:
+      return Negate({
+        ...expr,
+        ...inductiveCall('expression', expr),
+        typeEff: teffFn(expr.typeEff),
+      });
     case ExprKind.Binary:
     case ExprKind.NonLinearBinary:
       return Binary({
