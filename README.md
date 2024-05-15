@@ -32,7 +32,7 @@ gsoul --help
 
 ## Features
 
-TODO: For now, see the [paper](TODO).
+TODO: For now, see the [paper](https://arxiv.org/abs/2308.02018).
 
 ## Project status
 
